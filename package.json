@@ -1,0 +1,32 @@
+{
+  "name": "hv-swim-bendigo-mobile",
+  "version": "5.0.0",
+  "private": true,
+  "description": "Capacitor foundation for the HV Swim Bendigo iOS and Android apps.",
+  "scripts": {
+    "mobile:web": "node scripts/build-mobile-web.mjs",
+    "mobile:add:ios": "npm run mobile:web && npx cap add ios",
+    "mobile:add:android": "npm run mobile:web && npx cap add android",
+    "mobile:sync": "npm run mobile:web && npx cap sync",
+    "mobile:open:ios": "npx cap open ios",
+    "mobile:open:android": "npx cap open android"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.0.0",
+    "@capacitor/app": "^8.0.0",
+    "@capacitor/core": "^8.0.0",
+    "@capacitor/geolocation": "^8.0.0",
+    "@capacitor/haptics": "^8.0.0",
+    "@capacitor/ios": "^8.0.0",
+    "@capacitor/network": "^8.0.0",
+    "@capacitor/splash-screen": "^8.0.0",
+    "@capacitor/status-bar": "^8.0.0"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^8.0.0"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

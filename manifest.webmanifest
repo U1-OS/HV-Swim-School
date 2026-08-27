@@ -1,0 +1,29 @@
+{
+  "name": "HV Swim Bendigo",
+  "short_name": "HV Swim",
+  "description": "HV Swim Bendigo lessons, bookings, rosters, pool checks and management operations.",
+  "id": "/hv-swim-mobile",
+  "start_url": "app.html?source=pwa",
+  "scope": "./",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
+  "background_color": "#061a3b",
+  "theme_color": "#061a3b",
+  "orientation": "portrait-primary",
+  "lang": "en-AU",
+  "dir": "ltr",
+  "categories": ["education", "sports", "lifestyle"],
+  "prefer_related_applications": false,
+  "launch_handler": { "client_mode": "navigate-existing" },
+  "icons": [
+    { "src": "assets/app-icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "assets/app-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" },
+    { "src": "assets/app-icon-1024.png", "sizes": "1024x1024", "type": "image/png", "purpose": "any" }
+  ],
+  "shortcuts": [
+    { "name": "Family account", "short_name": "Family", "url": "login.html?role=customer", "icons": [{ "src": "assets/app-icon-192.png", "sizes": "192x192" }] },
+    { "name": "Staff app", "short_name": "Staff", "url": "login.html?role=staff", "icons": [{ "src": "assets/app-icon-192.png", "sizes": "192x192" }] },
+    { "name": "Admin panel", "short_name": "Admin", "url": "login.html?role=admin", "icons": [{ "src": "assets/app-icon-192.png", "sizes": "192x192" }] },
+    { "name": "Pool conditions", "short_name": "Conditions", "url": "locations.html", "icons": [{ "src": "assets/app-icon-192.png", "sizes": "192x192" }] }
+  ]
+}

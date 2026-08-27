@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#061a3b">
+  <meta name="description" content="HV Swim Bendigo connected family, staff and management platform.">
+  <title>HV Swim Platform</title>
+  <link rel="icon" href="assets/hv-swim-logo.png"><link rel="apple-touch-icon" href="assets/app-icon-192.png"><link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="assets/styles.css?v=5.0.0"><link rel="stylesheet" href="assets/platform.css?v=5.0.0"><script defer src="assets/platform.js?v=5.0.0"></script>
+</head>
+<body class="platform-page" data-platform-page="app">
+  <header class="platform-topbar"><div class="platform-topbar-inner"><div style="display:flex;align-items:center;gap:10px"><button class="platform-menu-button" type="button" id="platform-menu" aria-label="Open navigation">☰</button><a class="platform-logo" href="platform.html"><img src="assets/hv-swim-logo.png" alt="HV Swim Bendigo"><span><strong>Connected platform</strong><span id="platform-role-label">Loading account…</span></span></a></div><div class="platform-top-actions"><a class="btn btn-outline btn-small" href="index.html">Public website</a><button class="notification-button" id="notification-button" type="button" aria-label="Notifications">♢<span class="notification-count" id="notification-count">0</span></button><div class="platform-user"><span class="avatar" id="platform-avatar">HV</span><div><strong id="platform-user-name">Loading…</strong><span id="platform-user-role">Secure session</span></div></div><button class="btn btn-outline btn-small" type="button" id="logout-button">Sign out</button></div></div></header>
+  <aside class="platform-sidebar" id="platform-sidebar"><p class="side-label">Workspace</p><nav class="platform-nav" id="platform-nav"></nav><div class="platform-sidebar-foot"><strong>Connected mode</strong>Changes on this screen are saved to the local SQLite database and protected by your signed-in role.</div><div class="platform-mobile-actions"><a href="index.html">Public website</a><button type="button" data-logout>Sign out</button></div></aside>
+  <main class="platform-workspace"><div class="platform-content"><div class="live-banner" id="connectivity-banner"><span><strong>Database-backed preview:</strong> bookings, rosters, pool readings, time entries and approvals are now saved by the server.</span><span class="status open" id="connectivity-status">API live</span></div><div id="platform-content" class="loading-shell"><div><div class="loading-ring"></div><p>Loading your HV Swim workspace…</p></div></div></div></main>
+  <nav class="platform-tabbar" id="platform-tabbar" aria-label="Quick app navigation"></nav>
+  <div class="platform-toast" id="platform-toast" role="status" aria-live="polite"></div>
+</body>
+</html>

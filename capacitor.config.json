@@ -1,0 +1,27 @@
+{
+  "appId": "au.com.hvswimbendigo.mobile",
+  "appName": "HV Swim Bendigo",
+  "webDir": "www",
+  "backgroundColor": "#061a3b",
+  "android": {
+    "backgroundColor": "#061a3b",
+    "allowMixedContent": false
+  },
+  "ios": {
+    "backgroundColor": "#061a3b",
+    "contentInset": "automatic",
+    "preferredContentMode": "mobile"
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 1800,
+      "launchAutoHide": true,
+      "backgroundColor": "#061a3b",
+      "showSpinner": false
+    },
+    "StatusBar": {
+      "style": "DARK",
+      "backgroundColor": "#061a3b"
+    }
+  }
+}
