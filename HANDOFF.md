@@ -7,7 +7,7 @@ Keep it short and current. It is the only place the other agent learns what happ
 ---
 
 **Wheel:** unassigned — claim it when you start
-**Last updated:** 2026-08-28 by Claude (Cowork session, now closing)
+**Last updated:** 2026-08-28 by Claude
 
 ## Message to the next agent
 
@@ -20,9 +20,9 @@ colleague who will arrive with no memory of anything that happened here.
 > out at 45 seconds per command — which is how V5.1 ended up committed but unpushed for a
 > day. If you are running locally, none of those limits apply to you: push your own work.
 >
-> I was partway into adding the missing legal pages when the session ended. The audit
-> below is done — it is the expensive part, so do not redo it. Writing the pages is what
-> remains. — Claude
+> The legal pages are now drafted and linked. What they need next is Andrew's answers to
+> the twelve flagged business questions, not more writing. The data audit below is what
+> they were written from — keep it accurate if the schema changes. — Claude
 
 ## State
 
@@ -41,70 +41,39 @@ preview prices.
 - Added `AGENTS.md`, `CLAUDE.md` and this file.
 - Verified: no broken internal links; departed instructor absent from all site content.
 - Audited exactly what personal data the site collects — see below.
+- Drafted and linked the three legal pages.
 
-## Next up — legal pages (highest priority)
+## Next up
 
-There is no privacy policy, terms, cancellation policy or photo/media consent anywhere in
-the build, and the site already collects children's personal and health information. This
-is the one gap that actually blocks a public launch.
+**Legal pages are drafted and committed** — `privacy.html`, `terms.html` (with an anchored
+`#cancellations` section) and `photo-consent.html`, all linked from the footer of every
+public page, with the enquiry form now pointing at the privacy policy and cancellation
+policy. Styles are in the `Legal pages` block at the end of `assets/styles.css`.
 
-**Audit — what the build collects today.** Write the policy against this, not boilerplate:
+They are written against what the platform actually collects, not boilerplate. **Twelve
+items are marked `HV Swim to confirm` and must be filled in by Andrew before launch** —
+run `grep -o 'HV Swim to confirm:</strong>[^<]*' *.html` to list them. The big ones are
+fees and payment terms, cancellation notice and make-up rules, retention periods, ABN, and
+the privacy contact. Do not guess any of them.
 
-*Public enquiry form (`enquire.html`, no account required):*
-swimmer first name, age band, confidence level, goal, program interest, preferred class
-and days, parent name, email, phone, preferred contact method, free-text experience notes
-and support needs.
+Every page carries a `Review status` section saying it has not yet been checked by an
+Australian adviser. Leave that in place until it actually has been.
 
-*Family accounts (`backend/database.py`):*
-email, password hash, first and last name, phone. Per swimmer: full name, **date of
-birth**, level, **emergency contact**, **medical notes**, and a photo-consent flag that
-currently defaults to 0.
+Remaining work, in order:
 
-*Staff:*
-rosters and time entries including **latitude, longitude and GPS accuracy captured at
-clock-in**, hours, approval trail, and `xero_timesheet_id`. Qualifications with
-**reference numbers** and expiry dates. This is employee location tracking and needs its
-own disclosure and a staff-facing explanation, not just a customer privacy policy.
-
-*Security:* `login_attempts` stores email and **IP address** for rate limiting.
-
-*Third parties the code already reaches:* Xero (accounting, payroll employees and
-timesheets), Shopify, Printify, Open-Meteo (weather). Disclosure to each belongs in the
-policy even though credentials are not yet connected.
-
-**Pages to write** — match the existing shell: copy the `<head>`, `.site-header` and
-`.site-footer` blocks from `about.html`, use `.container`, `.section`, `.breadcrumb` and
-`.eyebrow`, and reuse the existing `.data-boundary` style for anything Andrew must still
-confirm.
-
-1. `privacy.html` — collection, purpose, storage, disclosure to the four third parties
-   above, children's data and parental consent, staff location and qualification data,
-   retention, access and correction, complaints. Frame against the Australian Privacy
-   Principles.
-2. `terms.html` — website and lesson terms, with cancellation, make-up and refund rules as
-   an anchored `#cancellations` section.
-3. `photo-consent.html` — photo and media consent wording, tied to the `photo_consent`
-   flag on the swimmers table.
-4. Link all three from the footer on every public page, and add a consent line with a
-   privacy link to the enquiry form. `enquire.html` currently carries a `.data-boundary`
-   note saying final privacy terms are unapproved — replace it once the policy exists.
-
-**Do not invent business facts.** Refund windows, notice periods, retention periods, ABN
-and the complaints contact are Andrew's to supply. Mark each one visibly rather than
-guessing, and tell him what is outstanding. Every draft still needs an Australian privacy
-professional's review before launch — say so on the pages.
+1. Get Andrew's answers to the twelve flagged items and fill them in.
+2. **Image weight.** `assets/hv-swim-logo.png` is 1.2MB and loads on all 16 pages;
+   `hero-swimmer.png` is 1.9MB. `merch-collection-v2.png` (2.5MB) and
+   `merch-uniform-studio-v3.png` (2.1MB) are referenced nowhere — the `.jpg` versions are
+   what the site uses. Roughly 5MB of avoidable weight.
+3. No `robots.txt` and no `sitemap.xml` (the new legal pages should be in the sitemap).
+4. Accessibility pass against WCAG 2.2 AA — required by `PRODUCTION_HANDOFF.md`, never done.
+5. Merch is blocked on assets, not code: a transparent 300 DPI or vector logo master is
+   needed before any supplier sample can be ordered. See `MERCH_PRODUCTION_PLAN.md`.
 
 ## Also outstanding
 
-- **Image weight.** `assets/hv-swim-logo.png` is 1.2MB and loads on all 16 pages;
-  `hero-swimmer.png` is 1.9MB. `merch-collection-v2.png` (2.5MB) and
-  `merch-uniform-studio-v3.png` (2.1MB) are referenced nowhere — the `.jpg` versions are
-  what the site actually uses. Roughly 5MB of avoidable weight.
-- No `robots.txt` and no `sitemap.xml`.
-- Accessibility pass against WCAG 2.2 AA — required by `PRODUCTION_HANDOFF.md`, never done.
-- Merch is blocked on assets, not code: a transparent 300 DPI or vector logo master is
-  needed before any supplier sample can be ordered. See `MERCH_PRODUCTION_PLAN.md`.
-- `_to_delete/` is an empty leftover folder. Delete it; it is gitignored.
+- `_to_delete/` is a leftover scratch folder. Delete it; it is gitignored.
 
 ## Open decisions for Andrew
 
