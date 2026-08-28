@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Annotated, Any, Literal
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response, status
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from pydantic import BaseModel, EmailStr, Field, model_validator
@@ -1194,5 +1194,52 @@ async def not_found_page(request: Request, exc: StarletteHTTPException):
     return JSONResponse({"detail": exc.detail}, status_code=exc.status_code, headers=getattr(exc, "headers", None))
 
 
-# Keep this mount last so /api routes take precedence.
-app.mount("/", StaticFiles(directory=ROOT, html=True), name="site")
+# Only the browser assets directory is mounted wholesale. The previous root mount exposed
+# every file in the repository — including backend source, the SQLite database and any
+# future .env file — to anyone who knew the path. Root-level files are now served from an
+# explicit allowlist so adding a private operational file can never make it public by
+# accident.
+app.mount("/assets", StaticFiles(directory=ROOT / "assets"), name="assets")
+
+PUBLIC_ROOT_FILES = frozenset(
+    {
+        "404.html",
+        "START_HERE.html",
+        "about.html",
+        "admin.html",
+        "app.html",
+        "customer.html",
+        "enquire.html",
+        "index.html",
+        "locations.html",
+        "login.html",
+        "manifest.webmanifest",
+        "mobile-shell.html",
+        "offline.html",
+        "photo-consent.html",
+        "platform.html",
+        "privacy.html",
+        "programs.html",
+        "robots.txt",
+        "service-worker.js",
+        "shop.html",
+        "sitemap.xml",
+        "staff.html",
+        "terms.html",
+    }
+)
+
+
+@app.get("/", include_in_schema=False)
+def public_home() -> FileResponse:
+    return FileResponse(ROOT / "index.html")
+
+
+@app.get("/{public_path:path}", include_in_schema=False)
+def public_file(public_path: str) -> FileResponse:
+    if public_path not in PUBLIC_ROOT_FILES:
+        raise HTTPException(status_code=404, detail="Not Found")
+    file_path = ROOT / public_path
+    if not file_path.is_file():
+        raise HTTPException(status_code=404, detail="Not Found")
+    return FileResponse(file_path)

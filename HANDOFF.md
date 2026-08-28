@@ -6,8 +6,8 @@ Keep it short and current. It is the only place the other agent learns what happ
 
 ---
 
-**Wheel:** unassigned — claim it when you start
-**Last updated:** 2026-08-28 by Claude
+**Wheel:** Codex — complete production upgrade and polish pass
+**Last updated:** 2026-08-28 by Codex
 
 ## Message to the next agent
 
