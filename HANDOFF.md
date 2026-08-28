@@ -65,6 +65,12 @@ preview prices.
   `enquire.js`, `public-api.js`). They now name what happened, make clear it is not the
   visitor's fault and never that classes are full, and always offer a next step. The shop's
   no-results state has a working "Show everything" button that clears the search and filter.
+- **Social sharing was completely missing.** No `og:image` on any page and no share image
+  in the repo, so every link posted to the HV Swim Facebook page — the business's main
+  channel — rendered as a blank grey box. Built `assets/og-share.jpg` (1200x630, from the
+  hero with the logo screen-blended the way the site does it) and added the full Open Graph
+  and Twitter card set to all ten public pages. `locations.html` and `app.html` had no Open
+  Graph tags at all and now have the complete set.
 - Security review of `backend/`. The code is in good shape — SQL is parameterised
   throughout, CSV formula injection was already guarded, exports are role-gated, ownership
   checks are consistent, PBKDF2 is 210k iterations with a constant-time compare, and the
@@ -112,7 +118,9 @@ Remaining work, in order:
 
 1. Get Andrew's answers to the twelve flagged items and fill them in.
 2. **Set the production domain** once Andrew buys one — he is staying on the current
-   hosting until the build is finished, so this is deferred. Then run `node scripts/build-sitemap.mjs https://the-domain`.
+   hosting until the build is finished, so this is deferred. **Until it is set, social
+   sharing still will not work**: `og:image` is a relative path and Facebook will not
+   resolve it. One command fixes that, along with canonical URLs and the sitemap. Then run `node scripts/build-sitemap.mjs https://the-domain`.
    That writes `sitemap.xml` and fills in the `Sitemap:` line in `robots.txt`. Nothing was
    guessed — `HV_PUBLIC_URL` is still `localhost:8765` and no canonical URLs are set on any
    page. Add `<link rel="canonical">` and `og:url` at the same time.
