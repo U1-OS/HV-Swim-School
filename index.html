@@ -21,9 +21,9 @@
   <link rel="icon" href="assets/app-icon-v3-64.png">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="assets/app-icon-v3-180.png">
-  <link rel="stylesheet" href="assets/styles.css?v=5.3.1">
-  <script defer src="assets/app.js?v=5.3.1"></script>
-  <script defer src="assets/public-api.js?v=5.3.1"></script>
+  <link rel="stylesheet" href="assets/styles.css?v=5.4.2">
+  <script defer src="assets/app.js?v=5.4.2"></script>
+  <script defer src="assets/public-api.js?v=5.4.2"></script>
   <script type="application/ld+json">{
   "@context": "https://schema.org",
   "@type": "SportsActivityLocation",
@@ -97,10 +97,10 @@
       <aside class="hero-float reveal" aria-label="Latest pool condition">
         <div class="hero-float-top">
           <div><strong>Wood Street pool</strong><p>Latest condition from the staff portal.</p></div>
-          <span class="status demo" data-home-status>Awaiting check</span>
+          <span class="status changed" data-home-status>Awaiting check</span>
         </div>
         <div class="hero-condition-row">
-          <div class="temp-bubble"><strong data-home-temp>31.8°C</strong><span data-home-updated>Sample reading</span></div>
+          <div class="temp-bubble"><strong data-home-temp>—</strong><span data-home-updated>Update due</span></div>
           <a class="text-link" href="locations.html">Details</a>
         </div>
       </aside>
@@ -194,7 +194,7 @@
         </div>
         <div class="grid-2" id="home-locations">
           <article class="card location-preview reveal" data-location="wood-street">
-            <div class="location-visual"><span class="location-place" aria-hidden="true">⌂</span><div class="temp-bubble"><strong data-temp>31.8°C</strong><span data-temp-label>Demo sample</span></div></div>
+            <div class="location-visual"><span class="location-place" aria-hidden="true">⌂</span><div class="temp-bubble"><strong data-temp>—</strong><span data-temp-label>Update due</span></div></div>
             <div class="location-body"><span class="status" data-status>Check today’s conditions</span><h3>Wood Street Indoor Pool</h3><p class="location-address">76 Wood Street, California Gully VIC 3556</p><div class="location-meta"><div><strong>Today</strong><span data-lessons>See today’s schedule</span></div><div><strong>Best for</strong><span>Year-round learn-to-swim programs</span></div></div><div class="location-actions"><a class="btn btn-blue btn-small" href="locations.html#wood-street">View conditions</a><a class="btn btn-outline dark btn-small" target="_blank" rel="noopener" href="https://www.google.com/maps/dir/?api=1&destination=76+Wood+Street+California+Gully+VIC+3556">Directions</a></div></div>
           </article>
           <article class="card location-preview reveal" data-location="bendigo-east">
@@ -253,10 +253,71 @@
       </div>
     </section>
 
+    <section class="section white facebook-section" aria-labelledby="facebook-title">
+      <div class="container facebook-grid">
+        <div class="facebook-copy reveal">
+          <div class="facebook-kicker"><span aria-hidden="true">f</span> Facebook updates</div>
+          <h2 id="facebook-title">Stay close to the pool.</h2>
+          <p class="lead">Choose to load the optional HV Swim School Bendigo timeline for recent notices, community moments and lesson updates, or open the full page on Facebook.</p>
+          <div class="facebook-actions">
+            <a class="btn btn-blue" href="https://www.facebook.com/hvswimschoolbendigo" target="_blank" rel="noopener">View all posts on Facebook <span aria-hidden="true">↗</span></a>
+            <span>Content is supplied by Meta.</span>
+          </div>
+          <p class="micro">For privacy, the Facebook connection is not made until you choose to load the timeline.</p>
+        </div>
+        <div class="facebook-feed-card reveal" data-facebook-feed data-src="https://www.facebook.com/plugins/page.php?href=https%3A%2F%2Fwww.facebook.com%2Fhvswimschoolbendigo&amp;tabs=timeline&amp;width=500&amp;height=680&amp;small_header=false&amp;adapt_container_width=true&amp;hide_cover=false&amp;show_facepile=false">
+          <div class="facebook-consent">
+            <div class="facebook-consent-mark" aria-hidden="true">f</div>
+            <span class="status changed">Optional external content</span>
+            <h3>Load the optional Facebook timeline?</h3>
+            <p>This opens a direct connection to Meta and may allow Meta to receive browser and device information under its own privacy terms.</p>
+            <button class="btn btn-blue" type="button" data-load-facebook>Load Facebook posts</button>
+            <a class="text-link" href="https://www.facebook.com/hvswimschoolbendigo" target="_blank" rel="noopener">Open Facebook instead</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <section class="section" id="enquire">
       <div class="container cta-panel reveal">
         <div><div class="eyebrow">Ready when they are</div><h2>Let's find the right lesson.</h2><p>Tell us about the swimmer, their experience and what you would love them to achieve. HV Swim Bendigo can help you choose the best starting point.</p></div>
         <div class="cta-actions"><a class="btn btn-primary" href="enquire.html">Find a lesson</a><a class="btn btn-outline" href="login.html">Secure platform sign in</a></div>
+      </div>
+    </section>
+
+    <section class="credential-section" aria-labelledby="credentials-title">
+      <div class="container credential-shell reveal">
+        <div class="credential-intro">
+          <div class="eyebrow">Public industry listings</div>
+          <h2 id="credentials-title">Check HV Swim at the source.</h2>
+          <p>These links open HV Swim Bendigo’s public industry directory records. A directory listing does not certify every instructor or authorise use of an organisation’s logo.</p>
+        </div>
+        <div class="credential-grid" aria-label="Aquatic industry directory listings">
+          <a class="credential-card" href="https://12524.locationlandingpages.com/australia/victoria/california-gully/hv-swim-school-bendigo/2807" target="_blank" rel="noopener">
+            <span class="directory-card-mark" data-label="Open record" aria-hidden="true"><svg class="ui-icon"><use href="assets/icons.svg#arrow-up-right"></use></svg></span>
+            <span><strong>SWIM Coaches &amp; Teachers Australia</strong><small>Public swim-school finder record</small></span>
+          </a>
+          <a class="credential-card" href="https://austswim.com.au/australian-swim-school-finder" target="_blank" rel="noopener">
+            <span class="directory-card-mark" data-label="Open finder" aria-hidden="true"><svg class="ui-icon"><use href="assets/icons.svg#arrow-up-right"></use></svg></span>
+            <span><strong>AUSTSWIM</strong><small>Listed as a Swim School Network member</small></span>
+          </a>
+          <a class="credential-card" href="https://autism-swim.org/providers/aquatic-centre-hidden-valley-swim-school-bendigo/" target="_blank" rel="noopener">
+            <span class="directory-card-mark" data-label="Open record" aria-hidden="true"><svg class="ui-icon"><use href="assets/icons.svg#arrow-up-right"></use></svg></span>
+            <span><strong>Autism Swim</strong><small>Public provider-directory record</small></span>
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <section class="country-acknowledgement" aria-labelledby="country-title">
+      <div class="container country-panel reveal">
+        <div class="country-symbol" aria-hidden="true"><span></span><i></i><b></b></div>
+        <div class="country-copy">
+          <div class="country-location">Dja Dja Wurrung Country · Bendigo</div>
+          <h2 id="country-title">Acknowledgement of Country</h2>
+          <p>HV Swim Bendigo acknowledges that our Bendigo venues are on Dja Dja Wurrung Country. We acknowledge and extend our appreciation to the Dja Dja Wurrung People, the Traditional Owners of the land and waters on which we learn, work and gather. We pay our respects to leaders and Elders past, present and future, and recognise their continuing connection to Country, culture and community.</p>
+          <a href="https://www.bendigo.vic.gov.au/acknowledgement-country" target="_blank" rel="noopener">Read the City of Greater Bendigo’s Acknowledgement of Country <span aria-hidden="true">↗</span></a>
+        </div>
       </div>
     </section>
   </main>

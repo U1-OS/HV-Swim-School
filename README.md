@@ -1,4 +1,4 @@
-# HV Swim Bendigo V5.3 Premium Platform
+# HV Swim Bendigo V5.4 Premium Platform
 
 Premium public website, installable Progressive Web App and connected operations platform for HV Swim Bendigo. The build combines a polished responsive front end with a FastAPI service, role-based accounts and a SQLite preview database. SQLite is not approved for the final production deployment that will store customer, child or payroll data.
 
@@ -21,7 +21,8 @@ The launcher creates its own Python environment and installs the pinned dependen
 - `app.html` — installable app experience
 - `mobile-shell.html` — native iOS/Android connection launch experience
 - `MOBILE_APP_README.md` — Mac, Xcode, Android Studio and store-build guide
-- `BRAND_GUIDE.md` — V5.3 logo, colour, typography and merchandise usage guide
+- `BRAND_GUIDE.md` — logo, colour, typography and merchandise usage guide
+- `IMAGE_ASSET_PROVENANCE.md` — exact V5.4 image prompts, modes, masters and web outputs
 - `prepare-mobile-app.command` — creates and synchronises the Capacitor iOS/Android projects
 - `capacitor.config.json` / `package.json` — Capacitor 8 native project foundation
 - `backend/` — API, security, database and third-party integration boundaries
@@ -60,6 +61,11 @@ Demo credentials only work while `HV_APP_ENV=development`. Production mode disab
 - Local catalogue price/status controls before products are approved for Shopify
 - Cached Bendigo outdoor weather through the server-side weather service; production requires a commercial Open-Meteo key
 - Premium “Today at HV Swim” homepage view combining local weather, staff-verified pool conditions, seasonal venue status and the next connected class place
+- Privacy-first optional Facebook timeline with a direct-page fallback and a Meta connection only after visitor consent
+- Venue-specific Acknowledgement of Country and source-linked public SWIM, AUSTSWIM and Autism Swim directory records
+- Distinct, locally optimised program, enquiry and Laura-led approach campaign imagery
+- Enquiry preference recovery that deliberately excludes names, contact details and free-text notes from browser storage
+- Role-specific family and staff next-action hubs plus a management attention queue built from existing API data
 - Cached Shopify storefront/cart and Printify catalogue boundaries
 - Xero OAuth connection, staff mapping and an audited payroll-readiness preview; outbound payroll transmission remains locked until real pay periods and idempotent export tracking are implemented
 - VistaPrint/manual and specialist-swim supplier plans for products unsuitable for generic POD
@@ -71,7 +77,9 @@ Demo credentials only work while `HV_APP_ENV=development`. Production mode disab
 
 ## External activation boundaries
 
-Real Xero, Shopify, Printify, VistaPrint ordering, commercial weather, email, SMS, push, pool sensors, hosting, domain and native app-store distribution require credentials or accounts owned by HV Swim. Those values belong in a private `.env` file created from `.env.example`; secrets must never be placed in HTML or committed to source control. Credentials do not activate email, SMS or push by themselves—the provider adapters and consent workflows are still explicit launch work.
+Connecting the existing Xero organisation requires an HV Swim-owned OAuth app and mappings. Shopify, Printify, VistaPrint ordering, commercial weather, email, SMS, push, pool sensors, hosting, domain and native app-store distribution likewise require credentials or accounts owned by HV Swim. Those values belong in a private `.env` file created from `.env.example`; secrets must never be placed in HTML or committed to source control. Credentials do not activate email, SMS or push by themselves—the provider adapters and consent workflows are still explicit launch work. The optional Meta Page Plugin is configured but must be tested on the approved production domain.
+
+The website links to public industry directory records without presenting them as instructor accreditation. Use only current member/provider badge files issued through HV Swim's own organisation accounts. Generic or scraped organisation logos are not included. See `PRODUCTION_HANDOFF.md` for the directory-record differences that HV Swim must reconcile before launch.
 
 The direct management entry is `http://127.0.0.1:8765/login.html?role=admin`. In development, the page can load the Management demo account from the local server. Production never exposes demo credentials. After signing in, use **Website content** for approved homepage fields, **Enquiry inbox** for family follow-up and **Merchandise** for the launch catalogue.
 
@@ -96,9 +104,10 @@ The same backend, static-site and mobile-shell checks run automatically for push
 
 ## Generated visual assets
 
-The hero photograph, merchandise campaign visuals and V5.3 logo refinement were created
+The homepage hero, page-specific program/enquiry/about imagery, merchandise campaign visuals and logo refinement were created
 with the built-in OpenAI image-generation tool using supplied HV Swim artwork as the brand
 reference. The transparent logo and icon files are approved digital/sample proofs only;
 `BRAND_GUIDE.md` records the required manual vector, colour and physical-sampling work before
-bulk merchandise production. Product campaign images remain concepts until final products
-and manufacturer specifications are approved.
+bulk merchandise production. The new photographs are clearly generic campaign imagery and do
+not depict Laura, HV Swim staff or customers. Product campaign images remain concepts until
+final products and manufacturer specifications are approved.

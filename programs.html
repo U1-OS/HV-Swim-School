@@ -21,9 +21,10 @@
   <link rel="icon" href="assets/app-icon-v3-64.png">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="assets/app-icon-v3-180.png">
-  <link rel="stylesheet" href="assets/styles.css?v=5.3.1">
-  <script defer src="assets/app.js?v=5.3.1"></script>
-  <script defer src="assets/programs.js?v=5.3.1"></script>
+  <link rel="preload" as="image" href="assets/hero-programs-v4.jpg" fetchpriority="high">
+  <link rel="stylesheet" href="assets/styles.css?v=5.4.2">
+  <script defer src="assets/app.js?v=5.4.2"></script>
+  <script defer src="assets/programs.js?v=5.4.2"></script>
   <script type="application/ld+json">{"@context":"https://schema.org","@type":"ItemList","name":"HV Swim Bendigo swimming programs","itemListElement":[{"@type":"ListItem","position":1,"item":{"@type":"Service","name":"Infant Aquatics"}},{"@type":"ListItem","position":2,"item":{"@type":"Service","name":"Learn to Swim"}},{"@type":"ListItem","position":3,"item":{"@type":"Service","name":"Stroke Development"}},{"@type":"ListItem","position":4,"item":{"@type":"Service","name":"Private Swimming Lessons"}}]}</script>
 </head>
 <body data-page="programs">
@@ -93,9 +94,9 @@
       <div class="container matcher-grid">
         <div class="reveal"><div class="eyebrow">Guided lesson matcher</div><h2>A clearer place to begin.</h2><p class="lead" style="margin-top:18px">Three quick choices create a useful recommendation. It is guidance—not an automated assessment—and the team will personally confirm the best fit.</p><div class="matcher-assurance"><span>✓</span><p><strong>No account needed</strong><small>No medical details or sensitive information are collected here.</small></p></div></div>
         <form class="matcher-card reveal" id="program-matcher">
-          <div class="matcher-step"><span>1</span><div class="field"><label for="matcher-age">Swimmer's age</label><select id="matcher-age"><option value="under2">Approximately 4 months–2 years</option><option value="child" selected>Child</option><option value="teenadult">Teen or adult</option></select></div></div>
-          <div class="matcher-step"><span>2</span><div class="field"><label for="matcher-confidence">Current water confidence</label><select id="matcher-confidence"><option value="new">New, cautious or nervous</option><option value="supported" selected>Comfortable with some support</option><option value="independent">Swimming independently</option></select></div></div>
-          <div class="matcher-step"><span>3</span><div class="field"><label for="matcher-goal">Main goal right now</label><select id="matcher-goal"><option value="confidence">Build comfort and confidence</option><option value="skills" selected>Learn core swimming skills</option><option value="technique">Improve technique and endurance</option><option value="personal">Get focused one-to-one support</option></select></div></div>
+          <div class="matcher-step"><span>1</span><div class="field"><label for="matcher-age">Swimmer's age</label><select id="matcher-age" required><option value="">Choose the closest option</option><option value="under2">Approximately 4 months–2 years</option><option value="child">Child</option><option value="teenadult">Teen or adult</option></select></div></div>
+          <div class="matcher-step"><span>2</span><div class="field"><label for="matcher-confidence">Current water confidence</label><select id="matcher-confidence" required><option value="">Choose the closest option</option><option value="new">New, cautious or nervous</option><option value="supported">Comfortable with some support</option><option value="independent">Swimming independently</option></select></div></div>
+          <div class="matcher-step"><span>3</span><div class="field"><label for="matcher-goal">Main goal right now</label><select id="matcher-goal" required><option value="">Choose the main goal</option><option value="confidence">Build comfort and confidence</option><option value="skills">Learn core swimming skills</option><option value="technique">Improve technique and endurance</option><option value="personal">Get focused one-to-one support</option></select></div></div>
           <button class="btn btn-primary" type="submit">Show my recommendation <span aria-hidden="true">→</span></button>
           <div class="matcher-result" id="matcher-result" role="status" aria-live="polite"><span class="matcher-result-label">Your suggested starting point</span><strong>Choose the closest answers above.</strong><p>We will explain why the pathway may suit, then carry it into your enquiry.</p></div>
         </form>

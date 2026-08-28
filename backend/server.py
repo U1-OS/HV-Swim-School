@@ -66,7 +66,7 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(
     title="HV Swim Bendigo Platform API",
-    version="5.3.0",
+    version="5.4.0",
     docs_url="/api/docs" if not settings.production else None,
     openapi_url="/openapi.json" if not settings.production else None,
     redoc_url=None,
@@ -123,7 +123,7 @@ async def security_headers(request: Request, call_next):
     response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=(self)"
     response.headers["Content-Security-Policy"] = (
         "default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; "
-        "script-src 'self'; connect-src 'self'; form-action 'self' mailto:; "
+        "script-src 'self'; connect-src 'self'; frame-src https://www.facebook.com; form-action 'self' mailto:; "
         "base-uri 'self'; frame-ancestors 'self'"
     )
     if settings.production:
@@ -424,7 +424,7 @@ def renumber_waitlist(db: sqlite3.Connection, class_id: int) -> None:
 
 @app.get("/api/health")
 def health() -> dict[str, Any]:
-    return {"ok": True, "service": "HV Swim Bendigo", "version": "5.3.0", "environment": settings.app_env, "time": now_iso()}
+    return {"ok": True, "service": "HV Swim Bendigo", "version": "5.4.0", "environment": settings.app_env, "time": now_iso()}
 
 
 @app.get("/api/public/site-settings")
@@ -1554,6 +1554,12 @@ PUBLIC_ROOT_FILES = frozenset(
         "terms.html",
     }
 )
+
+
+@app.api_route("/favicon.ico", methods=["GET", "HEAD"], include_in_schema=False)
+def browser_favicon() -> FileResponse:
+    """Serve the existing PNG icon for browsers that probe the conventional URL."""
+    return FileResponse(ROOT / "assets" / "app-icon-v3-64.png", media_type="image/png")
 
 
 @app.api_route("/", methods=["GET", "HEAD"], include_in_schema=False)

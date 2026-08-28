@@ -17,15 +17,15 @@
   <meta name="twitter:description" content="Bookings, pool conditions, rosters and HV Swim updates in one secure, mobile-friendly place.">
   <meta name="twitter:image" content="assets/og-share-v3.jpg">
   <meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="HV Swim">  <title>HV Swim App | Bendigo</title>
-  <link rel="icon" href="assets/app-icon-v3-64.png"><link rel="apple-touch-icon" href="assets/app-icon-v3-180.png"><link rel="manifest" href="manifest.webmanifest"><link rel="stylesheet" href="assets/styles.css?v=5.3.1"><script defer src="assets/app.js?v=5.3.1"></script>
+  <link rel="icon" href="assets/app-icon-v3-64.png"><link rel="apple-touch-icon" href="assets/app-icon-v3-180.png"><link rel="manifest" href="manifest.webmanifest"><link rel="stylesheet" href="assets/styles.css?v=5.4.2"><script defer src="assets/app.js?v=5.4.2"></script>
 </head>
 <body class="app-page" data-page="app">
   <a class="skip-link" href="#main-content">Skip to main content</a>
   <main class="app-main" id="main-content">
     <div class="container app-container">
       <div class="app-topbar"><a class="brand" href="index.html"><img src="assets/hv-swim-logo-v3.png" width="400" height="265" alt="HV Swim Bendigo"><span class="brand-copy"><strong>HV Swim App</strong><span>Bendigo · Secure access</span></span></a><div class="app-topbar-actions"><a class="btn btn-primary btn-small" href="login.html">Secure sign in</a><button class="btn btn-outline btn-small" type="button" data-install-app hidden>Install app</button></div></div>
-      <section class="app-hero-intro reveal"><div class="eyebrow">Mobile-friendly · secure · connected</div><h1 aria-label="Your swim day, all in one place.">Your swim day,<br><span class="accent">all in one place.</span></h1><p>Use the HV Swim web app for family updates, staff tools and management oversight from your phone, tablet or computer.</p><div class="app-platform-pills"><span>Family accounts</span><span>Staff tools</span><span>Management oversight</span></div></section>
-      <section class="app-delivery-grid reveal">
+      <section class="app-hero-intro reveal"><div class="eyebrow">Mobile-friendly · secure · connected</div><div class="app-launch-status" data-app-launch-status hidden>Checking your secure session…</div><h1 aria-label="Your swim day, all in one place.">Your swim day,<br><span class="accent">all in one place.</span></h1><p data-app-launch-copy>Use the HV Swim web app for family updates, staff tools and management oversight from your phone, tablet or computer.</p><div class="app-platform-pills"><span>Family accounts</span><span>Staff tools</span><span>Management oversight</span></div></section>
+      <section class="app-delivery-grid reveal" data-app-marketing>
         <article><span class="app-delivery-index">01</span><div><strong>Available now</strong><h2>Add it to your home screen</h2><p>Use Safari or Chrome to install the secure web app for quick access and a focused, app-like experience.</p></div><button class="btn btn-primary btn-small" type="button" data-install-app>Install web app</button></article>
         <article><span class="app-delivery-index">02</span><div><strong>Planned release</strong><h2>iPhone &amp; Android apps</h2><p>Native store releases will follow production testing, business approval and Apple and Google store review.</p></div><a class="btn btn-soft btn-small" href="login.html">Use the web app</a></article>
       </section>
@@ -36,10 +36,10 @@
       </section>
       <a class="card card-pad reveal app-platform-card" href="login.html"><div><div class="eyebrow">One secure platform</div><h3>Keep everyday swim-school tasks together.</h3><p class="fine">Accounts, bookings, waitlists, rosters, time entries, pool checks, notifications and operational records are available by role.</p></div><span class="btn btn-primary">Sign in →</span></a>
       <section class="grid-2 reveal app-live-grid">
-        <article class="card card-pad app-live-card" data-location="wood-street"><div class="dash-title"><h2>Wood Street pool</h2><span class="status demo" data-status aria-live="polite">Awaiting check</span></div><div class="app-card-inline"><div class="condition-temp"><strong data-temp>31.8°C</strong><span data-temp-label>Sample only</span></div><a class="text-link" href="locations.html">Conditions</a></div><p class="micro" data-updated aria-live="polite">Staff update required</p></article>
+        <article class="card card-pad app-live-card" data-location="wood-street"><div class="dash-title"><h2>Wood Street pool</h2><span class="status changed" data-status aria-live="polite">Awaiting check</span></div><div class="app-card-inline"><div class="condition-temp"><strong data-temp>—</strong><span data-temp-label>Update due</span></div><a class="text-link" href="locations.html">Conditions</a></div><p class="micro" data-updated aria-live="polite">No current staff reading published</p></article>
         <article class="card card-pad app-live-card" data-weather-card><div class="dash-title"><h2>Live Bendigo weather</h2><button class="btn btn-soft btn-small" type="button" data-refresh-weather>Refresh</button></div><div class="app-weather-inline"><span class="metric-icon app-weather-icon" data-weather-icon aria-hidden="true">☀</span><div><strong class="metric-value" data-weather-temp>Loading…</strong><span class="metric-foot" data-weather-summary aria-live="polite">Current outdoor conditions</span></div></div><p class="micro" data-weather-updated aria-live="polite">Connecting to weather service</p></article>
       </section>
-      <div class="info-note app-delivery-note reveal"><strong>Availability:</strong> The installable web app works now. App Store and Google Play availability follows production hosting, beta testing and store approval.</div>
+      <div class="info-note app-delivery-note reveal" data-app-marketing><strong>Availability:</strong> The installable web app works now. App Store and Google Play availability follows production hosting, beta testing and store approval.</div>
       <p class="app-page-foot"><a href="index.html">Return to the public website</a> · HV Swim Bendigo</p>
     </div>
   </main>

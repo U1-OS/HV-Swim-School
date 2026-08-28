@@ -95,7 +95,7 @@
       const chooseVariant = catalogueSource === 'shopify';
       const available = product.status === 'available';
       const badge = available ? 'Available' : (chooseVariant ? 'Currently unavailable' : 'Collection concept');
-      const addLabel = chooseVariant ? (available ? 'Choose option' : 'Unavailable') : 'Add';
+      const addLabel = chooseVariant ? (available ? 'Choose option' : 'Unavailable') : 'Save';
       return `<article class="shop-card reveal visible" style="--reveal-delay:${Math.min(index*55,220)}ms"><button class="shop-product-visual" type="button" data-product-view="${esc(product.id)}" aria-label="View ${esc(product.title)}">${visual(product)}<span class="shop-product-badge">${badge}</span><span class="shop-quick-view">Quick view</span></button><div class="shop-card-copy"><div class="shop-card-heading"><span class="shop-category">${esc(product.category)}</span><span>${sizes.length?`${sizes.length} ${sizes.length===1?'option':'options'}`:'Sizing pending'}</span></div><h3>${esc(product.title)}</h3><p>${esc(product.description)}</p><div class="shop-sizes">${sizes.slice(0,4).map(size=>`<span>${esc(size)}</span>`).join('')||'<span>Final sizing pending</span>'}${sizes.length>4?`<span>+${sizes.length-4}</span>`:''}</div><div class="shop-card-foot"><div><strong>${money(product.price_cents)}</strong><small>${chooseVariant?'Current price':'Indicative price'}</small></div><button type="button" class="shop-add-button" data-product-add="${esc(product.id)}" ${chooseVariant&&!available?'disabled':''}>${addLabel} <span aria-hidden="true">${chooseVariant?'→':'+'}</span></button></div></div></article>`;
     }).join('') || '<div class="empty-state"><strong>Nothing matches that search.</strong><p>Try a different category, or clear the search to see the whole collection.</p><button type="button" class="btn btn-outline btn-small" data-clear-search>Show everything</button></div>';
   }
@@ -123,7 +123,7 @@
   function addKit(kitId) {
     if (catalogueSource === 'shopify') {
       const status=document.getElementById('kit-builder-status');
-      if(status){status.classList.remove('complete');status.innerHTML='<span>→</span><p><strong>Choose options from the live collection.</strong> Sizes and variants must be selected for each product before it can be added.</p>';}
+      if(status){status.classList.remove('complete');status.innerHTML='<span>→</span><p><strong>Choose options from the live collection.</strong> Sizes and variants must be selected for each product before it can be saved.</p>';}
       document.getElementById('collection')?.scrollIntoView({behavior:'smooth',block:'start'});
       return;
     }
@@ -138,7 +138,7 @@
     });
     saveCart();
     const status=document.getElementById('kit-builder-status');
-    if(status){status.classList.add('complete');status.innerHTML=`<span>✓</span><p><strong>${kitProducts.length} products added.</strong> Review sizes and quantities in your saved collection before sending an enquiry.</p>`;}
+    if(status){status.classList.add('complete');status.innerHTML=`<span>✓</span><p><strong>${kitProducts.length} products saved.</strong> Review sizes and quantities in your saved collection before sending an enquiry.</p>`;}
     openCart();
   }
 
@@ -146,6 +146,10 @@
     const itemCount = cart.reduce((sum,item)=>sum+Number(item.quantity||0),0);
     const subtotal = cart.reduce((sum,item)=>sum+Number(item.quantity||0)*Number(item.price_cents||0),0);
     document.querySelectorAll('[data-cart-count]').forEach(element=>element.textContent=String(itemCount));
+    const mobileBar=document.querySelector('.shop-mobile-bar');
+    if(mobileBar)mobileBar.hidden=itemCount===0;
+    const mobileSummary=document.querySelector('[data-cart-summary]');
+    if(mobileSummary)mobileSummary.textContent=`${itemCount} ${itemCount===1?'item':'items'} saved`;
     document.getElementById('cart-subtotal').textContent=money(subtotal);
     const items=document.getElementById('cart-items');
     if (!cart.length) items.innerHTML='<div class="cart-empty"><span>◇</span><h3>Your saved collection is empty.</h3><p>Choose preferred products and options to create a lesson-day collection list.</p><button class="btn btn-soft" type="button" data-cart-close>Explore the collection</button></div>';
@@ -200,7 +204,7 @@
     const options=live
       ? `<option value="">Choose an option</option>${(product.variants||[]).map(variant=>`<option value="${esc(variant.id)}" ${variant.availableForSale?'':'disabled'}>${esc(variant.title==='Default Title'?'Standard':variant.title)}${variant.availableForSale?'':' — unavailable'}</option>`).join('')}`
       : (sizes.length?sizes:['Standard']).map(size=>`<option value="${esc(size)}">${esc(size)}</option>`).join('');
-    document.getElementById('product-dialog-content').innerHTML=`<div class="dialog-product-visual">${visual(product)}<span class="dialog-concept-label">HV Swim Collection</span></div><div class="dialog-product-copy"><span class="shop-category">${esc(product.category)}</span><h2 id="product-dialog-title">${esc(product.title)}</h2><strong class="dialog-price">${money(product.price_cents)}</strong><p>${esc(product.description)}</p><dl class="product-specs"><div><dt>Material direction</dt><dd>${esc(detail.material)}</dd></div><div><dt>Care</dt><dd>${esc(detail.care)}</dd></div><div><dt>Personalisation</dt><dd>${esc(detail.personalisation)}</dd></div></dl><div class="product-dialog-options"><div class="product-option"><label for="dialog-size">${live?'Select option':'Preferred option'}</label><select id="dialog-size" required>${options}</select></div><div class="product-option"><label for="dialog-quantity">Quantity</label><select id="dialog-quantity">${[1,2,3,4,5].map(value=>`<option value="${value}">${value}</option>`).join('')}</select></div></div><p class="wizard-error" id="dialog-option-error" role="alert" hidden>Please choose an available option.</p><div class="info-note"><strong>${live?'Live catalogue':'Collection availability'}:</strong> ${live?(available?'Availability and options come from Shopify. Sign in is required before secure checkout.':'This product is currently unavailable in Shopify. You can still review its details and check again later.'):'No stock is reserved and no payment is taken while final samples and suppliers are approved.'}</div><button class="btn btn-primary" type="button" data-dialog-add="${esc(product.id)}" ${available?'':'disabled'}>${live?(available?'Add selected option':'Currently unavailable'):'Add to collection list'}</button></div>`;
+    document.getElementById('product-dialog-content').innerHTML=`<div class="dialog-product-visual">${visual(product)}<span class="dialog-concept-label">HV Swim Collection</span></div><div class="dialog-product-copy"><span class="shop-category">${esc(product.category)}</span><h2 id="product-dialog-title">${esc(product.title)}</h2><strong class="dialog-price">${money(product.price_cents)}</strong><p>${esc(product.description)}</p><dl class="product-specs"><div><dt>Material direction</dt><dd>${esc(detail.material)}</dd></div><div><dt>Care</dt><dd>${esc(detail.care)}</dd></div><div><dt>Personalisation</dt><dd>${esc(detail.personalisation)}</dd></div></dl><div class="product-dialog-options"><div class="product-option"><label for="dialog-size">${live?'Select option':'Preferred option'}</label><select id="dialog-size" required>${options}</select></div><div class="product-option"><label for="dialog-quantity">Quantity</label><select id="dialog-quantity">${[1,2,3,4,5].map(value=>`<option value="${value}">${value}</option>`).join('')}</select></div></div><p class="wizard-error" id="dialog-option-error" role="alert" hidden>Please choose an available option.</p><div class="info-note"><strong>${live?'Live catalogue':'Collection availability'}:</strong> ${live?(available?'Availability and options come from Shopify. Sign in is required before secure checkout.':'This product is currently unavailable in Shopify. You can still review its details and check again later.'):'No stock is reserved and no payment is taken while final samples and suppliers are approved.'}</div><button class="btn btn-primary" type="button" data-dialog-add="${esc(product.id)}" ${available?'':'disabled'}>${live?(available?'Add selected option':'Currently unavailable'):'Save to collection list'}</button></div>`;
     dialog.showModal();
   }
 

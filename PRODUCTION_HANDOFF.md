@@ -74,6 +74,25 @@ This build is a production foundation, not a substitute for the final deployment
 - Keep the server-side cache enabled so each visitor does not create a new provider request.
 - Add approved term dates, public holidays, venue closures and one-off lesson exceptions before treating recurring “today” class suggestions as an authoritative operating run sheet.
 
+## 8. Associations, public directories and third-party marks
+
+The public website links to source records rather than claiming school or instructor accreditation. Verification completed 29 August 2026 found:
+
+- SWIM Coaches & Teachers Australia publishes an HV Swim Bendigo swim-school finder record.
+- AUSTSWIM lists HV Swim School Bendigo as a Swim School Network member. AUSTSWIM describes that Network as membership, not an audit or accreditation program.
+- Autism Swim publishes an HV Swim provider-directory record. Confirm the organisation's current renewal and expiry directly before describing HV Swim as an Approved Provider.
+
+Before displaying organisation logos or badges, obtain the exact current member/provider artwork issued through HV Swim's own account and confirm the applicable usage rights. Do not scrape, redraw, recolour or use generic corporate logos as substitute membership badges. Do not publish personal AUSTSWIM, SWIM or Autism Swim qualifications for Laura or another instructor without a current certificate/licence type, issuing body and expiry date.
+
+HV Swim must nominate the canonical public business details, then correct every external directory. Current records disagree with this repository on `76` versus `76B` Wood Street, postcode `3550` versus `3556`, phone `0413 462 112` versus `0458 733 323`, Hotmail versus `bendigo@hvswimschool.com`, and `31` versus `33` Lansell Street. The Autism Swim page also still names Andrea; Andrea has been removed from this repository and that external record needs an owner-requested update.
+
+## 9. Facebook and Acknowledgement of Country
+
+- The homepage Meta Page Plugin remains opt-in and no Facebook request is made until the visitor chooses to load it. The content-security policy permits only `https://www.facebook.com` as an external frame source.
+- On the approved production domain, test the optional timeline while signed out on desktop and mobile, with common privacy/content blockers enabled, and confirm the direct Facebook link remains a usable fallback. Meta controls availability and presentation; do not treat the embedded feed as an owned content archive.
+- Have the Meta disclosure in `privacy.html` reviewed with the rest of the privacy policy before launch.
+- Confirm the Country for each operating venue and have the venue-specific Acknowledgement of Country reviewed by the appropriate local authority or cultural adviser. The accompanying HV-designed sun/water mark is an abstract local graphic, not Indigenous artwork or an approved cultural symbol.
+
 ## Launch sign-off
 
 Complete real-data migration, browser/device QA, payment testing, payroll dry run, backup restore, legal review, accessibility review and staff training before public production launch.

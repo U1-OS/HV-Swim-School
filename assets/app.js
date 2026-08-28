@@ -18,11 +18,11 @@
   };
   const conditions = {
     'wood-street': {
-      temperature: 31.8,
-      status: 'open',
-      statusText: 'Lessons running',
+      temperature: null,
+      status: 'changed',
+      statusText: 'Staff check required',
       verified: false,
-      staff: 'Sample only',
+      staff: 'Awaiting staff update',
       updatedAt: null
     },
     'bendigo-east': {
@@ -144,15 +144,31 @@
   }), { threshold:0, rootMargin:'0px 0px -8% 0px' }) : null;
   document.querySelectorAll('.reveal').forEach(el => observer ? observer.observe(el) : el.classList.add('visible'));
 
+  // Keep the mobile quick action out of the opening hero, then reveal it when it is useful.
+  // The shop owns its saved-items bar separately, so it is intentionally excluded here.
+  const mobileBookBar = document.querySelector('.mobile-book-bar:not(.shop-mobile-bar)');
+  const openingHero = document.querySelector('.hero,.programs-hero,.enrolment-hero,.about-hero,.app-hero');
+  if (mobileBookBar) {
+    mobileBookBar.classList.add('is-managed');
+    if (openingHero && 'IntersectionObserver' in window) {
+      const quickActionObserver = new IntersectionObserver(([entry]) => {
+        mobileBookBar.classList.toggle('is-visible', !entry.isIntersecting);
+      }, { threshold:.08 });
+      quickActionObserver.observe(openingHero);
+    } else {
+      mobileBookBar.classList.add('is-visible');
+    }
+  }
+
   // Pool conditions shared by public, customer, staff, admin and app views.
   function conditionView(condition) {
     const updatedTime = new Date(condition.updatedAt || '').getTime();
     const isStale = condition.verified && (!Number.isFinite(updatedTime) || Date.now() - updatedTime > DAY);
     const temp = condition.temperature == null ? '—' : `${Number(condition.temperature).toFixed(1)}°C`;
-    const tempLabel = condition.verified ? (isStale ? 'Reading over 24h old' : 'Staff verified') : 'Demo sample';
-    const updated = condition.updatedAt ? `${formatDateTime(condition.updatedAt)} · ${condition.staff}` : 'Staff update required before treating as live';
+    const tempLabel = condition.verified ? (isStale ? 'Reading over 24h old' : 'Staff verified') : 'Update due';
+    const updated = condition.updatedAt ? `${formatDateTime(condition.updatedAt)} · ${condition.staff}` : 'No current staff reading published';
     const statusText = isStale && condition.status === 'open' ? `Check required · ${condition.statusText}` : condition.statusText;
-    const statusClass = isStale && condition.status === 'open' ? 'changed' : (condition.verified ? condition.status : 'demo');
+    const statusClass = isStale && condition.status === 'open' ? 'changed' : (condition.verified ? condition.status : 'changed');
     return { temp, tempLabel, updated, statusText, statusClass, isStale };
   }
   function renderConditions() {
@@ -163,9 +179,9 @@
       card.querySelectorAll('[data-temp]').forEach(el => el.textContent = view.temp);
       card.querySelectorAll('[data-temp-label]').forEach(el => el.textContent = view.tempLabel);
       card.querySelectorAll('[data-updated]').forEach(el => el.textContent = view.updated);
-      card.querySelectorAll('[data-verified-by]').forEach(el => el.textContent = condition.verified ? `Verified by ${condition.staff}` : 'Demo sample only');
+      card.querySelectorAll('[data-verified-by]').forEach(el => el.textContent = condition.verified ? `Verified by ${condition.staff}` : 'Awaiting staff verification');
       card.querySelectorAll('[data-status]').forEach(el => {
-        el.textContent = condition.verified ? view.statusText : `Demo · ${condition.statusText.toLowerCase()}`;
+        el.textContent = condition.verified ? view.statusText : view.statusText;
         el.classList.remove('open','closed','changed','demo');
         el.classList.add(view.statusClass);
       });
@@ -261,6 +277,53 @@
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
     navigator.serviceWorker.register('service-worker.js').catch(() => {});
   }
+
+  // Installed/native launches prioritise secure account access over website-install marketing.
+  if (document.body.dataset.page === 'app') {
+    const params = new URLSearchParams(location.search);
+    const installedLaunch = params.get('native') === '1' || window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+    if (installedLaunch) {
+      document.body.classList.add('app-launch-mode');
+      const intro = document.querySelector('[data-app-launch-copy]');
+      if (intro) intro.textContent = 'Choose your secure workspace below. If you are already signed in, we will take you straight to your HV Swim account.';
+      const status = document.querySelector('[data-app-launch-status]');
+      if (status) status.hidden = false;
+      if (/^https?:$/.test(location.protocol)) {
+        fetchJSON('/api/auth/me', { headers:{ Accept:'application/json' } }, 4500)
+          .then(payload => { if (payload?.user) location.replace('platform.html'); })
+          .catch(() => { if (status) status.textContent = 'Choose a secure workspace to sign in'; });
+      }
+    }
+  }
+
+  // The Facebook timeline is opt-in so Meta receives no browser request until a visitor chooses to load it.
+  document.querySelectorAll('[data-facebook-feed]').forEach(feed => {
+    const button = feed.querySelector('[data-load-facebook]');
+    if (!button) return;
+    button.addEventListener('click', () => {
+      if (feed.querySelector('iframe')) return;
+      if (['localhost','127.0.0.1'].includes(location.hostname)) {
+        const preview = document.createElement('div');
+        preview.className = 'facebook-consent facebook-local-preview';
+        preview.innerHTML = `<div class="facebook-consent-mark" aria-hidden="true">f</div><span class="status changed">Meta embed configured</span><h3>Local preview keeps Meta disconnected.</h3><p>This local-only mode does not load the Meta iframe. Test the optional timeline on the approved production domain before launch, or use the direct link to see every current post.</p><a class="btn btn-blue" href="https://www.facebook.com/hvswimschoolbendigo" target="_blank" rel="noopener">View all Facebook posts <span aria-hidden="true">↗</span></a>`;
+        feed.classList.add('is-preview');
+        feed.replaceChildren(preview);
+        return;
+      }
+      const frame = document.createElement('iframe');
+      frame.className = 'facebook-iframe';
+      frame.title = 'Latest posts from HV Swim School Bendigo on Facebook';
+      frame.src = feed.dataset.src;
+      frame.width = '500';
+      frame.height = '680';
+      frame.loading = 'lazy';
+      frame.allow = 'autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share';
+      frame.setAttribute('allowfullscreen', 'true');
+      frame.setAttribute('scrolling', 'yes');
+      feed.classList.add('is-loaded');
+      feed.replaceChildren(frame);
+    });
+  });
 
   // Preview-centre shortcuts provide the supplied test-account guidance.
   document.querySelectorAll('[data-demo-action]').forEach(button => button.addEventListener('click', () => showToast(button.dataset.demoAction || 'This action is available in the live connected build.')));

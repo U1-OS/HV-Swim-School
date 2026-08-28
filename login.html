@@ -5,7 +5,7 @@
   <meta name="description" content="Secure sign in for the HV Swim Bendigo family, staff and management platform.">
   <title>Sign in | HV Swim Bendigo</title>
   <link rel="icon" href="assets/app-icon-v3-64.png"><link rel="apple-touch-icon" href="assets/app-icon-v3-180.png"><link rel="manifest" href="manifest.webmanifest">
-  <link rel="stylesheet" href="assets/styles.css?v=5.3.1"><link rel="stylesheet" href="assets/platform.css?v=5.3.1"><script defer src="assets/platform.js?v=5.3.1"></script>
+  <link rel="stylesheet" href="assets/styles.css?v=5.4.2"><link rel="stylesheet" href="assets/platform.css?v=5.4.2"><script defer src="assets/platform.js?v=5.4.2"></script>
 </head>
 <body data-platform-page="login">
   <a class="skip-link" href="#main-content">Skip to main content</a>
@@ -16,8 +16,8 @@
       <p class="auth-footer">HV Swim Bendigo <span aria-hidden="true">·</span> Every role protected by its own account</p>
     </section>
     <section class="auth-panel">
-      <div class="auth-card">
-        <div class="eyebrow">Welcome back</div><h2>Sign in to HV Swim.</h2><p class="fine" style="margin-top:11px">Families, staff and managers all sign in here. You will only see what your own account covers.</p>
+      <div class="auth-card" aria-labelledby="login-context-heading">
+        <div class="eyebrow" id="login-context-eyebrow">Welcome back</div><h2 id="login-context-heading">Sign in to HV Swim.</h2><p class="fine" id="login-context-copy" style="margin-top:11px">Families, staff and managers all sign in here. You will only see what your own account covers.</p>
         <form class="auth-form" id="login-form">
           <div class="auth-error" id="login-error" role="alert"></div>
           <div class="field"><label for="login-email">Email</label><input class="input" id="login-email" name="email" type="email" autocomplete="username" required></div>

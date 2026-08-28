@@ -1,4 +1,4 @@
-# HV Swim Bendigo mobile app · V5.3
+# HV Swim Bendigo mobile app · V5.4
 
 This release contains two related mobile products:
 
@@ -34,6 +34,7 @@ The launcher detects missing Node.js. Xcode and Android Studio still need to be 
 - Management enrolment desk, approvals, website controls and merchandise
 - Installable icons, standalone display mode and offline app shell
 - Live connection checking before opening the native connected experience
+- Smart installed/native launch mode that checks the current session and prioritises the correct secure workspace
 
 ## Production work before submission
 

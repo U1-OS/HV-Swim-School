@@ -70,7 +70,7 @@ def test_public_endpoints_need_no_session(client):
 
 
 def test_public_site_serves_only_explicitly_approved_files(client):
-    for path in ("/", "/index.html", "/assets/styles.css", "/service-worker.js", "/robots.txt"):
+    for path in ("/", "/index.html", "/assets/styles.css", "/service-worker.js", "/robots.txt", "/favicon.ico"):
         assert client.get(path).status_code == 200, path
 
     # These paths all exist in a normal checkout. None may ever become a public download,
@@ -96,6 +96,14 @@ def test_public_files_support_head_for_probes_and_crawlers(client):
         response = client.head(path)
         assert response.status_code == 200, path
         assert response.content == b"", path
+
+
+def test_security_policy_allows_only_the_opt_in_facebook_frame(client):
+    policy = client.get("/index.html").headers.get("content-security-policy", "")
+    assert "script-src 'self'" in policy
+    assert "connect-src 'self'" in policy
+    assert "frame-src https://www.facebook.com" in policy
+    assert "frame-ancestors 'self'" in policy
 
 
 def test_native_app_origin_can_reach_the_api(client):

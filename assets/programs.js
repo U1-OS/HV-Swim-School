@@ -75,6 +75,7 @@
 
   document.getElementById('program-matcher')?.addEventListener('submit', event => {
     event.preventDefault();
+    if (!event.currentTarget.reportValidity()) return;
     const age = document.getElementById('matcher-age').value;
     const confidence = document.getElementById('matcher-confidence').value;
     const goal = document.getElementById('matcher-goal').value;
@@ -85,7 +86,7 @@
     else if (goal === 'personal') { title = 'Private 1:1 Lesson'; anchor = 'private'; explanation = 'One-to-one coaching can match the swimmer’s pace, confidence, communication style and individual goals.'; }
     else if (confidence === 'independent' || goal === 'technique') { title = 'Stroke Development'; anchor = 'stroke'; explanation = 'A technique-focused pathway can strengthen movement patterns, breathing and endurance for an independent swimmer.'; }
     else if (age === 'teenadult' && (confidence === 'new' || goal === 'confidence')) { title = 'Adult / Teen Private Assessment'; anchor = 'private'; explanation = 'A calm private assessment gives a teen or adult a personal, no-pressure starting point.'; }
-    const query = new URLSearchParams({program:title});
+    const query = new URLSearchParams({program:title, matcher_age:age, matcher_confidence:confidence, matcher_goal:goal});
     const result = document.getElementById('matcher-result');
     result.innerHTML = `<span class="matcher-result-label">Suggested starting point</span><strong>${esc(title)}</strong><p>${esc(explanation)}</p><div class="matcher-result-actions"><a class="btn btn-blue btn-small" href="enquire.html?${query}">Continue to enquiry</a><a class="text-link" href="#${anchor}">Review this program</a></div>`;
     result.classList.add('has-result');

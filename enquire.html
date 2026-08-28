@@ -21,9 +21,10 @@
   <link rel="icon" href="assets/app-icon-v3-64.png">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="assets/app-icon-v3-180.png">
-  <link rel="stylesheet" href="assets/styles.css?v=5.3.1">
-  <script defer src="assets/app.js?v=5.3.1"></script>
-  <script defer src="assets/enquire.js?v=5.3.1"></script>
+  <link rel="preload" as="image" href="assets/hero-enquire-v4.jpg" fetchpriority="high">
+  <link rel="stylesheet" href="assets/styles.css?v=5.4.2">
+  <script defer src="assets/app.js?v=5.4.2"></script>
+  <script defer src="assets/enquire.js?v=5.4.2"></script>
 </head>
 <body data-page="enquire">
   <a class="skip-link" href="#main-content">Skip to main content</a>
@@ -49,6 +50,7 @@
 
         <form class="enrolment-wizard reveal" id="enrolment-wizard" novalidate>
           <div class="enrolment-topline"><span id="wizard-step-label" aria-live="polite">Step 1 of 4</span><div id="wizard-progress-track" role="progressbar" aria-label="Enquiry progress" aria-valuemin="1" aria-valuemax="4" aria-valuenow="1" aria-valuetext="Step 1 of 4"><i id="wizard-progress-bar"></i></div></div>
+          <div class="enquiry-draft-notice" id="enquiry-draft-notice" role="status" hidden><span aria-hidden="true">✓</span><p><strong>Lesson preferences restored.</strong> We kept only non-contact choices from this browser tab. Names and contact details are never saved here.</p><button type="button" id="enquiry-draft-clear">Start again</button></div>
 
           <section class="wizard-step active" data-step="1">
             <div class="wizard-heading"><span>01 · The swimmer</span><h2 tabindex="-1">Who are we helping?</h2><p>Age gives us a useful starting point, but the next step will focus on confidence and current skills.</p></div>

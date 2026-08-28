@@ -1733,3 +1733,289 @@ body:not([data-platform-page]) .reveal { transform:translateY(18px); transition-
   body:not([data-platform-page]) .mobile-book-bar,
   body:not([data-platform-page]) .shop-mobile-bar { display:none!important; }
 }
+
+/* V5.4 — truthful live states, distinct campaign imagery and a stronger trust-led footer. */
+body:not([data-platform-page]) .hero .reveal,
+body:not([data-platform-page]) .programs-hero .reveal,
+body:not([data-platform-page]) .enrolment-hero .reveal,
+body:not([data-platform-page]) .about-hero .reveal,
+body:not([data-platform-page]) .shop-hero .reveal,
+body:not([data-platform-page]) .app-hero-intro.reveal {
+  opacity:1;
+  transform:none;
+  animation:heroCopyIn .58s cubic-bezier(.2,.75,.2,1) both;
+}
+@keyframes heroCopyIn {
+  from { opacity:.76; transform:translateY(8px); }
+  to { opacity:1; transform:none; }
+}
+body:not([data-platform-page]) .programs-hero::before {
+  opacity:1;
+  background:
+    linear-gradient(90deg,rgba(2,13,31,.98) 0%,rgba(3,23,48,.91) 43%,rgba(3,25,51,.36) 72%,rgba(3,25,51,.12) 100%),
+    url("hero-programs-v4.jpg") 72% center/cover no-repeat;
+  filter:saturate(.9) contrast(1.03);
+}
+body:not([data-platform-page]) .enrolment-hero::before {
+  opacity:1;
+  background:
+    linear-gradient(90deg,rgba(2,13,31,.98) 0%,rgba(3,23,48,.91) 43%,rgba(3,25,51,.35) 72%,rgba(3,25,51,.1) 100%),
+    url("hero-enquire-v4.jpg") 72% center/cover no-repeat;
+  filter:saturate(.9) contrast(1.03);
+}
+body:not([data-platform-page]) .about-hero-image {
+  background:
+    linear-gradient(90deg,rgba(2,14,34,.98) 0%,rgba(3,24,50,.9) 45%,rgba(3,25,51,.28) 75%,rgba(3,25,51,.08) 100%),
+    url("hero-about-v4-female.jpg") 72% center/cover no-repeat;
+}
+body:not([data-platform-page]) .about-portrait::before {
+  opacity:.95;
+  background:url("hero-about-v4-female.jpg") 70% center/cover no-repeat;
+}
+
+@media (max-width:700px) {
+  body:not([data-platform-page]) .mobile-book-bar.is-managed:not(.is-visible) {
+    opacity:0;
+    pointer-events:none;
+    transform:translateY(calc(100% + 22px));
+  }
+  body:not([data-platform-page]) .mobile-book-bar.is-managed {
+    transition:opacity .24s ease,transform .32s cubic-bezier(.2,.75,.2,1);
+  }
+}
+body.app-page .app-launch-status {
+  width:max-content;
+  max-width:100%;
+  margin:18px auto 14px;
+  padding:8px 13px;
+  border:1px solid rgba(117,225,246,.22);
+  border-radius:999px;
+  color:#93e5f4;
+  background:rgba(6,43,81,.68);
+  font-size:.61rem;
+  font-weight:850;
+}
+body.app-page.app-launch-mode [data-app-marketing] { display:none; }
+body.app-page.app-launch-mode .app-topbar [data-install-app] { display:none; }
+body.app-page.app-launch-mode .app-hero-intro { padding-bottom:32px; }
+body.app-page.app-launch-mode .app-role-grid { margin-top:18px; }
+body.app-page.app-launch-mode .app-platform-card { margin-top:18px; }
+
+body:not([data-platform-page]) .facebook-section {
+  position:relative;
+  overflow:hidden;
+  background:
+    radial-gradient(circle at 8% 18%,rgba(53,200,232,.12),transparent 27%),
+    linear-gradient(180deg,#fff 0%,#f3f8fc 100%);
+}
+body:not([data-platform-page]) .enquiry-draft-notice {
+  display:grid;
+  grid-template-columns:34px 1fr auto;
+  align-items:center;
+  gap:13px;
+  margin:-10px 0 26px;
+  padding:13px 14px;
+  border:1px solid rgba(6,121,171,.2);
+  border-radius:14px;
+  color:#365a73;
+  background:#eef9fc;
+}
+body:not([data-platform-page]) .enquiry-draft-notice[hidden] { display:none; }
+body:not([data-platform-page]) .enquiry-draft-notice > span { display:grid; place-items:center; width:32px; height:32px; border-radius:10px; color:#063358; background:#67d7ed; font-weight:900; }
+body:not([data-platform-page]) .enquiry-draft-notice p { font-size:.65rem; line-height:1.55; }
+body:not([data-platform-page]) .enquiry-draft-notice strong { color:#083d63; }
+body:not([data-platform-page]) .enquiry-draft-notice button { padding:7px 0; border:0; color:#076c9f; background:none; font:inherit; font-size:.61rem; font-weight:900; cursor:pointer; text-decoration:underline; text-underline-offset:3px; }
+body:not([data-platform-page]) .facebook-section::before {
+  content:"";
+  position:absolute;
+  width:420px;
+  height:420px;
+  right:-210px;
+  bottom:-250px;
+  border:1px solid rgba(9,101,154,.13);
+  border-radius:50%;
+  box-shadow:0 0 0 52px rgba(9,101,154,.035),0 0 0 106px rgba(9,101,154,.025);
+  pointer-events:none;
+}
+body:not([data-platform-page]) .facebook-grid {
+  position:relative;
+  display:grid;
+  grid-template-columns:minmax(0,.86fr) minmax(360px,1.14fr);
+  align-items:center;
+  gap:clamp(46px,7vw,104px);
+}
+body:not([data-platform-page]) .facebook-copy { max-width:560px; }
+body:not([data-platform-page]) .facebook-copy h2 { margin-top:19px; }
+body:not([data-platform-page]) .facebook-copy .lead { margin-top:20px; }
+body:not([data-platform-page]) .facebook-kicker {
+  display:inline-flex;
+  align-items:center;
+  gap:10px;
+  color:#0965a0;
+  font-size:.68rem;
+  font-weight:900;
+  letter-spacing:.13em;
+  text-transform:uppercase;
+}
+body:not([data-platform-page]) .facebook-kicker > span,
+body:not([data-platform-page]) .facebook-consent-mark {
+  display:grid;
+  place-items:center;
+  width:30px;
+  height:30px;
+  border-radius:9px;
+  color:white;
+  background:#1877f2;
+  font-family:Arial,sans-serif;
+  font-size:1.15rem;
+  font-weight:900;
+  text-transform:none;
+  box-shadow:0 9px 20px rgba(24,119,242,.18);
+}
+body:not([data-platform-page]) .facebook-actions { display:flex; flex-wrap:wrap; align-items:center; gap:15px; margin-top:30px; }
+body:not([data-platform-page]) .facebook-actions > span { color:#5c7187; font-size:.64rem; font-weight:750; }
+body:not([data-platform-page]) .facebook-copy > .micro { max-width:500px; margin-top:16px; }
+body:not([data-platform-page]) .facebook-feed-card {
+  min-height:610px;
+  overflow:hidden;
+  border:1px solid rgba(9,41,75,.1);
+  border-radius:30px;
+  background:rgba(255,255,255,.86);
+  box-shadow:0 30px 70px rgba(5,35,68,.13);
+  backdrop-filter:blur(16px);
+}
+body:not([data-platform-page]) .facebook-consent {
+  min-height:610px;
+  display:flex;
+  flex-direction:column;
+  align-items:flex-start;
+  justify-content:center;
+  padding:clamp(30px,5vw,64px);
+  background:
+    linear-gradient(145deg,rgba(255,255,255,.94),rgba(241,248,253,.92)),
+    repeating-linear-gradient(0deg,transparent 0 28px,rgba(9,101,154,.025) 29px 30px);
+}
+body:not([data-platform-page]) .facebook-consent .status { margin-top:32px; }
+body:not([data-platform-page]) .facebook-consent h3 { max-width:430px; margin-top:18px; font-size:clamp(1.45rem,2.4vw,2rem); }
+body:not([data-platform-page]) .facebook-consent p { max-width:450px; margin-top:14px; color:#587087; line-height:1.72; }
+body:not([data-platform-page]) .facebook-consent .btn { margin-top:26px; }
+body:not([data-platform-page]) .facebook-consent .text-link { margin-top:18px; }
+body:not([data-platform-page]) .facebook-feed-card.is-loaded { min-height:680px; background:white; }
+body:not([data-platform-page]) .facebook-iframe { display:block; width:100%; max-width:500px; min-height:680px; margin:0 auto; border:0; }
+
+body:not([data-platform-page]) .credential-section {
+  padding:90px 0;
+  color:white;
+  background:
+    radial-gradient(circle at 82% 20%,rgba(53,200,232,.13),transparent 25%),
+    linear-gradient(125deg,#03132e 0%,#062957 62%,#06436c 100%);
+}
+body:not([data-platform-page]) .credential-shell {
+  display:grid;
+  grid-template-columns:minmax(260px,.78fr) minmax(0,1.22fr);
+  align-items:center;
+  gap:clamp(38px,6vw,86px);
+}
+body:not([data-platform-page]) .credential-intro h2 { margin-top:17px; color:white; font-size:clamp(1.8rem,3.5vw,3.15rem); }
+body:not([data-platform-page]) .credential-intro p { max-width:610px; margin-top:18px; color:#bdd0e3; line-height:1.75; }
+body:not([data-platform-page]) .credential-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; }
+body:not([data-platform-page]) .credential-card {
+  min-height:228px;
+  display:flex;
+  flex-direction:column;
+  justify-content:space-between;
+  padding:23px;
+  border:1px solid rgba(255,255,255,.12);
+  border-radius:22px;
+  color:#072647;
+  background:rgba(255,255,255,.97);
+  box-shadow:0 18px 46px rgba(0,12,33,.18);
+  transition:transform .25s ease,box-shadow .25s ease,border-color .25s ease;
+}
+body:not([data-platform-page]) .credential-card:hover { transform:translateY(-4px); border-color:rgba(53,200,232,.5); box-shadow:0 24px 54px rgba(0,12,33,.25); }
+body:not([data-platform-page]) .directory-card-mark { display:flex; align-items:center; justify-content:center; flex-direction:column; gap:8px; width:100%; height:105px; border:1px solid #c9dce8; border-radius:20px; color:#087bab; background:linear-gradient(145deg,#f4fbfe,#e8f5fa); box-shadow:inset 0 0 0 7px rgba(255,255,255,.7); }
+body:not([data-platform-page]) .directory-card-mark .ui-icon { width:30px; height:30px; }
+body:not([data-platform-page]) .directory-card-mark::after { content:attr(data-label); color:#3d6c84; font-size:.68rem; font-weight:850; letter-spacing:.08em; text-transform:uppercase; }
+body:not([data-platform-page]) .credential-card span,
+body:not([data-platform-page]) .credential-card strong,
+body:not([data-platform-page]) .credential-card small { display:block; }
+body:not([data-platform-page]) .credential-card strong { font-size:.88rem; line-height:1.35; }
+body:not([data-platform-page]) .credential-card small { margin-top:7px; color:#61788d; font-size:.72rem; font-weight:720; line-height:1.45; }
+
+body:not([data-platform-page]) .country-acknowledgement {
+  position:relative;
+  overflow:hidden;
+  padding:72px 0;
+  color:#f5f8fc;
+  background:#061a3b;
+  border-top:1px solid rgba(255,255,255,.08);
+}
+body:not([data-platform-page]) .country-acknowledgement::before {
+  content:"";
+  position:absolute;
+  inset:0;
+  opacity:.42;
+  background:
+    linear-gradient(115deg,rgba(255,201,40,.08),transparent 42%),
+    radial-gradient(circle at 88% 25%,rgba(201,120,69,.26),transparent 27%);
+  pointer-events:none;
+}
+body:not([data-platform-page]) .country-panel { position:relative; display:grid; grid-template-columns:190px minmax(0,1fr); align-items:center; gap:clamp(34px,6vw,80px); }
+body:not([data-platform-page]) .country-symbol {
+  position:relative;
+  width:172px;
+  aspect-ratio:1;
+  overflow:hidden;
+  border:1px solid rgba(255,255,255,.14);
+  border-radius:50%;
+  background:linear-gradient(180deg,#0d4269 0 49%,#082a4d 50% 100%);
+  box-shadow:0 22px 60px rgba(0,8,24,.25),inset 0 0 0 12px rgba(255,255,255,.025);
+}
+body:not([data-platform-page]) .country-symbol > span { position:absolute; width:58px; height:58px; left:57px; top:35px; border-radius:50%; background:#ffc928; box-shadow:0 0 38px rgba(255,201,40,.25); }
+body:not([data-platform-page]) .country-symbol > i,
+body:not([data-platform-page]) .country-symbol > b { position:absolute; left:-12%; width:124%; height:46px; border:7px solid rgba(78,205,230,.78); border-color:rgba(78,205,230,.78) transparent transparent; border-radius:50%; transform:rotate(-5deg); }
+body:not([data-platform-page]) .country-symbol > i { top:104px; }
+body:not([data-platform-page]) .country-symbol > b { top:124px; opacity:.48; transform:rotate(4deg); }
+body:not([data-platform-page]) .country-location { color:#ffc928; font-size:.65rem; font-weight:900; letter-spacing:.13em; text-transform:uppercase; }
+body:not([data-platform-page]) .country-copy h2 { margin-top:11px; color:white; font-size:clamp(1.65rem,3vw,2.7rem); }
+body:not([data-platform-page]) .country-copy p { max-width:910px; margin-top:17px; color:#cfdae7; font-size:clamp(.84rem,1.3vw,1rem); line-height:1.78; }
+body:not([data-platform-page]) .country-copy a { display:inline-flex; gap:8px; margin-top:18px; color:#7ce3f5; font-size:.68rem; font-weight:800; }
+body:not([data-platform-page]) .country-copy a:hover { color:white; }
+
+@media (max-width:980px) {
+  body:not([data-platform-page]) .facebook-grid,
+  body:not([data-platform-page]) .credential-shell { grid-template-columns:1fr; }
+  body:not([data-platform-page]) .facebook-copy { max-width:680px; }
+  body:not([data-platform-page]) .facebook-feed-card { width:100%; max-width:620px; }
+  body:not([data-platform-page]) .credential-grid { max-width:760px; }
+}
+@media (max-width:700px) {
+  body:not([data-platform-page]) .programs-hero::before { background-position:76% center; }
+  body:not([data-platform-page]) .enrolment-hero::before { background-position:77% center; }
+  body:not([data-platform-page]) .about-hero-image { background-position:76% center; }
+  body:not([data-platform-page]) .facebook-grid { gap:38px; }
+  body:not([data-platform-page]) .facebook-feed-card,
+  body:not([data-platform-page]) .facebook-consent { min-height:500px; }
+  body:not([data-platform-page]) .facebook-consent { padding:28px 23px; }
+  body:not([data-platform-page]) .facebook-actions { align-items:flex-start; flex-direction:column; }
+  body:not([data-platform-page]) .enquiry-draft-notice { grid-template-columns:32px 1fr; }
+  body:not([data-platform-page]) .enquiry-draft-notice button { grid-column:2; justify-self:start; }
+  body:not([data-platform-page]) .credential-section { padding:68px 0; }
+  body:not([data-platform-page]) .credential-grid { grid-template-columns:1fr; }
+  body:not([data-platform-page]) .credential-card { min-height:158px; display:grid; grid-template-columns:120px 1fr; align-items:center; gap:20px; }
+  body:not([data-platform-page]) .directory-card-mark { width:112px; height:88px; }
+  body:not([data-platform-page]) .country-acknowledgement { padding:60px 0; }
+  body:not([data-platform-page]) .country-panel { grid-template-columns:1fr; }
+  body:not([data-platform-page]) .country-symbol { width:128px; }
+  body:not([data-platform-page]) .country-symbol > span { width:44px; height:44px; left:42px; top:25px; }
+  body:not([data-platform-page]) .country-symbol > i { top:77px; }
+  body:not([data-platform-page]) .country-symbol > b { top:93px; }
+}
+@media (prefers-reduced-motion:reduce) {
+  body:not([data-platform-page]) .hero .reveal,
+  body:not([data-platform-page]) .programs-hero .reveal,
+  body:not([data-platform-page]) .enrolment-hero .reveal,
+  body:not([data-platform-page]) .about-hero .reveal,
+  body:not([data-platform-page]) .shop-hero .reveal,
+  body:not([data-platform-page]) .app-hero-intro.reveal { animation:none; }
+}

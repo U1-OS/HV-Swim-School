@@ -11,7 +11,12 @@
   const incoming=new URLSearchParams(location.search);
   const queryProgram=incoming.get('program')||'';
   const queryClass=incoming.get('class')||'';
+  const knownLocations=['Wood Street Indoor Pool','Bendigo East Swimming Pool'];
+  const queryLocation=knownLocations.find(item=>item===incoming.get('location'))||'';
   const merchInterest=incoming.get('merch')||'';
+  const matcherConfidence=incoming.get('matcher_confidence')||'';
+  const matcherGoal=incoming.get('matcher_goal')||'';
+  const DRAFT_KEY='hv-swim-enquiry-preferences-v1';
   let currentStep=1;
   let classes=[];
 
@@ -22,6 +27,24 @@
     preferredClass:document.getElementById('preferred-class'),preferredDays:document.getElementById('preferred-days'),experience:document.getElementById('experience-summary'),notes:document.getElementById('experience-notes'),
     phone:document.getElementById('contact-phone'),contactMethod:document.getElementById('contact-method')
   };
+
+  function readDraft(){
+    try{return JSON.parse(sessionStorage.getItem(DRAFT_KEY)||'null');}catch(_){return null;}
+  }
+  function saveDraft(){
+    if(merchInterest)return;
+    const draft={
+      age:elements.age.value,
+      confidence:form.querySelector('[name="confidence"]:checked')?.value||'',
+      goal:elements.goal.value,
+      program:elements.program.value,
+      preferredClass:elements.preferredClass.value,
+      preferredDays:[...form.querySelectorAll('[name="preferred_day"]:checked')].map(input=>input.value),
+      savedAt:Date.now()
+    };
+    try{sessionStorage.setItem(DRAFT_KEY,JSON.stringify(draft));}catch(_){}
+  }
+  function clearDraft(){try{sessionStorage.removeItem(DRAFT_KEY);}catch(_){}}
 
   function stepElement(step){return document.querySelector(`[data-step="${step}"]`);}
   function fieldLabel(input){
@@ -114,21 +137,29 @@
   function renderClasses(){
     const target=document.getElementById('wizard-class-grid');
     const group=programGroup();
-    const sorted=[...classes].sort((a,b)=>Number(classGroup(a.title)!==group)-Number(classGroup(b.title)!==group));
+    const locationMatch=item=>Boolean(queryLocation&&String(item.location_name||'')===queryLocation);
+    const sorted=[...classes].sort((a,b)=>{
+      const programScore=Number(classGroup(a.title)!==group)-Number(classGroup(b.title)!==group);
+      if(programScore)return programScore;
+      return Number(!locationMatch(a))-Number(!locationMatch(b));
+    });
     target.innerHTML=`<label class="wizard-class-card flexible"><input type="radio" name="class_choice" value="Flexible—team recommendation"><span class="class-choice-check">✓</span><div><span class="class-match-label">Best fit</span><strong>Keep me flexible</strong><small>Let HV Swim recommend the program, class and time.</small></div></label>`+sorted.map(item=>{
       const available=Number(item.available||0);
       const time=classTime(item.start_time);
       const value=`${item.title} · ${days[item.weekday]} ${time} · ${item.location_name}`;
       const isMatch=classGroup(item.title)===group;
-      const selected=queryClass&&value.toLowerCase().includes(queryClass.toLowerCase().replace(' at ',' · '));
-      return `<label class="wizard-class-card ${isMatch?'recommended':''}"><input type="radio" name="class_choice" value="${esc(value)}" ${selected?'checked':''}><span class="class-choice-check">✓</span><div><span class="class-match-label">${isMatch?'Suggested match':'Other pathway'}</span><strong>${esc(item.title)}</strong><small>${esc(days[item.weekday])} · ${esc(time)} · ${esc(item.location_name)}</small><p><b>${money(item.price)} indicative</b><em class="${available?'available':'waitlist'}">${available?`${available} ${available===1?'place':'places'} showing`:'Waitlist'}</em></p></div></label>`;
+      const selected=(queryClass&&value.toLowerCase().includes(queryClass.toLowerCase().replace(' at ',' · ')))||(!queryClass&&elements.preferredClass.value===value);
+      const preferredVenue=locationMatch(item);
+      const matchLabel=isMatch&&preferredVenue?'Program + venue match':(preferredVenue?'Preferred venue':(isMatch?'Suggested match':'Other pathway'));
+      return `<label class="wizard-class-card ${isMatch?'recommended':''}"><input type="radio" name="class_choice" value="${esc(value)}" ${selected?'checked':''}><span class="class-choice-check">✓</span><div><span class="class-match-label">${matchLabel}</span><strong>${esc(item.title)}</strong><small>${esc(days[item.weekday])} · ${esc(time)} · ${esc(item.location_name)}</small><p><b>${money(item.price)} indicative</b><em class="${available?'available':'waitlist'}">${available?`${available} ${available===1?'place':'places'} showing`:'Waitlist'}</em></p></div></label>`;
     }).join('');
     const selected=target.querySelector('[name="class_choice"]:checked');
     if(selected)elements.preferredClass.value=selected.value;
+    else if(queryLocation)elements.preferredClass.value=`Location preference: ${queryLocation}`;
   }
   function filterClasses(){if(classes.length)renderClasses();}
-  document.getElementById('wizard-class-grid').addEventListener('change',event=>{if(event.target.name==='class_choice')elements.preferredClass.value=event.target.value;});
-  document.querySelector('.day-choice-grid').addEventListener('change',()=>{elements.preferredDays.value=[...form.querySelectorAll('[name="preferred_day"]:checked')].map(input=>input.value).join(', ');});
+  document.getElementById('wizard-class-grid').addEventListener('change',event=>{if(event.target.name==='class_choice'){elements.preferredClass.value=event.target.value;saveDraft();}});
+  document.querySelector('.day-choice-grid').addEventListener('change',()=>{elements.preferredDays.value=[...form.querySelectorAll('[name="preferred_day"]:checked')].map(input=>input.value).join(', ');saveDraft();});
 
   function renderReview(){
     if(merchInterest){
@@ -143,13 +174,13 @@
     if(merchInterest)return `Merchandise collection interest: ${merchInterest}`;
     const confidence=form.querySelector('[name="confidence"]:checked')?.value||'Not supplied';
     const goal=elements.goal.selectedOptions[0]?.textContent||'Not supplied';
-    return `Confidence: ${confidence}. Main goal: ${goal}.${elements.notes.value.trim()?` Additional context: ${elements.notes.value.trim()}`:''}`;
+    return `Confidence: ${confidence}. Main goal: ${goal}.${queryLocation?` Preferred location: ${queryLocation}.`:''}${elements.notes.value.trim()?` Additional context: ${elements.notes.value.trim()}`:''}`;
   }
 
   elements.next.addEventListener('click',()=>{if(validateStep(currentStep)){if(currentStep===2)recommendation();showStep(currentStep+1);}});
   elements.back.addEventListener('click',()=>showStep(currentStep-1));
   elements.contactMethod.addEventListener('change',syncPhoneRequirement);
-  form.addEventListener('change',event=>{if(['confidence','swimmer-goal'].includes(event.target.name)||event.target.id==='swimmer-goal')recommendation();});
+  form.addEventListener('change',event=>{if(['confidence','swimmer-goal'].includes(event.target.name)||event.target.id==='swimmer-goal')recommendation();saveDraft();});
   form.addEventListener('submit',async event=>{
     event.preventDefault();
     if(!validateStep(4))return;
@@ -163,6 +194,7 @@
       form.hidden=true;document.querySelector('.enrolment-progress').hidden=true;
       document.getElementById('success-reference').textContent=result.reference||`HV-ENQ-${String(result.id).padStart(4,'0')}`;
       const success=document.getElementById('enrolment-success');success.hidden=false;
+      clearDraft();
       success.scrollIntoView({behavior:'smooth',block:'center'});
       requestAnimationFrame(()=>success.querySelector('h2')?.focus({preventScroll:true}));
     }catch(problem){elements.error.textContent=`${problem.message} Please try again or call 0413 462 112.`;elements.submit.disabled=false;elements.submit.innerHTML='Send secure enquiry <span aria-hidden="true">→</span>';}
@@ -173,11 +205,62 @@
   document.querySelectorAll('.wizard-heading h2').forEach(heading=>heading.tabIndex=-1);
   document.querySelector('#enrolment-success h2')?.setAttribute('tabindex','-1');
   syncPhoneRequirement();
+  if(!merchInterest){
+    const draft=readDraft();
+    const confidenceValues=[...form.querySelectorAll('[name="confidence"]')].map(input=>input.value);
+    const queryConfidenceMap={new:'New, cautious or nervous around water',supported:'Comfortable with support',independent:'Swimming independently'};
+    const preferredConfidence=queryConfidenceMap[matcherConfidence]||'';
+    const preferredGoal=['confidence','skills','safety','technique','personal'].includes(matcherGoal)?matcherGoal:'';
+    if(draft&&typeof draft==='object'){
+      if(draft.age)elements.age.value=draft.age;
+      const savedConfidence=confidenceValues.includes(draft.confidence)?draft.confidence:'';
+      const confidence=preferredConfidence||savedConfidence;
+      if(confidence)form.querySelectorAll('[name="confidence"]').forEach(input=>input.checked=input.value===confidence);
+      elements.goal.value=preferredGoal||draft.goal||'';
+      if(!queryProgram&&draft.program)elements.program.value=draft.program;
+      if(!queryClass&&draft.preferredClass)elements.preferredClass.value=draft.preferredClass;
+      if(Array.isArray(draft.preferredDays))form.querySelectorAll('[name="preferred_day"]').forEach(input=>input.checked=draft.preferredDays.includes(input.value));
+      elements.preferredDays.value=[...form.querySelectorAll('[name="preferred_day"]:checked')].map(input=>input.value).join(', ');
+      const hasSavedChoice=Boolean(draft.age||draft.confidence||draft.goal||draft.program||draft.preferredClass||(Array.isArray(draft.preferredDays)&&draft.preferredDays.length));
+      document.getElementById('enquiry-draft-notice').hidden=!hasSavedChoice;
+    }else{
+      if(preferredConfidence)form.querySelectorAll('[name="confidence"]').forEach(input=>input.checked=input.value===preferredConfidence);
+      if(preferredGoal)elements.goal.value=preferredGoal;
+    }
+    if((form.querySelector('[name="confidence"]:checked')&&elements.goal.value)||queryProgram)recommendation();
+  }
+  document.getElementById('enquiry-draft-clear')?.addEventListener('click',()=>{
+    clearDraft();
+    elements.age.value='';elements.goal.value='';elements.program.value=queryProgram||'';elements.preferredClass.value=queryLocation?`Location preference: ${queryLocation}`:'';elements.preferredDays.value='';
+    form.querySelectorAll('[name="confidence"],[name="preferred_day"],[name="class_choice"]').forEach(input=>input.checked=false);
+    const recommendationPanel=document.getElementById('pathway-recommendation');
+    recommendationPanel.classList.remove('ready');
+    recommendationPanel.innerHTML='<span>Suggested pathway</span><strong>Complete both choices to see a starting point.</strong><p>The HV Swim team will personally confirm the final class match.</p>';
+    document.getElementById('enquiry-draft-notice').hidden=true;
+    showStep(1,false);
+    elements.age.focus();
+  });
   if(queryProgram){elements.program.value=queryProgram;document.getElementById('pathway-recommendation').innerHTML=`<span>Selected pathway</span><strong>${esc(queryProgram)}</strong><p>Complete the confidence questions so the team can confirm this starting point.</p>`;}
+  if(queryLocation){
+    elements.preferredClass.value=`Location preference: ${queryLocation}`;
+    const heroCopy=document.querySelector('.enrolment-hero-grid > div > p');
+    if(heroCopy)heroCopy.textContent=`${queryLocation} is saved as your preferred location. Tell us about the swimmer so the team can confirm a suitable program, class and time.`;
+    const classCopy=stepElement(3)?.querySelector('.wizard-heading p');
+    if(classCopy)classCopy.textContent=`Preferred venue: ${queryLocation}. Select a current class as a preference, or stay flexible and let the team recommend one.`;
+  }
+  document.querySelectorAll('a[href="#enrolment"]').forEach(link=>link.addEventListener('click',event=>{
+    event.preventDefault();
+    history.replaceState(null,'','#enrolment');
+    showStep(currentStep,true);
+  }));
   if(merchInterest){
     elements.swimmerName.value='Merchandise enquiry';elements.age.value='Adult';elements.program.value='HV Swim Collection';elements.preferredClass.value='Not applicable';elements.notes.value=merchInterest;
     document.querySelector('.enrolment-hero h1').innerHTML='Your collection <span>interest is ready.</span>';
     document.querySelector('.enrolment-hero-grid > div > p').textContent='Add your contact details and send the saved merchandise preferences directly to the HV Swim team before the collection launches.';
     showStep(4,false);
-  }else showStep(1,false);
+  }else{
+    showStep(1,false);
+    // Keep an incoming program authoritative after the initial wizard render.
+    if(queryProgram)elements.program.value=queryProgram;
+  }
 })();
