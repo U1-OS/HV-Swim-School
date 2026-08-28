@@ -112,7 +112,7 @@ p { margin: 0; }
 
 /* Hero */
 .hero { position: relative; min-height: 760px; color: white; display: grid; align-items: center; overflow: hidden; background: #03132e; }
-.hero::before { content:""; position:absolute; inset:0; background: linear-gradient(90deg, rgba(3,14,36,.98) 2%, rgba(3,18,44,.86) 37%, rgba(3,20,46,.24) 65%, rgba(3,18,42,.22)), url("hero-swimmer.png") center/cover no-repeat; transform: scale(1.02); animation: heroDrift 15s ease-in-out infinite alternate; }
+.hero::before { content:""; position:absolute; inset:0; background: linear-gradient(90deg, rgba(3,14,36,.98) 2%, rgba(3,18,44,.86) 37%, rgba(3,20,46,.24) 65%, rgba(3,18,42,.22)), url("hero-swimmer.jpg") center/cover no-repeat; transform: scale(1.02); animation: heroDrift 15s ease-in-out infinite alternate; }
 .hero::after { content:""; position:absolute; inset:auto 0 0; height:180px; background:linear-gradient(180deg, transparent, rgba(1,11,27,.9)); }
 .hero-glow { position:absolute; left:-14vw; top:-25vw; width:60vw; height:60vw; border-radius:50%; background:radial-gradient(circle, rgba(0,157,255,.18), transparent 63%); }
 .hero-caustics { position:absolute; z-index:1; inset:-20%; opacity:.16; mix-blend-mode:screen; pointer-events:none; background:repeating-radial-gradient(ellipse at 72% 32%,transparent 0 28px,rgba(116,226,255,.4) 30px 31px,transparent 33px 68px); transform:rotate(-8deg); animation:causticFloat 13s ease-in-out infinite alternate; }
@@ -198,7 +198,7 @@ p { margin: 0; }
 .loading-card span:nth-child(2){width:72%;height:28px;margin-top:42px}.loading-card span:nth-child(3){width:48%;margin-top:auto}
 .about-layout { display:grid; grid-template-columns:1fr 1.1fr; gap:70px; align-items:center; }
 .photo-panel { position:relative; min-height:520px; border-radius:34px; background:linear-gradient(150deg,#082a59,#004e93); overflow:hidden; box-shadow:var(--shadow); }
-.photo-panel::before { content:""; position:absolute; inset:0; background:url("hero-swimmer.png") 66% center/auto 100% no-repeat; opacity:.9; }
+.photo-panel::before { content:""; position:absolute; inset:0; background:url("hero-swimmer.jpg") 66% center/auto 100% no-repeat; opacity:.9; }
 .photo-panel::after { content:""; position:absolute; inset:0; background:linear-gradient(0deg,rgba(3,15,35,.7),transparent 65%); }
 .photo-caption { position:absolute; z-index:2; left:25px; right:25px; bottom:25px; padding:18px 20px; border:1px solid rgba(255,255,255,.17); border-radius:18px; color:white; background:rgba(4,21,45,.62); backdrop-filter:blur(14px); }
 .photo-caption strong { display:block; }
@@ -513,7 +513,7 @@ p { margin: 0; }
 
 /* Programs and pricing */
 .programs-hero { position:relative; min-height:720px; display:grid; align-items:center; overflow:hidden; color:white; background:radial-gradient(circle at 77% 30%,#0a6592 0,transparent 23%),linear-gradient(118deg,#031229 0%,#062857 52%,#064978 100%); }
-.programs-hero::before { content:""; position:absolute; inset:0; opacity:.18; background:url("hero-swimmer.png") 88% center/auto 108% no-repeat; filter:saturate(.7) contrast(1.1); }
+.programs-hero::before { content:""; position:absolute; inset:0; opacity:.18; background:url("hero-swimmer.jpg") 88% center/auto 108% no-repeat; filter:saturate(.7) contrast(1.1); }
 .programs-hero::after { content:""; position:absolute; inset:0; background:linear-gradient(90deg,rgba(2,14,34,.55),transparent 72%); }
 .programs-hero-water { position:absolute; z-index:1; inset:-20%; opacity:.18; background:repeating-radial-gradient(ellipse at 75% 42%,transparent 0 29px,rgba(133,235,255,.42) 31px 32px,transparent 34px 70px); transform:rotate(-7deg); animation:causticFloat 14s ease-in-out infinite alternate; }
 .programs-hero-grid { position:relative; z-index:3; display:grid; grid-template-columns:minmax(0,1.25fr) minmax(300px,.55fr); gap:80px; align-items:center; padding:100px 0 130px; }
@@ -589,7 +589,7 @@ p { margin: 0; }
 
 /* Guided enrolment concierge */
 .enrolment-hero { position:relative; min-height:680px; display:grid; align-items:center; overflow:hidden; color:white; background:radial-gradient(circle at 79% 32%,#096594 0,transparent 27%),linear-gradient(120deg,#031329,#062957 57%,#064875); }
-.enrolment-hero::before { content:""; position:absolute; inset:0; opacity:.16; background:url("hero-swimmer.png") 86% center/auto 112% no-repeat; filter:saturate(.7); }
+.enrolment-hero::before { content:""; position:absolute; inset:0; opacity:.16; background:url("hero-swimmer.jpg") 86% center/auto 112% no-repeat; filter:saturate(.7); }
 .enrolment-hero::after { content:""; position:absolute; inset:0; background:linear-gradient(90deg,rgba(2,14,34,.62),transparent 75%); }
 .enrolment-hero-water { position:absolute; z-index:1; inset:-20%; opacity:.16; background:repeating-radial-gradient(ellipse at 74% 45%,transparent 0 30px,rgba(131,234,255,.4) 32px 33px,transparent 35px 72px); transform:rotate(-7deg); animation:causticFloat 14s ease-in-out infinite alternate; }
 .enrolment-hero-grid { position:relative; z-index:3; display:grid; grid-template-columns:minmax(0,1.15fr) minmax(300px,.55fr); gap:75px; align-items:center; padding:90px 0 125px; }
@@ -716,7 +716,7 @@ p { margin: 0; }
 
 /* About and teaching approach */
 .about-hero { position:relative; min-height:720px; display:grid; grid-template-columns:minmax(0,1fr); align-items:center; overflow:hidden; color:white; background:#03142e; }
-.about-hero-image { position:absolute; inset:0; background:linear-gradient(90deg,rgba(2,14,34,.98) 0%,rgba(3,24,50,.82) 43%,rgba(3,25,51,.2) 75%),url("hero-swimmer.png") 68% center/cover no-repeat; animation:heroDrift 16s ease-in-out infinite alternate; }
+.about-hero-image { position:absolute; inset:0; background:linear-gradient(90deg,rgba(2,14,34,.98) 0%,rgba(3,24,50,.82) 43%,rgba(3,25,51,.2) 75%),url("hero-swimmer.jpg") 68% center/cover no-repeat; animation:heroDrift 16s ease-in-out infinite alternate; }
 .about-hero::after { content:""; position:absolute; inset:auto 0 0; height:190px; background:linear-gradient(transparent,rgba(2,14,34,.88)); }
 .about-hero-content { position:relative; z-index:2; padding:100px 0 135px; }
 .about-hero-content > div { max-width:760px; }
@@ -732,7 +732,7 @@ p { margin: 0; }
 .about-principles p { margin-top:7px; color:var(--muted); font-size:.64rem; }
 .about-story-grid { display:grid; grid-template-columns:.9fr 1.1fr; gap:75px; align-items:center; }
 .about-portrait { position:relative; min-height:570px; overflow:hidden; border-radius:32px; background:linear-gradient(145deg,#073661,#0081ac); box-shadow:var(--shadow); }
-.about-portrait::before { content:""; position:absolute; inset:0; opacity:.93; background:url("hero-swimmer.png") 62% center/auto 108% no-repeat; }
+.about-portrait::before { content:""; position:absolute; inset:0; opacity:.93; background:url("hero-swimmer.jpg") 62% center/auto 108% no-repeat; }
 .about-portrait::after { content:""; position:absolute; inset:0; background:linear-gradient(0deg,rgba(2,16,36,.82),transparent 58%); }
 .about-portrait-caption { position:absolute; z-index:2; left:24px; right:24px; bottom:24px; padding:17px; border:1px solid rgba(255,255,255,.17); border-radius:16px; color:white; background:rgba(3,20,43,.65); backdrop-filter:blur(14px); }
 .about-portrait-caption span,.about-portrait-caption strong { display:block; }

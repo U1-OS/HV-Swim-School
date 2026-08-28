@@ -1,0 +1,20 @@
+# HV Swim Bendigo
+
+User-agent: *
+Allow: /
+
+# Sign-in and role-restricted areas — no public content, nothing to index
+Disallow: /login.html
+Disallow: /platform.html
+Disallow: /admin.html
+Disallow: /staff.html
+Disallow: /customer.html
+
+# Internal and shell pages
+Disallow: /START_HERE.html
+Disallow: /mobile-shell.html
+Disallow: /offline.html
+
+# Sitemap: the production domain is not set yet. Once it is, run
+#   node scripts/build-sitemap.mjs https://your-domain.com.au
+# which writes sitemap.xml and adds the Sitemap line below.

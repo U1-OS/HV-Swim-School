@@ -42,6 +42,11 @@ preview prices.
 - Verified: no broken internal links; departed instructor absent from all site content.
 - Audited exactly what personal data the site collects — see below.
 - Drafted and linked the three legal pages.
+- Cut served image weight from ~3.1MB to ~220KB: `hv-swim-logo.png` rebuilt at 400px wide
+  (1.1MB to 44KB, master kept as `hv-swim-logo-source.jpg`) and the hero converted to
+  `hero-swimmer.jpg` (1.8MB to 174KB, master kept as `hero-swimmer-master.png`). All
+  references repointed and the service-worker cache bumped to `hv-swim-v5-shell-16`.
+- Added `robots.txt` (portals disallowed) and `scripts/build-sitemap.mjs`.
 
 ## Next up
 
@@ -62,13 +67,12 @@ Australian adviser. Leave that in place until it actually has been.
 Remaining work, in order:
 
 1. Get Andrew's answers to the twelve flagged items and fill them in.
-2. **Image weight.** `assets/hv-swim-logo.png` is 1.2MB and loads on all 16 pages;
-   `hero-swimmer.png` is 1.9MB. `merch-collection-v2.png` (2.5MB) and
-   `merch-uniform-studio-v3.png` (2.1MB) are referenced nowhere — the `.jpg` versions are
-   what the site uses. Roughly 5MB of avoidable weight.
-3. No `robots.txt` and no `sitemap.xml` (the new legal pages should be in the sitemap).
-4. Accessibility pass against WCAG 2.2 AA — required by `PRODUCTION_HANDOFF.md`, never done.
-5. Merch is blocked on assets, not code: a transparent 300 DPI or vector logo master is
+2. **Set the production domain**, then run `node scripts/build-sitemap.mjs https://the-domain`.
+   That writes `sitemap.xml` and fills in the `Sitemap:` line in `robots.txt`. Nothing was
+   guessed — `HV_PUBLIC_URL` is still `localhost:8765` and no canonical URLs are set on any
+   page. Add `<link rel="canonical">` and `og:url` at the same time.
+3. Accessibility pass against WCAG 2.2 AA — required by `PRODUCTION_HANDOFF.md`, never done.
+4. Merch is blocked on assets, not code: a transparent 300 DPI or vector logo master is
    needed before any supplier sample can be ordered. See `MERCH_PRODUCTION_PLAN.md`.
 
 ## Also outstanding
