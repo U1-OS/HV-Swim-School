@@ -1,9 +1,9 @@
-const CACHE = 'hv-swim-v5-shell-24';
-const PUBLIC_DATA_CACHE = 'hv-swim-v4-public-data-1';
+const CACHE = 'hv-swim-v5-shell-27';
+const PUBLIC_DATA_CACHE = 'hv-swim-v5-public-data-2';
 const SHELL = [
   './', './index.html', './about.html', './programs.html', './app.html', './mobile-shell.html', './login.html', './platform.html', './enquire.html', './locations.html', './shop.html', './customer.html', './staff.html', './admin.html', './offline.html',
-  './assets/styles.css?v=5.1.1', './assets/app.js?v=5.1.2', './assets/hv-swim-logo.png', './assets/hero-swimmer.jpg', './assets/og-share.jpg', './assets/merch-collection-v2.jpg', './assets/merch-uniform-studio-v3.jpg',
-  './assets/platform.css?v=5.1.2', './assets/platform.js?v=5.1.1', './assets/public-api.js?v=5.1.2', './assets/programs.js?v=5.1.1', './assets/shop.js?v=5.1.1', './assets/enquire.js?v=5.1.1', './assets/mobile-shell.css?v=5.1.0', './assets/mobile-shell.js?v=5.1.0',
+  './assets/styles.css?v=5.2.0', './assets/app.js?v=5.2.0', './assets/hv-swim-logo.png', './assets/hero-swimmer.jpg', './assets/og-share.jpg', './assets/merch-collection-v2.jpg', './assets/merch-uniform-studio-v3.jpg',
+  './assets/platform.css?v=5.2.0', './assets/platform.js?v=5.2.1', './assets/public-api.js?v=5.2.0', './assets/programs.js?v=5.2.0', './assets/shop.js?v=5.2.0', './assets/enquire.js?v=5.2.0', './assets/mobile-shell.css?v=5.1.0', './assets/mobile-shell.js?v=5.1.0',
   './assets/app-icon-192.png', './assets/app-icon-512.png', './assets/app-icon-1024.png', './assets/app-icon-maskable-192.png', './assets/app-icon-maskable-512.png', './manifest.webmanifest'
 ];
 
@@ -19,27 +19,33 @@ self.addEventListener('fetch', event => {
   if (url.origin === self.location.origin && url.pathname.startsWith('/api/')) {
     const publicPaths = ['/api/health','/api/public/site-settings','/api/public/locations','/api/public/weather','/api/classes','/api/products'];
     if (publicPaths.includes(url.pathname)) {
-      event.respondWith(fetch(event.request).then(response => {
-        if (response.ok) caches.open(PUBLIC_DATA_CACHE).then(cache => cache.put(event.request, response.clone()));
-        return response;
-      }).catch(() => caches.match(event.request).then(match => match || new Response(JSON.stringify({detail:'Live data needs an internet connection'}),{status:503,headers:{'Content-Type':'application/json'}}))));
+      event.respondWith((async () => {
+        try {
+          const response = await fetch(event.request);
+          if (response.ok) {
+            try { const cache = await caches.open(PUBLIC_DATA_CACHE); await cache.put(event.request, response.clone()); } catch (_) {}
+          }
+          return response;
+        } catch (_) {
+          return (await caches.match(event.request)) || new Response(JSON.stringify({detail:'Live data needs an internet connection'}),{status:503,headers:{'Content-Type':'application/json'}});
+        }
+      })());
       return;
     }
     event.respondWith(fetch(event.request).catch(() => new Response(JSON.stringify({detail:'Sign-in and account changes need an internet connection'}),{status:503,headers:{'Content-Type':'application/json'}})));
     return;
   }
-  if (url.hostname === 'api.open-meteo.com') {
-    event.respondWith(fetch(event.request).catch(() => caches.match(event.request)));
-    return;
-  }
-  event.respondWith(fetch(event.request).then(response => {
-    // Only store successful same-origin responses. Caching a 404 or a 500 would pin that
-    // error for the life of the cache, and cache.put rejects on opaque cross-origin
-    // responses, which surfaced as unhandled errors in the console.
-    if (response.ok && response.type === 'basic') {
-      const copy = response.clone();
-      caches.open(CACHE).then(cache => cache.put(event.request, copy)).catch(() => {});
+  event.respondWith((async () => {
+    try {
+      const response = await fetch(event.request);
+      // Only store successful same-origin responses. Caching a 404 or a 500 would pin that
+      // error for the life of the cache, and cache.put rejects on opaque cross-origin responses.
+      if (response.ok && response.type === 'basic') {
+        try { const cache = await caches.open(CACHE); await cache.put(event.request, response.clone()); } catch (_) {}
+      }
+      return response;
+    } catch (_) {
+      return (await caches.match(event.request)) || (event.request.mode === 'navigate' ? await caches.match('./offline.html') : Response.error());
     }
-    return response;
-  }).catch(() => caches.match(event.request).then(match => match || (event.request.mode === 'navigate' ? caches.match('./offline.html') : Response.error()))));
+  })());
 });

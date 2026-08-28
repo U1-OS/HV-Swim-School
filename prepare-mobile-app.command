@@ -28,21 +28,21 @@ fi
 
 export HV_MOBILE_APP_URL=${MOBILE_URL%/}
 
-echo "Installing pinned mobile build dependencies…"
-npm install
+echo "Installing the locked mobile build dependencies…"
+npx --yes pnpm@11.19.0 install --frozen-lockfile
 echo "Building the secure mobile launch shell…"
-npm run mobile:web
+npx --yes pnpm@11.19.0 run mobile:web
 
 if [[ ! -d ios ]]; then
   echo "Creating the iOS Xcode project…"
-  npx cap add ios
+  ./node_modules/.bin/cap add ios
 fi
 if [[ ! -d android ]]; then
   echo "Creating the Android Studio project…"
-  npx cap add android
+  ./node_modules/.bin/cap add android
 fi
 
-npx cap sync
+./node_modules/.bin/cap sync
 
 echo ""
 echo "Mobile projects are ready."

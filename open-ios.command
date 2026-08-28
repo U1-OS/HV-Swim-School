@@ -7,4 +7,4 @@ if [[ ! -d ios ]]; then
   read -k 1 "?Press any key to close…"
   exit 1
 fi
-npx cap open ios
+./node_modules/.bin/cap open ios

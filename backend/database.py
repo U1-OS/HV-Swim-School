@@ -6,8 +6,8 @@ from contextlib import contextmanager
 from datetime import date, datetime, timedelta, timezone
 from typing import Generator, Iterable
 
-from .config import DB_PATH
-from .security import now_iso, password_hash
+from .config import DB_PATH, settings
+from .security import business_today, now_iso, password_hash
 
 
 SCHEMA = """
@@ -22,6 +22,9 @@ CREATE TABLE IF NOT EXISTS users (
   first_name TEXT NOT NULL,
   last_name TEXT NOT NULL DEFAULT '',
   phone TEXT,
+  xero_employee_id TEXT,
+  xero_payroll_calendar_id TEXT,
+  must_change_password INTEGER NOT NULL DEFAULT 0,
   active INTEGER NOT NULL DEFAULT 1,
   created_at TEXT NOT NULL
 );
@@ -105,8 +108,7 @@ CREATE TABLE IF NOT EXISTS bookings (
   class_id INTEGER NOT NULL REFERENCES classes(id),
   swimmer_id INTEGER NOT NULL REFERENCES swimmers(id),
   status TEXT NOT NULL CHECK (status IN ('confirmed','cancelled','completed')),
-  created_at TEXT NOT NULL,
-  UNIQUE(class_id, swimmer_id, status)
+  created_at TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS waitlist (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -161,6 +163,12 @@ CREATE TABLE IF NOT EXISTS notifications (
   read_at TEXT,
   created_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS notification_receipts (
+  notification_id INTEGER NOT NULL REFERENCES notifications(id) ON DELETE CASCADE,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  read_at TEXT NOT NULL,
+  PRIMARY KEY (notification_id, user_id)
+);
 CREATE TABLE IF NOT EXISTS products (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   sku TEXT UNIQUE NOT NULL,
@@ -193,6 +201,7 @@ CREATE TABLE IF NOT EXISTS oauth_states (
 );
 CREATE TABLE IF NOT EXISTS enquiries (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
+  enquiry_type TEXT NOT NULL DEFAULT 'lesson',
   name TEXT NOT NULL,
   email TEXT NOT NULL,
   phone TEXT,
@@ -222,11 +231,13 @@ CREATE INDEX IF NOT EXISTS idx_sessions_expiry ON sessions(expires_at);
 CREATE INDEX IF NOT EXISTS idx_bookings_class ON bookings(class_id, status);
 CREATE INDEX IF NOT EXISTS idx_pool_readings_location ON pool_readings(location_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_notification_receipts_user ON notification_receipts(user_id, read_at DESC);
 CREATE INDEX IF NOT EXISTS idx_time_entries_status ON time_entries(status, staff_id);
 -- Both rate limits below scan on every sign-in and every public enquiry, and both tables
 -- grow with traffic, so they need covering indexes.
 CREATE INDEX IF NOT EXISTS idx_audit_action_ip ON audit_log(action, ip_address, created_at);
 CREATE INDEX IF NOT EXISTS idx_login_attempts_lookup ON login_attempts(email, ip_address, created_at);
+CREATE INDEX IF NOT EXISTS idx_login_attempts_created_at ON login_attempts(created_at);
 """
 
 
@@ -261,23 +272,78 @@ def rows(rows: Iterable[sqlite3.Row]) -> list[dict]:
     return [dict(row) for row in rows]
 
 
+def migrate_legacy_bookings_table(db: sqlite3.Connection) -> None:
+    """Remove the old three-column UNIQUE constraint without losing booking history."""
+    table_sql = db.execute(
+        "SELECT sql FROM sqlite_master WHERE type='table' AND name='bookings'"
+    ).fetchone()
+    normalised = "".join((table_sql[0] if table_sql else "").lower().split())
+    if "unique(class_id,swimmer_id,status)" not in normalised:
+        return
+
+    # SQLite cannot drop a table-level UNIQUE constraint. Rebuild the table in one
+    # transaction, preserving primary keys so audit references and support records remain
+    # meaningful. There are no inbound foreign keys to bookings, but foreign-key checks are
+    # still run before startup continues.
+    db.execute("PRAGMA foreign_keys=OFF")
+    try:
+        db.executescript(
+            """
+            BEGIN IMMEDIATE;
+            DROP INDEX IF EXISTS idx_bookings_class;
+            DROP INDEX IF EXISTS uniq_booking_confirmed;
+            ALTER TABLE bookings RENAME TO bookings_legacy;
+            CREATE TABLE bookings (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              class_id INTEGER NOT NULL REFERENCES classes(id),
+              swimmer_id INTEGER NOT NULL REFERENCES swimmers(id),
+              status TEXT NOT NULL CHECK (status IN ('confirmed','cancelled','completed')),
+              created_at TEXT NOT NULL
+            );
+            INSERT INTO bookings(id,class_id,swimmer_id,status,created_at)
+              SELECT id,class_id,swimmer_id,status,created_at FROM bookings_legacy;
+            DROP TABLE bookings_legacy;
+            CREATE INDEX idx_bookings_class ON bookings(class_id, status);
+            COMMIT;
+            """
+        )
+    except Exception:
+        if db.in_transaction:
+            db.execute("ROLLBACK")
+        raise
+    finally:
+        db.execute("PRAGMA foreign_keys=ON")
+    if list(db.execute("PRAGMA foreign_key_check")):
+        raise RuntimeError("Booking history migration failed its foreign-key check")
+
+
 def initialise_database() -> None:
     with db_session() as db:
         db.executescript(SCHEMA)
+        migrate_legacy_bookings_table(db)
+        # Rate-limit records carry email and IP data. Enforce the documented retention at
+        # startup as well as during sign-in so a site receiving only failed traffic cannot
+        # grow or retain these rows indefinitely.
+        login_cutoff = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
+        db.execute("DELETE FROM login_attempts WHERE created_at<=?", (login_cutoff,))
         # Database-level guards against double booking. Application code already checks,
         # but two requests arriving together can both pass that check before either writes.
         # Created defensively: an older database containing duplicates must not stop startup.
-        for statement in (
-            "CREATE UNIQUE INDEX IF NOT EXISTS uniq_booking_confirmed ON bookings(class_id, swimmer_id) WHERE status='confirmed'",
-            "CREATE UNIQUE INDEX IF NOT EXISTS uniq_waitlist_waiting ON waitlist(class_id, swimmer_id) WHERE status='waiting'",
+        for index_name, statement in (
+            ("confirmed-booking", "CREATE UNIQUE INDEX IF NOT EXISTS uniq_booking_confirmed ON bookings(class_id, swimmer_id) WHERE status='confirmed'"),
+            ("active-waitlist", "CREATE UNIQUE INDEX IF NOT EXISTS uniq_waitlist_waiting ON waitlist(class_id, swimmer_id) WHERE status='waiting'"),
+            ("open-shift", "CREATE UNIQUE INDEX IF NOT EXISTS uniq_open_shift_per_staff ON time_entries(staff_id) WHERE clock_out IS NULL"),
         ):
             try:
                 db.execute(statement)
-            except sqlite3.IntegrityError:
-                # Existing duplicates need clearing by hand before the guard can apply.
-                pass
+            except sqlite3.IntegrityError as exc:
+                # Production must not run without its safety/payroll uniqueness guards.
+                # Development keeps starting so old preview data can be inspected and fixed.
+                if settings.production:
+                    raise RuntimeError(f"Resolve duplicate {index_name} records before production startup") from exc
         enquiry_columns = {row[1] for row in db.execute("PRAGMA table_info(enquiries)")}
         for column, definition in {
+            "enquiry_type": "TEXT NOT NULL DEFAULT 'lesson'",
             "swimmer_name": "TEXT",
             "program_interest": "TEXT",
             "preferred_class": "TEXT",
@@ -295,6 +361,14 @@ def initialise_database() -> None:
         }.items():
             if column not in product_columns:
                 db.execute(f"ALTER TABLE products ADD COLUMN {column} {definition}")
+        user_columns = {row[1] for row in db.execute("PRAGMA table_info(users)")}
+        for column, definition in {
+            "xero_employee_id": "TEXT",
+            "xero_payroll_calendar_id": "TEXT",
+            "must_change_password": "INTEGER NOT NULL DEFAULT 0",
+        }.items():
+            if column not in user_columns:
+                db.execute(f"ALTER TABLE users ADD COLUMN {column} {definition}")
         created = now_iso()
         base_products = [
             ("HV-SWIMWEAR", "HV Swim Team Swimwear", "Swimwear", "Logo-branded training swimwear for children and adults.", 5995, '["Kids 4-14","Adult XS-XL"]', "planned", "🩱"),
@@ -324,7 +398,7 @@ def initialise_database() -> None:
                 "UPDATE products SET supplier_route=COALESCE(NULLIF(supplier_route,''),?),personalisation=COALESCE(NULLIF(personalisation,''),?) WHERE sku=?",
                 (supplier_route, personalisation, sku),
             )
-        for provider in ("xero", "shopify", "printify", "vistaprint", "email", "sms", "web_push", "pool_sensor"):
+        for provider in ("xero", "shopify", "printify", "vistaprint", "weather", "email", "sms", "web_push", "pool_sensor"):
             db.execute("INSERT OR IGNORE INTO integration_connections(provider,status,metadata,updated_at) VALUES(?,?,?,?)", (provider, "not_connected", "{}", created))
         site_defaults = {
             "announcement_enabled": "0",
@@ -337,9 +411,41 @@ def initialise_database() -> None:
             "primary_cta": "Find the right lesson",
         }
         db.executemany("INSERT OR IGNORE INTO site_settings(key,value,updated_at) VALUES(?,?,?)", [(key, value, created) for key, value in site_defaults.items()])
+        # Verified business venues are operational configuration, not demo people/data.
+        # Seed them idempotently before any early return so a fresh production account can
+        # immediately use pool, roster and class workflows.
+        locations = [
+            ("wood-street", "Wood Street Indoor Pool", "76 Wood Street, California Gully VIC 3556", -36.7339, 144.2595, "Private indoor heated pool", "On-site and nearby street parking", "Wheelchair access and public toilets listed; individual pool-entry needs should be confirmed", "Lessons running", 0),
+            ("bendigo-east", "Bendigo East Swimming Pool", "31 Lansell Street, East Bendigo VIC 3550", -36.7507, 144.3018, "Heated seasonal community facility", "Off-street parking", "Contact venue before booking to confirm pool-entry assistance", "Closed for winter", 0),
+        ]
+        db.executemany(
+            """INSERT OR IGNORE INTO locations(slug,name,address,latitude,longitude,venue_type,parking,accessibility,public_status,sensor_enabled)
+               VALUES(?,?,?,?,?,?,?,?,?,?)""",
+            locations,
+        )
         # Keep the bundled demo account aligned with the current business team.
         db.execute("UPDATE users SET first_name='Laura',last_name='' WHERE email='admin@hvswim.demo'")
         if db.execute("SELECT COUNT(*) FROM users").fetchone()[0]:
+            return
+        if settings.production:
+            if not settings.bootstrap_admin_email or len(settings.bootstrap_admin_password) < 12:
+                raise RuntimeError(
+                    "An empty production database needs HV_BOOTSTRAP_ADMIN_EMAIL and a unique "
+                    "HV_BOOTSTRAP_ADMIN_PASSWORD of at least 12 characters for its first start"
+                )
+            first_name, _, last_name = settings.bootstrap_admin_name.partition(" ")
+            db.execute(
+                "INSERT INTO users(email,password_hash,role,first_name,last_name,created_at) VALUES(?,?,?,?,?,?)",
+                (
+                    settings.bootstrap_admin_email,
+                    password_hash(settings.bootstrap_admin_password),
+                    "admin",
+                    first_name or "HV",
+                    last_name or "Swim Admin",
+                    created,
+                ),
+            )
+            audit(db, None, "bootstrap_admin", "user", db.execute("SELECT last_insert_rowid()").fetchone()[0])
             return
         demo_users = [
             ("parent@hvswim.demo", "FamilyDemo!26", "customer", "Jordan", "Smith", "0413 000 101"),
@@ -353,11 +459,6 @@ def initialise_database() -> None:
                 (email, password_hash(password), role, first, last, phone, created),
             )
         user_ids = {row["email"]: row["id"] for row in db.execute("SELECT id,email FROM users")}
-        locations = [
-            ("wood-street", "Wood Street Indoor Pool", "76 Wood Street, California Gully VIC 3556", -36.7339, 144.2595, "Private indoor heated pool", "On-site and nearby street parking", "Wheelchair access and public toilets listed; individual pool-entry needs should be confirmed", "Lessons running", 0),
-            ("bendigo-east", "Bendigo East Swimming Pool", "31 Lansell Street, East Bendigo VIC 3550", -36.7507, 144.3018, "Heated seasonal community facility", "Off-street parking", "Contact venue before booking to confirm pool-entry assistance", "Closed for winter", 0),
-        ]
-        db.executemany("INSERT INTO locations(slug,name,address,latitude,longitude,venue_type,parking,accessibility,public_status,sensor_enabled) VALUES(?,?,?,?,?,?,?,?,?,?)", locations)
         location_ids = {row["slug"]: row["id"] for row in db.execute("SELECT id,slug FROM locations")}
         db.execute(
             "INSERT INTO swimmers(customer_id,first_name,last_name,date_of_birth,level,emergency_contact,medical_notes,photo_consent,created_at) VALUES(?,?,?,?,?,?,?,?,?)",
@@ -380,7 +481,7 @@ def initialise_database() -> None:
         db.execute("INSERT INTO bookings(class_id,swimmer_id,status,created_at) VALUES(?,?,?,?)", (class_ids["LTS3-THU"], swimmer_ids["Mia"], "confirmed", created))
         db.execute("INSERT INTO bookings(class_id,swimmer_id,status,created_at) VALUES(?,?,?,?)", (class_ids["INF-A-MON"], swimmer_ids["Noah"], "confirmed", created))
         db.execute("INSERT INTO waitlist(class_id,swimmer_id,position,status,created_at) VALUES(?,?,?,?,?)", (class_ids["LTS1-TUE"], swimmer_ids["Mia"], 1, "waiting", created))
-        today = date.today()
+        today = business_today()
         for offset in range(0, 7):
             shift_day = today + timedelta(days=offset)
             if shift_day.weekday() < 6:

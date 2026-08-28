@@ -1,7 +1,7 @@
 """Tests for the password and token layer.
 
-These need only `cryptography`, so they run anywhere the backend runs. They can be driven
-by pytest, or straight from the command line if pytest is not installed:
+These use only Python's standard library. They can be driven by pytest, or straight from
+the command line if pytest is not installed:
 
     pytest tests/test_security.py -q
     python3 tests/test_security.py
@@ -10,12 +10,15 @@ by pytest, or straight from the command line if pytest is not installed:
 from __future__ import annotations
 
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from backend.security import (  # noqa: E402
     PBKDF2_ITERATIONS,
+    business_date_from_timestamp,
+    business_today,
     new_token,
     password_hash,
     password_needs_rehash,
@@ -43,8 +46,8 @@ def test_empty_password_is_rejected():
 
 
 def test_iterations_meet_current_guidance():
-    """OWASP's floor for PBKDF2-SHA256 is 210,000. Raise, never lower."""
-    assert PBKDF2_ITERATIONS >= 210_000
+    """OWASP's current floor for PBKDF2-HMAC-SHA256 is 600,000. Raise, never lower."""
+    assert PBKDF2_ITERATIONS >= 600_000
     assert password_hash(PASSWORD).startswith(f"pbkdf2_sha256${PBKDF2_ITERATIONS}$")
 
 
@@ -73,6 +76,12 @@ def test_session_tokens_are_unique_and_long_enough():
     tokens = {new_token() for _ in range(500)}
     assert len(tokens) == 500
     assert min(len(token) for token in tokens) >= 32
+
+
+def test_business_date_uses_melbourne_not_the_server_timezone():
+    utc_late = datetime(2026, 8, 28, 15, 30, tzinfo=timezone.utc)
+    assert business_today(utc_late).isoformat() == "2026-08-29"
+    assert business_date_from_timestamp("2026-08-28T15:30:00+00:00").isoformat() == "2026-08-29"
 
 
 if __name__ == "__main__":

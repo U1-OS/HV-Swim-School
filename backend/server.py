@@ -9,18 +9,21 @@ from contextlib import asynccontextmanager
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Annotated, Any, Literal
+from urllib.parse import urlparse
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response, status
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.middleware.gzip import GZipMiddleware
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 from pydantic import BaseModel, EmailStr, Field, model_validator
 
 from .config import ROOT, settings
 from .database import audit, db_session, initialise_database, rows
 from .integrations import (
     current_bendigo_weather,
-    decrypt_json,
     encrypt_json,
     pool_sensor_reading,
     printify_products,
@@ -28,20 +31,35 @@ from .integrations import (
     shopify_create_cart,
     shopify_products,
     shopify_ready,
+    weather_ready,
     xero_authorization_url,
     xero_exchange_code,
-    xero_post_timesheets,
     xero_ready,
 )
-from .security import expires_iso, new_token, now_iso, password_hash, password_needs_rehash, password_verify, public_user
+from .security import business_date_from_timestamp, business_today, expires_iso, new_token, now_iso, password_hash, password_needs_rehash, password_verify, public_user
 
 SESSION_COOKIE = "hv_session"
 
 
+def validate_production_config(candidate=settings) -> None:
+    if not candidate.production:
+        return
+    insecure_secrets = {
+        "local-demo-secret-change-before-production",
+        "replace-with-a-long-random-production-secret",
+    }
+    if candidate.session_secret in insecure_secrets or len(candidate.session_secret) < 32:
+        raise RuntimeError("HV_SESSION_SECRET must be a unique random value of at least 32 characters")
+    if not candidate.public_url.startswith("https://"):
+        raise RuntimeError("HV_PUBLIC_URL must use HTTPS in production")
+    xero_configured = bool(candidate.xero_client_id and candidate.xero_client_secret and candidate.xero_redirect_uri)
+    if xero_configured and not candidate.xero_redirect_uri.startswith("https://"):
+        raise RuntimeError("XERO_REDIRECT_URI must use HTTPS in production")
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    if settings.production and settings.session_secret == "local-demo-secret-change-before-production":
-        raise RuntimeError("HV_SESSION_SECRET must be changed before production startup")
+    validate_production_config()
     initialise_database()
     yield
 
@@ -50,15 +68,54 @@ app = FastAPI(
     title="HV Swim Bendigo Platform API",
     version="5.1.0",
     docs_url="/api/docs" if not settings.production else None,
+    openapi_url="/openapi.json" if not settings.production else None,
     redoc_url=None,
     lifespan=lifespan,
 )
+
+# Capacitor serves its bundled shell from a local app origin before opening the connected
+# HTTPS platform. Allow only the documented native origins; API sessions and CSRF checks
+# still apply normally to protected routes.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["capacitor://localhost", "http://localhost", "https://localhost"],
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Accept", "Content-Type", "X-CSRF-Token"],
+)
+app.add_middleware(GZipMiddleware, minimum_size=1000)
+if settings.production:
+    production_host = urlparse(settings.public_url).hostname
+    if production_host:
+        app.add_middleware(TrustedHostMiddleware, allowed_hosts=[production_host])
 
 
 
 
 @app.middleware("http")
 async def security_headers(request: Request, call_next):
+    request_path = str(request.scope.get("path") or "")
+    raw_path = request.scope.get("raw_path", b"")
+    host = request.headers.get("host", "")
+    invalid_target = (
+        not request_path.startswith("/")
+        or "\\" in request_path
+        or (isinstance(raw_path, bytes) and b"\\" in raw_path)
+        or any(character in host for character in ("/", "\\", "@", "#", "?", "\r", "\n", "\t", " "))
+    )
+    if invalid_target:
+        response = JSONResponse(status_code=400, content={"detail": "Invalid request target"})
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["Cache-Control"] = "no-store"
+        return response
+    content_type = request.headers.get("content-type", "").lower()
+    if request_path.startswith("/api/") and content_type.startswith(
+        ("application/x-www-form-urlencoded", "multipart/form-data")
+    ):
+        response = JSONResponse(status_code=415, content={"detail": "API requests must use JSON"})
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["Cache-Control"] = "no-store"
+        return response
     response = await call_next(request)
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "SAMEORIGIN"
@@ -66,12 +123,12 @@ async def security_headers(request: Request, call_next):
     response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=(self)"
     response.headers["Content-Security-Policy"] = (
         "default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; "
-        "script-src 'self'; connect-src 'self' https://api.open-meteo.com; form-action 'self' mailto:; "
+        "script-src 'self'; connect-src 'self'; form-action 'self' mailto:; "
         "base-uri 'self'; frame-ancestors 'self'"
     )
     if settings.production:
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
-    path = request.url.path
+    path = request_path
     if path.startswith("/api/"):
         response.headers["Cache-Control"] = "no-store"
     elif path.startswith("/assets/") and request.url.query.startswith("v="):
@@ -93,6 +150,11 @@ TimeOfDay = Annotated[str, Field(pattern=r"^([01]\d|2[0-3]):[0-5]\d$")]
 class LoginInput(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8, max_length=200)
+
+
+class ChangePasswordInput(BaseModel):
+    current_password: str = Field(min_length=8, max_length=200)
+    new_password: str = Field(min_length=12, max_length=200)
 
 
 class BookingInput(BaseModel):
@@ -130,6 +192,39 @@ class SubmitTimesheetInput(BaseModel):
 
 class ApproveTimesheetInput(BaseModel):
     entry_id: int
+
+
+class AdminUserInput(BaseModel):
+    email: EmailStr
+    temporary_password: str = Field(min_length=12, max_length=200)
+    role: Literal["customer", "staff", "admin"]
+    first_name: str = Field(min_length=1, max_length=80)
+    last_name: str = Field(default="", max_length=80)
+    phone: str = Field(default="", max_length=40)
+
+
+class AdminSwimmerInput(BaseModel):
+    customer_id: int
+    first_name: str = Field(min_length=1, max_length=80)
+    last_name: str = Field(min_length=1, max_length=80)
+    date_of_birth: date | None = None
+    level: str = Field(default="Program match required", max_length=80)
+    emergency_contact: str = Field(default="", max_length=180)
+    medical_notes: str = Field(default="", max_length=800)
+    photo_consent: bool = False
+
+
+class AccountStatusInput(BaseModel):
+    active: bool
+
+
+class AdminPasswordResetInput(BaseModel):
+    temporary_password: str = Field(min_length=12, max_length=200)
+
+
+class XeroStaffMappingInput(BaseModel):
+    employee_id: str = Field(default="", max_length=80)
+    payroll_calendar_id: str = Field(default="", max_length=80)
 
 
 class ClassInput(BaseModel):
@@ -170,6 +265,7 @@ class NotificationInput(BaseModel):
 
 
 class EnquiryInput(BaseModel):
+    enquiry_type: Literal["lesson", "merchandise", "general"] = "lesson"
     name: str = Field(min_length=2, max_length=100)
     email: EmailStr
     phone: str = Field(default="", max_length=40)
@@ -278,14 +374,21 @@ def location_by_slug(db: sqlite3.Connection, slug: str) -> sqlite3.Row:
 def integration_summary(db: sqlite3.Connection) -> list[dict[str, Any]]:
     output = []
     configuration = {
-        "xero": {"configured": xero_ready(), "description": "Existing Xero organisation · OAuth and payroll mapping"},
+        "xero": {
+            "configured": xero_ready(),
+            "oauth_implemented": True,
+            "payroll_transmission_implemented": False,
+            "transmission_locked": True,
+            "description": "Existing Xero organisation · secure OAuth connection and payroll-readiness preview",
+        },
         "shopify": {"configured": shopify_ready(), "description": "Storefront catalogue, cart and checkout"},
+        "weather": {"configured": weather_ready(), "implemented": True, "description": "Cached Bendigo conditions · commercial key required in production"},
         "printify": {"configured": printify_ready(), "description": "POD products, mockups and Shopify fulfilment"},
         "vistaprint": {"configured": False, "description": "Manual uniforms and promotional-product supplier workflow"},
-        "email": {"configured": bool(settings.email_provider and settings.email_api_key), "description": "Transactional email provider"},
-        "sms": {"configured": bool(settings.sms_provider and settings.sms_api_key), "description": "SMS reminders and urgent closures"},
-        "web_push": {"configured": bool(settings.web_push_public_key and settings.web_push_private_key), "description": "App push notifications"},
-        "pool_sensor": {"configured": bool(settings.pool_sensor_url), "description": "Optional automatic pool sensor feed"},
+        "email": {"configured": False, "credentials_present": bool(settings.email_provider and settings.email_api_key), "implemented": False, "description": "Provider adapter required; in-app notices work now"},
+        "sms": {"configured": False, "credentials_present": bool(settings.sms_provider and settings.sms_api_key), "implemented": False, "description": "Provider adapter required; in-app notices work now"},
+        "web_push": {"configured": False, "credentials_present": bool(settings.web_push_public_key and settings.web_push_private_key), "implemented": False, "description": "Push adapter and consent flow required; in-app notices work now"},
+        "pool_sensor": {"configured": bool(settings.pool_sensor_url), "implemented": bool(settings.pool_sensor_url), "description": "Optional sensor connectivity probe; staff publication remains authoritative"},
     }
     for row in db.execute("SELECT provider,status,metadata,updated_at FROM integration_connections ORDER BY provider"):
         item = dict(row)
@@ -351,6 +454,7 @@ def login(payload: LoginInput, request: Request, response: Response) -> dict[str
     ip = client_ip(request)
     cutoff = (datetime.now(timezone.utc) - timedelta(minutes=15)).isoformat()
     with db_session() as db:
+        db.execute("DELETE FROM login_attempts WHERE created_at<=?", (login_attempt_cutoff(),))
         failures = db.execute("SELECT COUNT(*) FROM login_attempts WHERE email=? AND ip_address=? AND success=0 AND created_at>?", (email, ip, cutoff)).fetchone()[0]
         if failures >= 10:
             raise HTTPException(status_code=429, detail="Too many sign-in attempts. Try again in 15 minutes.")
@@ -367,9 +471,6 @@ def login(payload: LoginInput, request: Request, response: Response) -> dict[str
             db.execute("UPDATE users SET password_hash=? WHERE id=?", (refreshed_hash, user["id"]))
         session_id, csrf = new_token(32), new_token(24)
         db.execute("DELETE FROM sessions WHERE expires_at<=?", (now_iso(),))
-        # Sign-in records exist only for rate limiting. Keeping email/IP pairs longer
-        # than that is a privacy liability, so prune anything past the retention window.
-        db.execute("DELETE FROM login_attempts WHERE created_at<=?", (login_attempt_cutoff(),))
         db.execute("INSERT INTO sessions(id,user_id,csrf_token,created_at,expires_at) VALUES(?,?,?,?,?)", (session_id, user["id"], csrf, now_iso(), expires_iso()))
         audit(db, user["id"], "login", "session", session_id[-8:], ip_address=ip)
         response.set_cookie(SESSION_COOKIE, session_id, max_age=14*24*60*60, httponly=True, secure=settings.production, samesite="lax", path="/")
@@ -389,6 +490,24 @@ def logout(request: Request, response: Response, user: dict[str, Any] = Depends(
         audit(db, user["id"], "logout", "session", user["session_id"][-8:], ip_address=client_ip(request))
     response.delete_cookie(SESSION_COOKIE, path="/")
     return {"ok": True}
+
+
+@app.post("/api/auth/change-password")
+def change_password(payload: ChangePasswordInput, request: Request, user: dict[str, Any] = Depends(session_user), x_csrf_token: str | None = Header(default=None)) -> dict[str, bool]:
+    csrf_guard(request, user, x_csrf_token)
+    if hmac.compare_digest(payload.current_password, payload.new_password):
+        raise HTTPException(status_code=422, detail="Choose a new password that is different from the current password")
+    with db_session() as db:
+        stored = db.execute("SELECT password_hash FROM users WHERE id=? AND active=1", (user["id"],)).fetchone()
+        if not stored or not password_verify(payload.current_password, stored["password_hash"]):
+            raise HTTPException(status_code=400, detail="Current password is incorrect")
+        db.execute(
+            "UPDATE users SET password_hash=?,must_change_password=0 WHERE id=?",
+            (password_hash(payload.new_password), user["id"]),
+        )
+        db.execute("DELETE FROM sessions WHERE user_id=? AND id<>?", (user["id"], user["session_id"]))
+        audit(db, user["id"], "change_password", "user", user["id"], ip_address=client_ip(request))
+    return {"changed": True}
 
 
 @app.get("/api/public/locations")
@@ -415,7 +534,7 @@ def public_locations() -> dict[str, Any]:
 @app.get("/api/public/weather")
 async def weather() -> dict[str, Any]:
     try:
-        return {"source": "Open-Meteo", "location": "Bendigo", "current": await current_bendigo_weather()}
+        return await current_bendigo_weather()
     except Exception:
         raise HTTPException(status_code=503, detail="Live weather is temporarily unavailable")
 
@@ -516,7 +635,7 @@ def staff_roster(user: dict[str, Any] = Depends(require_roles("staff", "admin"))
         query = f"""SELECT r.*,l.name location_name,l.slug location_slug,u.first_name,u.last_name
                     FROM rosters r JOIN locations l ON l.id=r.location_id JOIN users u ON u.id=r.staff_id
                     WHERE {where} AND r.shift_date>=? ORDER BY r.shift_date,r.start_time"""
-        return {"roster": rows(db.execute(query, params + (date.today().isoformat(),)))}
+        return {"roster": rows(db.execute(query, params + (business_today().isoformat(),)))}
 
 
 @app.post("/api/staff/clock")
@@ -524,11 +643,18 @@ def staff_clock(payload: ClockInput, request: Request, user: dict[str, Any] = De
     csrf_guard(request, user, x_csrf_token)
     with db_session() as db:
         if payload.action == "in":
+            # Serialise the active-shift check and insert. The partial unique index is the
+            # final guard; the write lock also produces a clear 409 instead of a race-time
+            # integrity error under two nearly simultaneous taps.
+            db.execute("BEGIN IMMEDIATE")
             active = db.execute("SELECT * FROM time_entries WHERE staff_id=? AND clock_out IS NULL", (user["id"],)).fetchone()
             if active:
                 raise HTTPException(status_code=409, detail="You are already clocked in")
             location = location_by_slug(db, payload.location_slug)
-            cursor = db.execute("INSERT INTO time_entries(staff_id,location_id,clock_in,latitude,longitude,accuracy_metres,status) VALUES(?,?,?,?,?,?,?)", (user["id"], location["id"], now_iso(), payload.latitude, payload.longitude, payload.accuracy_metres, "draft"))
+            try:
+                cursor = db.execute("INSERT INTO time_entries(staff_id,location_id,clock_in,latitude,longitude,accuracy_metres,status) VALUES(?,?,?,?,?,?,?)", (user["id"], location["id"], now_iso(), payload.latitude, payload.longitude, payload.accuracy_metres, "draft"))
+            except sqlite3.IntegrityError:
+                raise HTTPException(status_code=409, detail="You are already clocked in")
             audit(db, user["id"], "clock_in", "time_entry", cursor.lastrowid, {"location": payload.location_slug}, client_ip(request))
             return {"status": "clocked_in", "entry_id": cursor.lastrowid, "clock_in": now_iso(), "location": location["name"]}
         active = db.execute("SELECT * FROM time_entries WHERE staff_id=? AND clock_out IS NULL ORDER BY clock_in DESC LIMIT 1", (user["id"],)).fetchone()
@@ -620,15 +746,30 @@ def qualifications(user: dict[str, Any] = Depends(require_roles("staff", "admin"
 @app.get("/api/notifications")
 def notifications(user: dict[str, Any] = Depends(session_user)) -> dict[str, Any]:
     with db_session() as db:
-        query = """SELECT * FROM notifications WHERE user_id=? OR audience_role=? ORDER BY created_at DESC LIMIT 100"""
-        return {"notifications": rows(db.execute(query, (user["id"], user["role"])))}
+        query = """SELECT n.id,n.user_id,n.audience_role,n.title,n.message,n.kind,n.delivery_channels,n.created_at,
+                          COALESCE(r.read_at,CASE WHEN n.user_id=? THEN n.read_at END) read_at
+                   FROM notifications n
+                   LEFT JOIN notification_receipts r ON r.notification_id=n.id AND r.user_id=?
+                   WHERE n.user_id=? OR n.audience_role=?
+                   ORDER BY n.created_at DESC LIMIT 100"""
+        return {"notifications": rows(db.execute(query, (user["id"], user["id"], user["id"], user["role"])))}
 
 
 @app.post("/api/notifications/{notification_id}/read")
 def read_notification(notification_id: int, request: Request, user: dict[str, Any] = Depends(session_user), x_csrf_token: str | None = Header(default=None)) -> dict[str, bool]:
     csrf_guard(request, user, x_csrf_token)
     with db_session() as db:
-        db.execute("UPDATE notifications SET read_at=? WHERE id=? AND (user_id=? OR audience_role=?)", (now_iso(), notification_id, user["id"], user["role"]))
+        visible = db.execute(
+            "SELECT id FROM notifications WHERE id=? AND (user_id=? OR audience_role=?)",
+            (notification_id, user["id"], user["role"]),
+        ).fetchone()
+        if not visible:
+            raise HTTPException(status_code=404, detail="Notification not found")
+        db.execute(
+            """INSERT INTO notification_receipts(notification_id,user_id,read_at) VALUES(?,?,?)
+               ON CONFLICT(notification_id,user_id) DO UPDATE SET read_at=excluded.read_at""",
+            (notification_id, user["id"], now_iso()),
+        )
         return {"ok": True}
 
 
@@ -642,7 +783,7 @@ def admin_metrics(user: dict[str, Any] = Depends(require_roles("admin"))) -> dic
             "waitlist": db.execute("SELECT COUNT(*) FROM waitlist WHERE status='waiting'").fetchone()[0],
             "pending_hours": db.execute("SELECT COALESCE(SUM(hours),0) FROM time_entries WHERE status='submitted'").fetchone()[0],
             "new_enquiries": db.execute("SELECT COUNT(*) FROM enquiries WHERE status='new'").fetchone()[0],
-            "expiring_qualifications": db.execute("SELECT COUNT(*) FROM qualifications WHERE status='expiring' OR expiry_date<=?", ((date.today()+timedelta(days=60)).isoformat(),)).fetchone()[0],
+            "expiring_qualifications": db.execute("SELECT COUNT(*) FROM qualifications WHERE status='expiring' OR expiry_date<=?", ((business_today()+timedelta(days=60)).isoformat(),)).fetchone()[0],
             "class_utilisation": round(100 * db.execute("SELECT COUNT(*) FROM bookings WHERE status='confirmed'").fetchone()[0] / max(1, db.execute("SELECT COALESCE(SUM(capacity),1) FROM classes WHERE active=1").fetchone()[0]), 1),
         }
         return {"metrics": metrics}
@@ -677,7 +818,7 @@ def admin_dashboard(user: dict[str, Any] = Depends(require_roles("admin"))) -> d
             hour_mix[row["status"]] = round(float(row["hours"] or 0), 2)
         locations = []
         now = datetime.now(timezone.utc)
-        today_weekday = date.today().weekday()
+        today_weekday = business_today().weekday()
         for location in db.execute("SELECT * FROM locations ORDER BY id"):
             reading = db.execute("SELECT temperature,status,note,source,created_at FROM pool_readings WHERE location_id=? ORDER BY created_at DESC LIMIT 1", (location["id"],)).fetchone()
             checklist = db.execute("SELECT created_at,deck_safe,first_aid_ready,equipment_ready,water_checked FROM pool_checklists WHERE location_id=? ORDER BY created_at DESC LIMIT 1", (location["id"],)).fetchone()
@@ -718,7 +859,7 @@ def admin_dashboard(user: dict[str, Any] = Depends(require_roles("admin"))) -> d
 def admin_locations(user: dict[str, Any] = Depends(require_roles("admin"))) -> dict[str, Any]:
     with db_session() as db:
         locations = []
-        today_weekday = date.today().weekday()
+        today_weekday = business_today().weekday()
         for location in db.execute("SELECT * FROM locations ORDER BY name"):
             reading = db.execute(
                 "SELECT temperature,status,note,source,created_at FROM pool_readings WHERE location_id=? ORDER BY created_at DESC LIMIT 1",
@@ -757,20 +898,22 @@ def update_admin_location(location_id: int, payload: LocationUpdateInput, reques
 
 
 @app.get("/api/admin/exports/enquiries.csv")
-def export_enquiries(user: dict[str, Any] = Depends(require_roles("admin"))) -> Response:
+def export_enquiries(request: Request, user: dict[str, Any] = Depends(require_roles("admin"))) -> Response:
     with db_session() as db:
-        records = rows(db.execute("SELECT created_at,name,email,phone,swimmer_name,swimmer_age,program_interest,preferred_class,preferred_days,contact_method,status,experience FROM enquiries ORDER BY created_at DESC"))
+        records = rows(db.execute("SELECT created_at,enquiry_type,name,email,phone,swimmer_name,swimmer_age,program_interest,preferred_class,preferred_days,contact_method,status,experience FROM enquiries ORDER BY created_at DESC"))
+        audit(db, user["id"], "export_enquiries", "export", "hv-swim-enquiries.csv", {"record_count": len(records)}, client_ip(request))
     return csv_download(
         "hv-swim-enquiries.csv",
-        ["Created", "Contact", "Email", "Phone", "Swimmer", "Swimmer age", "Program", "Preferred class", "Preferred days", "Contact method", "Status", "Experience"],
-        [[item["created_at"], item["name"], item["email"], item["phone"], item["swimmer_name"], item["swimmer_age"], item["program_interest"], item["preferred_class"], item["preferred_days"], item["contact_method"], item["status"], item["experience"]] for item in records],
+        ["Created", "Type", "Contact", "Email", "Phone", "Swimmer", "Swimmer age", "Program", "Preferred class", "Preferred days", "Contact method", "Status", "Experience"],
+        [[item["created_at"], item["enquiry_type"], item["name"], item["email"], item["phone"], item["swimmer_name"], item["swimmer_age"], item["program_interest"], item["preferred_class"], item["preferred_days"], item["contact_method"], item["status"], item["experience"]] for item in records],
     )
 
 
 @app.get("/api/admin/exports/products.csv")
-def export_products(user: dict[str, Any] = Depends(require_roles("admin"))) -> Response:
+def export_products(request: Request, user: dict[str, Any] = Depends(require_roles("admin"))) -> Response:
     with db_session() as db:
         records = rows(db.execute("SELECT sku,title,category,price_cents,status,sizes FROM products ORDER BY category,title"))
+        audit(db, user["id"], "export_products", "export", "hv-swim-merchandise.csv", {"record_count": len(records)}, client_ip(request))
     return csv_download(
         "hv-swim-merchandise.csv",
         ["SKU", "Product", "Category", "Retail price AUD", "Status", "Sizes"],
@@ -779,12 +922,13 @@ def export_products(user: dict[str, Any] = Depends(require_roles("admin"))) -> R
 
 
 @app.get("/api/admin/exports/timesheets.csv")
-def export_timesheets(user: dict[str, Any] = Depends(require_roles("admin"))) -> Response:
+def export_timesheets(request: Request, user: dict[str, Any] = Depends(require_roles("admin"))) -> Response:
     with db_session() as db:
         query = """SELECT u.first_name,u.last_name,t.clock_in,t.clock_out,l.name location_name,t.hours,t.status,t.approved_at
                    FROM time_entries t JOIN users u ON u.id=t.staff_id JOIN locations l ON l.id=t.location_id
                    ORDER BY t.clock_in DESC"""
         records = rows(db.execute(query))
+        audit(db, user["id"], "export_timesheets", "export", "hv-swim-timesheets.csv", {"record_count": len(records)}, client_ip(request))
     return csv_download(
         "hv-swim-timesheets.csv",
         ["Staff", "Clock in", "Clock out", "Location", "Hours", "Status", "Approved at"],
@@ -832,11 +976,119 @@ def update_enquiry(enquiry_id: int, payload: EnquiryStatusInput, request: Reques
 @app.get("/api/admin/staff")
 def admin_staff(user: dict[str, Any] = Depends(require_roles("admin"))) -> dict[str, Any]:
     with db_session() as db:
-        query = """SELECT u.id,u.email,u.first_name,u.last_name,u.phone,u.role,u.active,
+        query = """SELECT u.id,u.email,u.first_name,u.last_name,u.phone,u.role,u.active,u.xero_employee_id,u.xero_payroll_calendar_id,
                    (SELECT COUNT(*) FROM qualifications q WHERE q.staff_id=u.id AND (q.status='expiring' OR q.expiry_date<=?)) expiring_qualifications
                    FROM users u WHERE u.role IN ('staff','admin') ORDER BY u.first_name,u.last_name"""
-        cutoff = (date.today() + timedelta(days=60)).isoformat()
+        cutoff = (business_today() + timedelta(days=60)).isoformat()
         return {"staff": rows(db.execute(query, (cutoff,)))}
+
+
+@app.get("/api/admin/accounts")
+def admin_accounts(user: dict[str, Any] = Depends(require_roles("admin"))) -> dict[str, Any]:
+    with db_session() as db:
+        query = """SELECT u.id,u.email,u.role,u.first_name,u.last_name,u.phone,u.active,u.created_at,
+                          u.xero_employee_id,u.xero_payroll_calendar_id,
+                          (SELECT COUNT(*) FROM swimmers s WHERE s.customer_id=u.id AND s.active=1) swimmer_count
+                   FROM users u ORDER BY u.active DESC,u.role,u.first_name,u.last_name"""
+        return {"accounts": rows(db.execute(query))}
+
+
+@app.post("/api/admin/accounts")
+def create_admin_account(payload: AdminUserInput, request: Request, user: dict[str, Any] = Depends(require_roles("admin")), x_csrf_token: str | None = Header(default=None)) -> dict[str, Any]:
+    csrf_guard(request, user, x_csrf_token)
+    email = str(payload.email).lower().strip()
+    if settings.production and email.endswith("@hvswim.demo"):
+        raise HTTPException(status_code=400, detail="Demo-domain accounts cannot be created in production")
+    with db_session() as db:
+        try:
+            cursor = db.execute(
+                """INSERT INTO users(email,password_hash,role,first_name,last_name,phone,must_change_password,created_at)
+                   VALUES(?,?,?,?,?,?,1,?)""",
+                (email, password_hash(payload.temporary_password), payload.role, payload.first_name.strip(), payload.last_name.strip(), payload.phone.strip(), now_iso()),
+            )
+        except sqlite3.IntegrityError:
+            raise HTTPException(status_code=409, detail="An account with this email already exists")
+        audit(db, user["id"], "create_account", "user", cursor.lastrowid, {"email": email, "role": payload.role}, client_ip(request))
+        return {"id": cursor.lastrowid, "created": True, "email": email, "role": payload.role}
+
+
+@app.patch("/api/admin/accounts/{account_id}/status")
+def update_account_status(account_id: int, payload: AccountStatusInput, request: Request, user: dict[str, Any] = Depends(require_roles("admin")), x_csrf_token: str | None = Header(default=None)) -> dict[str, Any]:
+    csrf_guard(request, user, x_csrf_token)
+    if account_id == user["id"] and not payload.active:
+        raise HTTPException(status_code=400, detail="You cannot deactivate the account you are currently using")
+    with db_session() as db:
+        account = db.execute("SELECT id,email,role,active FROM users WHERE id=?", (account_id,)).fetchone()
+        if not account:
+            raise HTTPException(status_code=404, detail="Account not found")
+        if account["role"] == "admin" and account["active"] and not payload.active:
+            active_admins = db.execute("SELECT COUNT(*) FROM users WHERE role='admin' AND active=1").fetchone()[0]
+            if active_admins <= 1:
+                raise HTTPException(status_code=409, detail="The final active management account cannot be deactivated")
+        db.execute("UPDATE users SET active=? WHERE id=?", (int(payload.active), account_id))
+        if not payload.active:
+            db.execute("DELETE FROM sessions WHERE user_id=?", (account_id,))
+        audit(
+            db,
+            user["id"],
+            "update_account_status",
+            "user",
+            account_id,
+            {"active": payload.active, "role": account["role"]},
+            client_ip(request),
+        )
+        return {"saved": True, "id": account_id, "active": payload.active}
+
+
+@app.post("/api/admin/accounts/{account_id}/temporary-password")
+def issue_temporary_password(account_id: int, payload: AdminPasswordResetInput, request: Request, user: dict[str, Any] = Depends(require_roles("admin")), x_csrf_token: str | None = Header(default=None)) -> dict[str, Any]:
+    csrf_guard(request, user, x_csrf_token)
+    if account_id == user["id"]:
+        raise HTTPException(status_code=400, detail="Use Change password for the account you are currently using")
+    with db_session() as db:
+        account = db.execute("SELECT id,role,active FROM users WHERE id=?", (account_id,)).fetchone()
+        if not account:
+            raise HTTPException(status_code=404, detail="Account not found")
+        if not account["active"]:
+            raise HTTPException(status_code=409, detail="Reactivate this account before issuing a temporary password")
+        db.execute(
+            "UPDATE users SET password_hash=?,must_change_password=1 WHERE id=?",
+            (password_hash(payload.temporary_password), account_id),
+        )
+        db.execute("DELETE FROM sessions WHERE user_id=?", (account_id,))
+        audit(db, user["id"], "issue_temporary_password", "user", account_id, {"role": account["role"]}, client_ip(request))
+        return {"saved": True, "id": account_id, "must_change_password": True}
+
+
+@app.post("/api/admin/swimmers")
+def create_admin_swimmer(payload: AdminSwimmerInput, request: Request, user: dict[str, Any] = Depends(require_roles("admin")), x_csrf_token: str | None = Header(default=None)) -> dict[str, Any]:
+    csrf_guard(request, user, x_csrf_token)
+    with db_session() as db:
+        customer = db.execute("SELECT id FROM users WHERE id=? AND role='customer' AND active=1", (payload.customer_id,)).fetchone()
+        if not customer:
+            raise HTTPException(status_code=404, detail="Active family account not found")
+        cursor = db.execute(
+            """INSERT INTO swimmers(customer_id,first_name,last_name,date_of_birth,level,emergency_contact,medical_notes,photo_consent,created_at)
+               VALUES(?,?,?,?,?,?,?,?,?)""",
+            (payload.customer_id, payload.first_name.strip(), payload.last_name.strip(), payload.date_of_birth.isoformat() if payload.date_of_birth else None, payload.level, payload.emergency_contact, payload.medical_notes, int(payload.photo_consent), now_iso()),
+        )
+        audit(db, user["id"], "create_swimmer", "swimmer", cursor.lastrowid, {"customer_id": payload.customer_id}, client_ip(request))
+        return {"id": cursor.lastrowid, "created": True}
+
+
+@app.patch("/api/admin/staff/{staff_id}/xero-mapping")
+def update_xero_staff_mapping(staff_id: int, payload: XeroStaffMappingInput, request: Request, user: dict[str, Any] = Depends(require_roles("admin")), x_csrf_token: str | None = Header(default=None)) -> dict[str, Any]:
+    csrf_guard(request, user, x_csrf_token)
+    with db_session() as db:
+        staff = db.execute("SELECT id FROM users WHERE id=? AND role IN ('staff','admin') AND active=1", (staff_id,)).fetchone()
+        if not staff:
+            raise HTTPException(status_code=404, detail="Active staff account not found")
+        db.execute(
+            "UPDATE users SET xero_employee_id=?,xero_payroll_calendar_id=? WHERE id=?",
+            (payload.employee_id.strip() or None, payload.payroll_calendar_id.strip() or None, staff_id),
+        )
+        audit(db, user["id"], "update_xero_staff_mapping", "user", staff_id, {"employee_mapped": bool(payload.employee_id), "calendar_mapped": bool(payload.payroll_calendar_id)}, client_ip(request))
+        return {"saved": True, "staff_id": staff_id, "employee_mapped": bool(payload.employee_id), "calendar_mapped": bool(payload.payroll_calendar_id)}
 
 
 @app.get("/api/admin/enrolments")
@@ -853,7 +1105,7 @@ def admin_enrolments(user: dict[str, Any] = Depends(require_roles("admin"))) -> 
             item = dict(row)
             item["available"] = max(0, item["capacity"] - item["enrolled"])
             item["utilisation"] = round(100 * item["enrolled"] / max(1, item["capacity"]), 1)
-            item["is_today"] = item["weekday"] == date.today().weekday()
+            item["is_today"] = item["weekday"] == business_today().weekday()
             classes.append(item)
         waitlist_query = """SELECT w.id,w.position,w.status,w.created_at,c.id class_id,c.code,c.title,c.weekday,c.start_time,c.capacity,
                             s.id swimmer_id,s.first_name swimmer_first,s.last_name swimmer_last,u.id customer_id,
@@ -966,20 +1218,27 @@ def create_notification(payload: NotificationInput, request: Request, user: dict
     csrf_guard(request, user, x_csrf_token)
     if not payload.user_id and not payload.audience_role:
         raise HTTPException(status_code=400, detail="Choose a user or audience role")
-    unavailable = []
-    if "email" in payload.channels and not (settings.email_provider and settings.email_api_key): unavailable.append("email")
-    if "sms" in payload.channels and not (settings.sms_provider and settings.sms_api_key): unavailable.append("sms")
-    if "push" in payload.channels and not (settings.web_push_public_key and settings.web_push_private_key): unavailable.append("push")
+    if "in_app" not in payload.channels:
+        raise HTTPException(status_code=409, detail="In-app delivery must remain selected until an external provider adapter is implemented")
+    external_channels = {
+        channel: "not_implemented" for channel in payload.channels if channel in {"email", "sms", "push"}
+    }
     with db_session() as db:
         cursor = db.execute("INSERT INTO notifications(user_id,audience_role,title,message,kind,delivery_channels,created_at) VALUES(?,?,?,?,?,?,?)", (payload.user_id, payload.audience_role, payload.title, payload.message, payload.kind, json.dumps(payload.channels), now_iso()))
-        audit(db, user["id"], "create_notification", "notification", cursor.lastrowid, {"channels": payload.channels, "unavailable": unavailable}, client_ip(request))
-        return {"id": cursor.lastrowid, "queued": True, "in_app_delivered": True, "unavailable_channels": unavailable}
+        audit(db, user["id"], "create_notification", "notification", cursor.lastrowid, {"channels": payload.channels, "external_channels": external_channels}, client_ip(request))
+        return {"id": cursor.lastrowid, "created": True, "in_app_delivered": True, "external_channels": external_channels}
 
 
 @app.get("/api/admin/integrations")
 def integrations(user: dict[str, Any] = Depends(require_roles("admin"))) -> dict[str, Any]:
     with db_session() as db:
-        return {"integrations": integration_summary(db), "safe_mode": {"xero_sync_enabled": settings.xero_sync_enabled}}
+        return {
+            "integrations": integration_summary(db),
+            "safe_mode": {
+                "xero_sync_requested": settings.xero_sync_enabled,
+                "xero_transmission_locked": True,
+            },
+        }
 
 
 @app.get("/api/integrations/xero/connect")
@@ -1013,25 +1272,83 @@ async def xero_callback(code: str, state: str):
 
 @app.post("/api/integrations/xero/sync-timesheets")
 async def sync_xero_timesheets(request: Request, user: dict[str, Any] = Depends(require_roles("admin")), x_csrf_token: str | None = Header(default=None)) -> dict[str, Any]:
+    """Build a safe payroll-readiness preview without transmitting payroll data.
+
+    Xero AU Payroll timesheets require account-specific pay-period boundaries and staff,
+    payroll-calendar and earnings-rate mappings. Those must be imported from the connected
+    organisation before an outbound implementation can be made idempotent. Until that
+    workflow exists, this endpoint deliberately remains a reviewed dry run even if a legacy
+    deployment still has XERO_SYNC_ENABLED=true.
+    """
     csrf_guard(request, user, x_csrf_token)
     with db_session() as db:
         connection = db.execute("SELECT * FROM integration_connections WHERE provider='xero' AND status='connected'").fetchone()
         if not connection:
             raise HTTPException(status_code=409, detail="Connect the existing Xero organisation first")
-        approved = rows(db.execute("SELECT t.*,u.email,u.first_name,u.last_name FROM time_entries t JOIN users u ON u.id=t.staff_id WHERE t.status='approved' AND t.xero_timesheet_id IS NULL"))
-        if not approved:
-            return {"synced": 0, "message": "No approved hours are waiting for Xero"}
+        approved = rows(
+            db.execute(
+                """SELECT t.id,t.staff_id,t.clock_in,t.clock_out,t.hours,
+                          u.first_name,u.last_name,u.xero_employee_id,u.xero_payroll_calendar_id
+                   FROM time_entries t JOIN users u ON u.id=t.staff_id
+                   WHERE t.status='approved' AND t.xero_timesheet_id IS NULL
+                   ORDER BY t.clock_in,t.id"""
+            )
+        )
+        entries = [
+            {
+                "entry_id": entry["id"],
+                "staff_id": entry["staff_id"],
+                "staff_name": f"{entry['first_name']} {entry['last_name']}".strip(),
+                "business_date": business_date_from_timestamp(entry["clock_in"]).isoformat(),
+                "hours": entry["hours"],
+                "employee_mapped": bool(entry["xero_employee_id"]),
+                "payroll_calendar_mapped": bool(entry["xero_payroll_calendar_id"]),
+            }
+            for entry in approved
+        ]
+        missing_staff = [
+            {
+                "staff_id": entry["staff_id"],
+                "staff_name": f"{entry['first_name']} {entry['last_name']}".strip(),
+                "employee_id": not bool(entry["xero_employee_id"]),
+                "payroll_calendar_id": not bool(entry["xero_payroll_calendar_id"]),
+            }
+            for entry in approved
+            if not entry["xero_employee_id"] or not entry["xero_payroll_calendar_id"]
+        ]
+        blocking_reasons = []
         if not settings.xero_earnings_rate_id:
-            return {"synced": 0, "dry_run": True, "entries": approved, "message": "Map XERO_EARNINGS_RATE_ID and staff Xero Employee IDs before enabling payroll transmission."}
-        token = decrypt_json(connection["encrypted_tokens"])
-        payload = []
-        for entry in approved:
-            payload.append({"EmployeeID": entry.get("xero_employee_id", "MAP_REQUIRED"), "StartDate": entry["clock_in"][:10], "EndDate": entry["clock_out"][:10], "Status": "DRAFT", "TimesheetLines": [{"EarningsRateID": settings.xero_earnings_rate_id, "NumberOfUnits": [entry["hours"]]}]})
-    try:
-        result = await xero_post_timesheets(token, payload)
-    except Exception as exc:
-        raise HTTPException(status_code=502, detail=f"Xero timesheet sync failed: {type(exc).__name__}")
-    return {"synced": 0 if result.get("dry_run") else len(payload), **result}
+            blocking_reasons.append("Xero earnings rate is not mapped")
+        if missing_staff:
+            blocking_reasons.append("One or more staff payroll mappings are incomplete")
+        blocking_reasons.append("Xero pay-period import and idempotent export tracking are not yet implemented")
+        readiness = {
+            "organisation_connected": True,
+            "approved_entries": len(entries),
+            "earnings_rate_mapped": bool(settings.xero_earnings_rate_id),
+            "staff_mappings_complete": not missing_staff,
+            "pay_period_import_implemented": False,
+            "idempotent_export_implemented": False,
+        }
+        audit(
+            db,
+            user["id"],
+            "preview_xero_timesheets",
+            "integration",
+            "xero",
+            {"approved_entries": len(entries), "blocking_reasons": blocking_reasons},
+            client_ip(request),
+        )
+        return {
+            "synced": 0,
+            "dry_run": True,
+            "transmission_locked": True,
+            "readiness": readiness,
+            "missing_staff_mappings": missing_staff,
+            "blocking_reasons": blocking_reasons,
+            "entries": entries,
+            "message": "Payroll data was not sent. Complete the Xero mappings and pay-period import before enabling a reviewed live export.",
+        }
 
 
 @app.get("/api/products")
@@ -1158,15 +1475,24 @@ def create_enquiry(payload: EnquiryInput, request: Request) -> dict[str, Any]:
                 detail="We have already received several enquiries from this connection. Please call 0413 462 112 if you need to reach us sooner.",
             )
         cursor = db.execute(
-            """INSERT INTO enquiries(name,email,phone,swimmer_name,swimmer_age,program_interest,preferred_class,preferred_days,contact_method,experience,support_needs,status,created_at)
-               VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-            (payload.name, payload.email, payload.phone, payload.swimmer_name, payload.swimmer_age, payload.program_interest, payload.preferred_class, payload.preferred_days, payload.contact_method, payload.experience, payload.support_needs, "new", now_iso()),
+            """INSERT INTO enquiries(enquiry_type,name,email,phone,swimmer_name,swimmer_age,program_interest,preferred_class,preferred_days,contact_method,experience,support_needs,status,created_at)
+               VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (payload.enquiry_type, payload.name, payload.email, payload.phone, payload.swimmer_name, payload.swimmer_age, payload.program_interest, payload.preferred_class, payload.preferred_days, payload.contact_method, payload.experience, payload.support_needs, "new", now_iso()),
         )
-        reference = f"HV-ENQ-{cursor.lastrowid:04d}"
-        swimmer = payload.swimmer_name or f"swimmer age {payload.swimmer_age or 'not supplied'}"
-        program = payload.program_interest or "program match required"
-        db.execute("INSERT INTO notifications(audience_role,title,message,kind,delivery_channels,created_at) VALUES(?,?,?,?,?,?)", ("admin", f"New enrolment enquiry · {reference}", f"{payload.name} submitted an enquiry for {swimmer}: {program}.", "enquiry", '["in_app","email"]', now_iso()))
-        audit(db, None, "create_enquiry", "enquiry", cursor.lastrowid, {"email": payload.email, "reference": reference, "program": payload.program_interest}, ip)
+        reference = f"HV-{'MERCH' if payload.enquiry_type == 'merchandise' else 'ENQ'}-{cursor.lastrowid:04d}"
+        if payload.enquiry_type == "merchandise":
+            title = f"New merchandise enquiry · {reference}"
+            message = f"{payload.name} asked about the HV Swim collection."
+        elif payload.enquiry_type == "general":
+            title = f"New general enquiry · {reference}"
+            message = f"{payload.name} sent a general HV Swim enquiry."
+        else:
+            swimmer = payload.swimmer_name or f"swimmer age {payload.swimmer_age or 'not supplied'}"
+            program = payload.program_interest or "program match required"
+            title = f"New enrolment enquiry · {reference}"
+            message = f"{payload.name} submitted an enquiry for {swimmer}: {program}."
+        db.execute("INSERT INTO notifications(audience_role,title,message,kind,delivery_channels,created_at) VALUES(?,?,?,?,?,?)", ("admin", title, message, "enquiry", '["in_app"]', now_iso()))
+        audit(db, None, "create_enquiry", "enquiry", cursor.lastrowid, {"email": payload.email, "reference": reference, "enquiry_type": payload.enquiry_type, "program": payload.program_interest}, ip)
         return {"id": cursor.lastrowid, "reference": reference, "received": True, "message": "Thanks — the HV Swim team can now follow up with you."}
 
 
@@ -1230,14 +1556,14 @@ PUBLIC_ROOT_FILES = frozenset(
 )
 
 
-@app.get("/", include_in_schema=False)
+@app.api_route("/", methods=["GET", "HEAD"], include_in_schema=False)
 def public_home() -> FileResponse:
     return FileResponse(ROOT / "index.html")
 
 
-@app.get("/{public_path:path}", include_in_schema=False)
+@app.api_route("/{public_path:path}", methods=["GET", "HEAD"], include_in_schema=False)
 def public_file(public_path: str) -> FileResponse:
-    if public_path not in PUBLIC_ROOT_FILES:
+    if public_path not in PUBLIC_ROOT_FILES or (settings.production and public_path == "START_HERE.html"):
         raise HTTPException(status_code=404, detail="Not Found")
     file_path = ROOT / public_path
     if not file_path.is_file():

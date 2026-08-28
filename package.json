@@ -1,9 +1,12 @@
 {
   "name": "hv-swim-bendigo-mobile",
-  "version": "5.1.0",
+  "version": "5.2.0",
   "private": true,
+  "packageManager": "pnpm@11.19.0",
   "description": "Capacitor foundation for the HV Swim Bendigo iOS and Android apps.",
   "scripts": {
+    "quality": "node scripts/check-site.mjs",
+    "test": "node scripts/check-site.mjs",
     "mobile:web": "node scripts/build-mobile-web.mjs",
     "mobile:add:ios": "npm run mobile:web && npx cap add ios",
     "mobile:add:android": "npm run mobile:web && npx cap add android",

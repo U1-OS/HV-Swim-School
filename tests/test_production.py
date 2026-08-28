@@ -1,0 +1,118 @@
+"""Production-startup safety and first-account bootstrap tests."""
+
+from __future__ import annotations
+
+from dataclasses import replace
+import sqlite3
+
+import pytest
+
+from backend import config, database, server
+
+
+def production_settings(**changes):
+    values = {
+        "app_env": "production",
+        "session_secret": "a-unique-production-secret-with-32-plus-characters",
+        "public_url": "https://swim.example.test",
+        "xero_client_id": "",
+        "xero_client_secret": "",
+        "xero_redirect_uri": "https://swim.example.test/api/integrations/xero/callback",
+        "bootstrap_admin_email": "",
+        "bootstrap_admin_password": "",
+    }
+    values.update(changes)
+    return replace(config.settings, **values)
+
+
+def test_documented_environment_name_enables_production(monkeypatch):
+    monkeypatch.setenv("HV_APP_ENV", "production")
+    monkeypatch.delenv("HV_ENVIRONMENT", raising=False)
+    assert config.resolved_app_environment() == "production"
+
+
+def test_conflicting_legacy_environment_names_fail_closed(monkeypatch):
+    monkeypatch.setenv("HV_APP_ENV", "production")
+    monkeypatch.setenv("HV_ENVIRONMENT", "development")
+    with pytest.raises(RuntimeError, match="disagree"):
+        config.resolved_app_environment()
+
+
+@pytest.mark.parametrize(
+    "secret",
+    (
+        "local-demo-secret-change-before-production",
+        "replace-with-a-long-random-production-secret",
+        "too-short",
+    ),
+)
+def test_production_rejects_placeholder_or_short_session_secrets(secret):
+    with pytest.raises(RuntimeError, match="HV_SESSION_SECRET"):
+        server.validate_production_config(production_settings(session_secret=secret))
+
+
+def test_production_requires_https_for_public_and_xero_urls():
+    with pytest.raises(RuntimeError, match="HV_PUBLIC_URL"):
+        server.validate_production_config(production_settings(public_url="http://swim.example.test"))
+    with pytest.raises(RuntimeError, match="XERO_REDIRECT_URI"):
+        server.validate_production_config(
+            production_settings(
+                xero_client_id="client",
+                xero_client_secret="secret",
+                xero_redirect_uri="http://swim.example.test/api/integrations/xero/callback",
+            )
+        )
+
+
+def test_empty_production_database_requires_and_uses_one_time_admin_bootstrap(tmp_path, monkeypatch):
+    db_path = tmp_path / "production.db"
+    monkeypatch.setattr(database, "DB_PATH", db_path)
+    monkeypatch.setattr(database, "settings", production_settings())
+    with pytest.raises(RuntimeError, match="HV_BOOTSTRAP_ADMIN"):
+        database.initialise_database()
+
+    monkeypatch.setattr(
+        database,
+        "settings",
+        production_settings(
+            bootstrap_admin_email="owner@example.test",
+            bootstrap_admin_password="OneTimeBootstrap!2026",
+            bootstrap_admin_name="HV Swim Owner",
+        ),
+    )
+    database.initialise_database()
+    with database.db_session() as db:
+        users = list(db.execute("SELECT email,role FROM users"))
+        locations = list(db.execute("SELECT slug FROM locations ORDER BY slug"))
+    assert [(row["email"], row["role"]) for row in users] == [("owner@example.test", "admin")]
+    assert not any(row["email"].endswith("@hvswim.demo") for row in users)
+    assert [row["slug"] for row in locations] == ["bendigo-east", "wood-street"]
+
+
+def test_legacy_booking_constraint_is_migrated_without_losing_history(tmp_path):
+    db = sqlite3.connect(tmp_path / "legacy.db")
+    db.row_factory = sqlite3.Row
+    db.executescript(
+        """
+        CREATE TABLE classes(id INTEGER PRIMARY KEY);
+        CREATE TABLE swimmers(id INTEGER PRIMARY KEY);
+        INSERT INTO classes(id) VALUES(1);
+        INSERT INTO swimmers(id) VALUES(1);
+        CREATE TABLE bookings (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          class_id INTEGER NOT NULL REFERENCES classes(id),
+          swimmer_id INTEGER NOT NULL REFERENCES swimmers(id),
+          status TEXT NOT NULL CHECK (status IN ('confirmed','cancelled','completed')),
+          created_at TEXT NOT NULL,
+          UNIQUE(class_id, swimmer_id, status)
+        );
+        CREATE INDEX idx_bookings_class ON bookings(class_id,status);
+        INSERT INTO bookings(class_id,swimmer_id,status,created_at) VALUES(1,1,'cancelled','2026-01-01');
+        """
+    )
+    database.migrate_legacy_bookings_table(db)
+    table_sql = db.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='bookings'").fetchone()[0]
+    assert "UNIQUE(class_id, swimmer_id, status)" not in table_sql
+    db.execute("INSERT INTO bookings(class_id,swimmer_id,status,created_at) VALUES(1,1,'cancelled','2026-02-01')")
+    assert db.execute("SELECT COUNT(*) FROM bookings").fetchone()[0] == 2
+    db.close()

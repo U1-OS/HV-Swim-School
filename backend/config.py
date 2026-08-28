@@ -23,11 +23,33 @@ def load_dotenv(path: Path) -> None:
 load_dotenv(ROOT / ".env")
 
 
+def integer_env(name: str, default: int, *, minimum: int, maximum: int) -> int:
+    """Read an integer setting without making the whole application fail at import."""
+    raw_value = os.getenv(name, str(default))
+    try:
+        value = int(raw_value)
+    except (TypeError, ValueError):
+        value = default
+    return max(minimum, min(value, maximum))
+
+
+def resolved_app_environment() -> str:
+    """Accept the old variable safely, but make conflicting deployment config fatal."""
+    current = os.getenv("HV_APP_ENV")
+    legacy = os.getenv("HV_ENVIRONMENT")
+    if current and legacy and current.lower() != legacy.lower():
+        raise RuntimeError("HV_APP_ENV and legacy HV_ENVIRONMENT disagree")
+    return current or legacy or "development"
+
+
 @dataclass(frozen=True)
 class Settings:
-    app_env: str = os.getenv("HV_APP_ENV", "development")
+    app_env: str = resolved_app_environment()
     session_secret: str = os.getenv("HV_SESSION_SECRET", "local-demo-secret-change-before-production")
     public_url: str = os.getenv("HV_PUBLIC_URL", "http://localhost:8765").rstrip("/")
+    bootstrap_admin_email: str = os.getenv("HV_BOOTSTRAP_ADMIN_EMAIL", "").strip().lower()
+    bootstrap_admin_password: str = os.getenv("HV_BOOTSTRAP_ADMIN_PASSWORD", "")
+    bootstrap_admin_name: str = os.getenv("HV_BOOTSTRAP_ADMIN_NAME", "HV Swim Admin").strip()
     xero_client_id: str = os.getenv("XERO_CLIENT_ID", "")
     xero_client_secret: str = os.getenv("XERO_CLIENT_SECRET", "")
     xero_redirect_uri: str = os.getenv("XERO_REDIRECT_URI", "http://localhost:8765/api/integrations/xero/callback")
@@ -36,10 +58,13 @@ class Settings:
     shopify_store_domain: str = os.getenv("SHOPIFY_STORE_DOMAIN", "").replace("https://", "").rstrip("/")
     shopify_storefront_token: str = os.getenv("SHOPIFY_STOREFRONT_TOKEN", "")
     shopify_api_version: str = os.getenv("SHOPIFY_API_VERSION", "2026-04")
+    shopify_cache_seconds: int = integer_env("SHOPIFY_CACHE_SECONDS", 300, minimum=60, maximum=1800)
     printify_api_token: str = os.getenv("PRINTIFY_API_TOKEN", "")
     printify_shop_id: str = os.getenv("PRINTIFY_SHOP_ID", "")
     pool_sensor_url: str = os.getenv("POOL_SENSOR_URL", "")
     pool_sensor_token: str = os.getenv("POOL_SENSOR_TOKEN", "")
+    weather_api_key: str = os.getenv("OPEN_METEO_API_KEY", "")
+    weather_cache_seconds: int = integer_env("WEATHER_CACHE_SECONDS", 600, minimum=60, maximum=3600)
     email_provider: str = os.getenv("EMAIL_PROVIDER", "")
     email_api_key: str = os.getenv("EMAIL_API_KEY", "")
     sms_provider: str = os.getenv("SMS_PROVIDER", "")
