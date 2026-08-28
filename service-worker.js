@@ -1,9 +1,9 @@
-const CACHE = 'hv-swim-v5-shell-27';
+const CACHE = 'hv-swim-v5-shell-28';
 const PUBLIC_DATA_CACHE = 'hv-swim-v5-public-data-2';
 const SHELL = [
   './', './index.html', './about.html', './programs.html', './app.html', './mobile-shell.html', './login.html', './platform.html', './enquire.html', './locations.html', './shop.html', './customer.html', './staff.html', './admin.html', './offline.html',
   './assets/styles.css?v=5.2.0', './assets/app.js?v=5.2.0', './assets/hv-swim-logo.png', './assets/hero-swimmer.jpg', './assets/og-share.jpg', './assets/merch-collection-v2.jpg', './assets/merch-uniform-studio-v3.jpg',
-  './assets/platform.css?v=5.2.0', './assets/platform.js?v=5.2.1', './assets/public-api.js?v=5.2.0', './assets/programs.js?v=5.2.0', './assets/shop.js?v=5.2.0', './assets/enquire.js?v=5.2.0', './assets/mobile-shell.css?v=5.1.0', './assets/mobile-shell.js?v=5.1.0',
+  './assets/platform.css?v=5.2.0', './assets/platform.js?v=5.2.1', './assets/public-api.js?v=5.2.0', './assets/programs.js?v=5.2.0', './assets/shop.js?v=5.2.0', './assets/enquire.js?v=5.2.0', './assets/mobile-shell.css?v=5.2.0', './assets/mobile-shell.js?v=5.2.0',
   './assets/app-icon-192.png', './assets/app-icon-512.png', './assets/app-icon-1024.png', './assets/app-icon-maskable-192.png', './assets/app-icon-maskable-512.png', './manifest.webmanifest'
 ];
 
