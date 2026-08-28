@@ -288,3 +288,41 @@ def test_versioned_assets_are_cached_hard(client):
     response = client.get("/assets/styles.css?v=5.1.1")
     if response.status_code == 200:
         assert "max-age=31536000" in response.headers.get("cache-control", "")
+
+
+# --- booking integrity ---------------------------------------------------------------
+
+def test_a_swimmer_cannot_be_booked_twice_into_the_same_class(client):
+    """Guarded in application code and by a unique index, so a race cannot slip past."""
+    client.cookies.clear()
+    csrf = sign_in(client, FAMILY)
+    swimmers = client.get("/api/customer/swimmers").json()["swimmers"]
+    classes = client.get("/api/classes").json()["classes"]
+    assert swimmers and classes, "seed data is missing"
+    swimmer_id = swimmers[0]["id"]
+    target = next((c for c in classes if c["available"] > 0), classes[0])
+    headers = {"X-CSRF-Token": csrf}
+    body = {"class_id": target["id"], "swimmer_id": swimmer_id}
+
+    first = client.post("/api/customer/bookings", json=body, headers=headers)
+    assert first.status_code in (200, 409), first.text
+    second = client.post("/api/customer/bookings", json=body, headers=headers)
+    assert second.status_code == 409, "the same swimmer was booked into one class twice"
+
+
+def test_booking_a_full_class_offers_the_waitlist_rather_than_overfilling(client):
+    """Class capacity encodes the instructor-to-swimmer ratio, so it must never be exceeded."""
+    client.cookies.clear()
+    csrf = sign_in(client, FAMILY)
+    swimmers = client.get("/api/customer/swimmers").json()["swimmers"]
+    full = [c for c in client.get("/api/classes").json()["classes"] if c["available"] == 0]
+    if not full or not swimmers:
+        pytest.skip("no full class in the seed data")
+    response = client.post(
+        "/api/customer/bookings",
+        json={"class_id": full[0]["id"], "swimmer_id": swimmers[-1]["id"]},
+        headers={"X-CSRF-Token": csrf},
+    )
+    assert response.status_code in (200, 409)
+    if response.status_code == 200:
+        assert response.json()["status"] == "waitlisted"

@@ -264,6 +264,18 @@ def rows(rows: Iterable[sqlite3.Row]) -> list[dict]:
 def initialise_database() -> None:
     with db_session() as db:
         db.executescript(SCHEMA)
+        # Database-level guards against double booking. Application code already checks,
+        # but two requests arriving together can both pass that check before either writes.
+        # Created defensively: an older database containing duplicates must not stop startup.
+        for statement in (
+            "CREATE UNIQUE INDEX IF NOT EXISTS uniq_booking_confirmed ON bookings(class_id, swimmer_id) WHERE status='confirmed'",
+            "CREATE UNIQUE INDEX IF NOT EXISTS uniq_waitlist_waiting ON waitlist(class_id, swimmer_id) WHERE status='waiting'",
+        ):
+            try:
+                db.execute(statement)
+            except sqlite3.IntegrityError:
+                # Existing duplicates need clearing by hand before the guard can apply.
+                pass
         enquiry_columns = {row[1] for row in db.execute("PRAGMA table_info(enquiries)")}
         for column, definition in {
             "swimmer_name": "TEXT",

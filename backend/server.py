@@ -450,6 +450,10 @@ def customer_bookings(user: dict[str, Any] = Depends(require_roles("customer", "
 def create_booking(payload: BookingInput, request: Request, user: dict[str, Any] = Depends(require_roles("customer", "admin")), x_csrf_token: str | None = Header(default=None)) -> dict[str, Any]:
     csrf_guard(request, user, x_csrf_token)
     with db_session() as db:
+        # Capacity is read and then written. Without an immediate write lock two requests
+        # arriving together can both see the last place free and both take it, putting the
+        # class over its instructor-to-swimmer ratio.
+        db.execute("BEGIN IMMEDIATE")
         swimmer = db.execute("SELECT * FROM swimmers WHERE id=?", (payload.swimmer_id,)).fetchone()
         swim_class = db.execute("SELECT * FROM classes WHERE id=? AND active=1", (payload.class_id,)).fetchone()
         if not swimmer or (user["role"] == "customer" and swimmer["customer_id"] != user["id"]):
@@ -846,6 +850,8 @@ def admin_enrolments(user: dict[str, Any] = Depends(require_roles("admin"))) -> 
 def admin_waitlist_action(waitlist_id: int, payload: WaitlistActionInput, request: Request, user: dict[str, Any] = Depends(require_roles("admin")), x_csrf_token: str | None = Header(default=None)) -> dict[str, Any]:
     csrf_guard(request, user, x_csrf_token)
     with db_session() as db:
+        # Same read-then-write gap as create_booking: lock before checking capacity.
+        db.execute("BEGIN IMMEDIATE")
         entry = db.execute(
             """SELECT w.*,c.title,c.capacity,s.first_name swimmer_first,s.customer_id
                FROM waitlist w JOIN classes c ON c.id=w.class_id JOIN swimmers s ON s.id=w.swimmer_id

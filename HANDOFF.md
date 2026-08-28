@@ -137,6 +137,15 @@ preview prices.
   unchanged, and offers retry.
   The rest of the file is in good shape — event delegation is registered once rather than
   per render, geolocation failure is handled, and escaping is consistent.
+- **Closed a booking race.** Class capacity was read and then written with no write lock,
+  so two families booking the last place at the same moment could both get it — putting the
+  class over its instructor-to-swimmer ratio, which is a safety limit rather than a
+  commercial one. Term enrolment opening is exactly when that traffic arrives. Both
+  `create_booking` and management waitlist promotion now take `BEGIN IMMEDIATE` before
+  checking capacity, and two partial unique indexes (`uniq_booking_confirmed`,
+  `uniq_waitlist_waiting`) enforce it at the database level as well. The indexes are created
+  defensively so an older database holding duplicates cannot block startup — if that
+  happens, clear the duplicates by hand and restart.
 - Security review of `backend/`. The code is in good shape — SQL is parameterised
   throughout, CSV formula injection was already guarded, exports are role-gated, ownership
   checks are consistent, PBKDF2 is 210k iterations with a constant-time compare, and the
