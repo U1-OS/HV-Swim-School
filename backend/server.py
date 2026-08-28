@@ -353,6 +353,9 @@ def login(payload: LoginInput, request: Request, response: Response) -> dict[str
         success = bool(user and password_verify(payload.password, user["password_hash"]))
         db.execute("INSERT INTO login_attempts(email,ip_address,success,created_at) VALUES(?,?,?,?)", (email, ip, int(success), now_iso()))
         if not success:
+            # The 401 is raised inside db_session(), whose exception path rolls back.
+            # Commit the failed attempt first or the limiter never sees any failures.
+            db.commit()
             raise HTTPException(status_code=401, detail="Email or password is incorrect")
         if password_needs_rehash(user["password_hash"]):
             refreshed_hash = password_hash(payload.password)
@@ -1167,6 +1170,12 @@ def audit_log(user: dict[str, Any] = Depends(require_roles("admin"))) -> dict[st
     with db_session() as db:
         query = """SELECT a.*,u.first_name,u.last_name FROM audit_log a LEFT JOIN users u ON u.id=a.user_id ORDER BY a.created_at DESC LIMIT 200"""
         return {"audit": rows(db.execute(query))}
+
+
+@app.api_route("/api/{unmatched_path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])
+def unknown_api_route(unmatched_path: str) -> None:
+    """Keep unmatched API requests JSON even though the static site has an HTML 404."""
+    raise HTTPException(status_code=404, detail="Not Found")
 
 
 @app.exception_handler(StarletteHTTPException)
