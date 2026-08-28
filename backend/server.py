@@ -66,7 +66,7 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(
     title="HV Swim Bendigo Platform API",
-    version="5.2.0",
+    version="5.3.0",
     docs_url="/api/docs" if not settings.production else None,
     openapi_url="/openapi.json" if not settings.production else None,
     redoc_url=None,
@@ -424,7 +424,7 @@ def renumber_waitlist(db: sqlite3.Connection, class_id: int) -> None:
 
 @app.get("/api/health")
 def health() -> dict[str, Any]:
-    return {"ok": True, "service": "HV Swim Bendigo", "version": "5.2.0", "environment": settings.app_env, "time": now_iso()}
+    return {"ok": True, "service": "HV Swim Bendigo", "version": "5.3.0", "environment": settings.app_env, "time": now_iso()}
 
 
 @app.get("/api/public/site-settings")

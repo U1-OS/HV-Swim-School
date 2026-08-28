@@ -42,6 +42,20 @@ for (const page of PAGES) {
   }
 }
 
+// CSS may reference locally hosted font files that do not appear in HTML. Keep this
+// deliberately scoped to @font-face blocks so the native shell gets its typography
+// without copying every unused public-page background image from the shared stylesheet.
+for (const cssPath of [...needed].filter(file => file.endsWith('.css'))) {
+  const css = await readFile(resolve(root, cssPath), 'utf8');
+  for (const face of css.matchAll(/@font-face\s*{([\s\S]*?)}/g)) {
+    for (const match of face[1].matchAll(/url\((['"]?)([^'")]+)\1\)/g)) {
+      const reference = match[2].trim().split(/[?#]/)[0];
+      if (!reference || /^(https?:|data:)/.test(reference)) continue;
+      needed.add(posix.normalize(posix.join(posix.dirname(cssPath), reference)));
+    }
+  }
+}
+
 // Icons come from the manifest, so adding one there is enough to ship it.
 const manifest = JSON.parse(await readFile(resolve(root, 'manifest.webmanifest'), 'utf8'));
 for (const icon of manifest.icons || []) needed.add(icon.src.replace(/^\.\//, ''));

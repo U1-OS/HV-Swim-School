@@ -1,4 +1,4 @@
-# HV Swim Bendigo V5.2 Production Foundation
+# HV Swim Bendigo V5.3 Premium Platform
 
 Premium public website, installable Progressive Web App and connected operations platform for HV Swim Bendigo. The build combines a polished responsive front end with a FastAPI service, role-based accounts and a SQLite preview database. SQLite is not approved for the final production deployment that will store customer, child or payroll data.
 
@@ -21,6 +21,7 @@ The launcher creates its own Python environment and installs the pinned dependen
 - `app.html` — installable app experience
 - `mobile-shell.html` — native iOS/Android connection launch experience
 - `MOBILE_APP_README.md` — Mac, Xcode, Android Studio and store-build guide
+- `BRAND_GUIDE.md` — V5.3 logo, colour, typography and merchandise usage guide
 - `prepare-mobile-app.command` — creates and synchronises the Capacitor iOS/Android projects
 - `capacitor.config.json` / `package.json` — Capacitor 8 native project foundation
 - `backend/` — API, security, database and third-party integration boundaries
@@ -63,6 +64,10 @@ Demo credentials only work while `HV_APP_ENV=development`. Production mode disab
 - Xero OAuth connection, staff mapping and an audited payroll-readiness preview; outbound payroll transmission remains locked until real pay periods and idempotent export tracking are implemented
 - VistaPrint/manual and specialist-swim supplier plans for products unsuitable for generic POD
 - PWA manifest, app icons, offline public shell and mobile-first interfaces
+- Refined transparent HV Swim logo system, simplified digital mark, refreshed social image,
+  new native/PWA icon family and locally hosted Manrope typography
+- Cohesive premium visual system across the public site, sign-in, family, staff and
+  management experiences with improved role-aware navigation and responsive density
 
 ## External activation boundaries
 
@@ -89,6 +94,11 @@ node scripts/build-mobile-web.mjs
 
 The same backend, static-site and mobile-shell checks run automatically for pushes and pull requests in the private GitHub repository.
 
-## Original generated website asset
+## Generated visual assets
 
-The hero photograph and HV Swim merchandise campaign visuals were created with the built-in OpenAI image generation tool for this project. The V5.2 uniform studio visual uses the supplied HV Swim Bendigo logo as its brand reference and is presented as a concept until final products and manufacturer specifications are approved.
+The hero photograph, merchandise campaign visuals and V5.3 logo refinement were created
+with the built-in OpenAI image-generation tool using supplied HV Swim artwork as the brand
+reference. The transparent logo and icon files are approved digital/sample proofs only;
+`BRAND_GUIDE.md` records the required manual vector, colour and physical-sampling work before
+bulk merchandise production. Product campaign images remain concepts until final products
+and manufacturer specifications are approved.

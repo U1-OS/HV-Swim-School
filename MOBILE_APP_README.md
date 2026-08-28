@@ -1,4 +1,4 @@
-# HV Swim Bendigo mobile app · V5.2
+# HV Swim Bendigo mobile app · V5.3
 
 This release contains two related mobile products:
 

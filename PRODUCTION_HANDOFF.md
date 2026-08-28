@@ -28,7 +28,7 @@ This build is a production foundation, not a substitute for the final deployment
 - Confirm accessibility against WCAG 2.2 AA with keyboard and assistive-technology testing.
 - Set enquiry ownership, response targets and deletion/retention rules before the public form goes live.
 - Confirm enrolment authority, waitlist priority rules, payment collection and signed-terms requirements before managers promote real families into classes.
-- Decide whether a released class place should notify the next family automatically or remain a manager-approved action; V5.2 defaults to audited manager approval.
+- Decide whether a released class place should notify the next family automatically or remain a manager-approved action; the current build defaults to audited manager approval.
 - Train managers to use Website content only for approved public wording and to verify every published change on mobile.
 
 ## 3. Existing Xero organisation

@@ -4,7 +4,7 @@
 
 - Proposed app name: **HV Swim Bendigo**
 - Proposed bundle/application ID: `au.com.hvswimbendigo.mobile`
-- Release line: `5.2.0`
+- Release line: `5.3.0`
 - Category: Education / Sports
 - Primary audience: HV Swim families, staff and management
 
@@ -34,10 +34,13 @@ From 31 August 2026, new Google Play apps and updates must target Android 16 / A
 
 ## Assets included
 
-- `assets/app-icon-1024.png` — store/master icon source
-- `assets/app-icon-512.png` — Android/PWA icon
-- `assets/app-icon-192.png` — PWA/home-screen icon
-- `assets/hv-swim-logo.png` — full horizontal brand source
+- `assets/app-icon-v3-1024.png` — store/master icon source
+- `assets/app-icon-v3-512.png` — Android/PWA icon
+- `assets/app-icon-v3-192.png` — PWA/home-screen icon
+- `assets/app-icon-v3-180.png` — Apple touch icon
+- `assets/app-icon-v3-maskable-192.png` and `assets/app-icon-v3-maskable-512.png` — Android mask-safe icons
+- `assets/hv-swim-logo-v3.png` — full horizontal brand source
+- `assets/hv-swim-mark-v3.png` — simplified app/navigation mark
 
 Run `npx capacitor-assets generate` after the native projects are created to populate required platform icon and splash variants, then inspect every generated asset in Xcode and Android Studio.
 
