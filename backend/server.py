@@ -165,6 +165,8 @@ class EnquiryInput(BaseModel):
     contact_method: str = Field(default="email", max_length=30)
     experience: str = Field(default="", max_length=500)
     support_needs: str = Field(default="", max_length=500)
+    # Honeypot. The form renders this hidden and off-screen, so a person never fills it in.
+    website: str = Field(default="", max_length=200)
 
 
 class EnquiryStatusInput(BaseModel):
@@ -1092,9 +1094,27 @@ async def sensor(user: dict[str, Any] = Depends(require_roles("staff", "admin"))
         raise HTTPException(status_code=502, detail="Configured pool sensor did not respond")
 
 
+ENQUIRY_LIMIT_PER_HOUR = 5
+
+
 @app.post("/api/public/enquiries")
 def create_enquiry(payload: EnquiryInput, request: Request) -> dict[str, Any]:
+    ip = client_ip(request)
+    # Bots fill every field they find. Answer as though it worked so they stop retrying,
+    # but record nothing.
+    if payload.website.strip():
+        return {"id": 0, "reference": "HV-ENQ-0000", "received": True, "message": "Thanks — the HV Swim team can now follow up with you."}
     with db_session() as db:
+        cutoff = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
+        recent = db.execute(
+            "SELECT COUNT(*) FROM audit_log WHERE action='create_enquiry' AND ip_address=? AND created_at>?",
+            (ip, cutoff),
+        ).fetchone()[0]
+        if recent >= ENQUIRY_LIMIT_PER_HOUR:
+            raise HTTPException(
+                status_code=429,
+                detail="We have already received several enquiries from this connection. Please call 0413 462 112 if you need to reach us sooner.",
+            )
         cursor = db.execute(
             """INSERT INTO enquiries(name,email,phone,swimmer_name,swimmer_age,program_interest,preferred_class,preferred_days,contact_method,experience,support_needs,status,created_at)
                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)""",
@@ -1104,7 +1124,7 @@ def create_enquiry(payload: EnquiryInput, request: Request) -> dict[str, Any]:
         swimmer = payload.swimmer_name or f"swimmer age {payload.swimmer_age or 'not supplied'}"
         program = payload.program_interest or "program match required"
         db.execute("INSERT INTO notifications(audience_role,title,message,kind,delivery_channels,created_at) VALUES(?,?,?,?,?,?)", ("admin", f"New enrolment enquiry · {reference}", f"{payload.name} submitted an enquiry for {swimmer}: {program}.", "enquiry", '["in_app","email"]', now_iso()))
-        audit(db, None, "create_enquiry", "enquiry", cursor.lastrowid, {"email": payload.email, "reference": reference, "program": payload.program_interest}, client_ip(request))
+        audit(db, None, "create_enquiry", "enquiry", cursor.lastrowid, {"email": payload.email, "reference": reference, "program": payload.program_interest}, ip)
         return {"id": cursor.lastrowid, "reference": reference, "received": True, "message": "Thanks — the HV Swim team can now follow up with you."}
 
 

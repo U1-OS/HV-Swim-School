@@ -109,6 +109,14 @@ preview prices.
   got no indication which field was wrong. It now names the field from its label
   ("Please fill in "Swimmer's first name" before continuing"), marks it visibly and via
   `aria-invalid`, and clears both the moment the parent starts fixing it.
+- **Protected the public enquiry form**, which was the only unauthenticated write endpoint
+  in the system and had no rate limiting and no spam protection whatsoever. Anyone could
+  POST unlimited enquiries, each of which also created an admin notification — so a bot
+  would have flooded the management inbox and grown the database without limit. There is now
+  a hidden honeypot field (bots fill it, people never see it; a hit returns a normal-looking
+  success and stores nothing) and a limit of 5 enquiries per IP per hour, whose 429 message
+  gives the phone number so a genuine family is never stranded. Added covering indexes for
+  both this and the sign-in rate limit, since each runs a scan on every attempt.
 - Security review of `backend/`. The code is in good shape — SQL is parameterised
   throughout, CSV formula injection was already guarded, exports are role-gated, ownership
   checks are consistent, PBKDF2 is 210k iterations with a constant-time compare, and the

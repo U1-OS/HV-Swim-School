@@ -1157,3 +1157,7 @@ textarea { min-height:82px; padding-top:11px; resize:vertical; }
 .empty-state strong { display:block; font-size:1.08rem; color:#0d2f52; margin-bottom:8px; }
 .empty-state p { max-width:52ch; margin:0 auto 18px; font-size:.9rem; line-height:1.6; }
 .empty-state .btn { margin-top:2px; }
+
+/* Spam honeypot: taken out of the layout and the tab order entirely. Real visitors never
+   see or reach it, so anything arriving in it came from a bot. */
+.hp-field { position:absolute; left:-9999px; width:1px; height:1px; overflow:hidden; }

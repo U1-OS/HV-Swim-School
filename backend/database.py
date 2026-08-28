@@ -223,6 +223,10 @@ CREATE INDEX IF NOT EXISTS idx_bookings_class ON bookings(class_id, status);
 CREATE INDEX IF NOT EXISTS idx_pool_readings_location ON pool_readings(location_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_time_entries_status ON time_entries(status, staff_id);
+-- Both rate limits below scan on every sign-in and every public enquiry, and both tables
+-- grow with traffic, so they need covering indexes.
+CREATE INDEX IF NOT EXISTS idx_audit_action_ip ON audit_log(action, ip_address, created_at);
+CREATE INDEX IF NOT EXISTS idx_login_attempts_lookup ON login_attempts(email, ip_address, created_at);
 """
 
 
