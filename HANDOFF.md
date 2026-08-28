@@ -47,6 +47,7 @@ preview prices.
   `hero-swimmer.jpg` (1.8MB to 174KB, master kept as `hero-swimmer-master.png`). All
   references repointed and the service-worker cache bumped to `hv-swim-v5-shell-16`.
 - Added `robots.txt` (portals disallowed) and `scripts/build-sitemap.mjs`.
+- First accessibility pass — see item 3 under Next up for what was fixed and what remains.
 
 ## Next up
 
@@ -67,11 +68,20 @@ Australian adviser. Leave that in place until it actually has been.
 Remaining work, in order:
 
 1. Get Andrew's answers to the twelve flagged items and fill them in.
-2. **Set the production domain**, then run `node scripts/build-sitemap.mjs https://the-domain`.
+2. **Set the production domain** once Andrew buys one — he is staying on the current
+   hosting until the build is finished, so this is deferred. Then run `node scripts/build-sitemap.mjs https://the-domain`.
    That writes `sitemap.xml` and fills in the `Sitemap:` line in `robots.txt`. Nothing was
    guessed — `HV_PUBLIC_URL` is still `localhost:8765` and no canonical URLs are set on any
    page. Add `<link rel="canonical">` and `og:url` at the same time.
-3. Accessibility pass against WCAG 2.2 AA — required by `PRODUCTION_HANDOFF.md`, never done.
+3. **Accessibility — first pass done, but static only.** Fixed: skip links on the nine pages
+   that lacked them, heading-order breaks on `locations.html` and `START_HERE.html`,
+   reduced-motion support in `platform.css` and `mobile-shell.css` (there was none) plus a
+   catch-all in `styles.css`, and 16 secondary-text colours that failed 4.5:1 contrast.
+   Alt text, form labels and landmarks were already clean.
+   Still needed and **cannot be done statically**: keyboard-only walkthrough of the enquiry
+   wizard and the platform portals, screen-reader testing, focus-order check on the mobile
+   menu and cart drawer, and confirmation that live-updating regions (pool conditions, class
+   places) announce properly. Run these in a real browser.
 4. Merch is blocked on assets, not code: a transparent 300 DPI or vector logo master is
    needed before any supplier sample can be ordered. See `MERCH_PRODUCTION_PLAN.md`.
 

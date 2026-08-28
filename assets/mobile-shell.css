@@ -9,3 +9,11 @@ button { font:inherit; }
 .mobile-role-grid { max-width:620px; margin:24px auto; display:grid; grid-template-columns:repeat(3,1fr); gap:9px; }.mobile-role-grid article { padding:15px 11px; border:1px solid rgba(255,255,255,.1); border-radius:14px; background:rgba(255,255,255,.045); }.mobile-role-grid article>span { color:#5ed8f3; font-size:1.05rem; }.mobile-role-grid strong,.mobile-role-grid small { display:block; }.mobile-role-grid strong { margin-top:17px; font-size:.67rem; }.mobile-role-grid small { margin-top:4px; color:#91a9bd; font-size:.52rem; line-height:1.45; }
 .mobile-shell footer { max-width:620px; margin:32px auto 0; display:flex; align-items:center; justify-content:space-between; gap:10px; color:#6f8ca5; font-size:.56rem; }.mobile-shell footer strong { color:#90a9bf; }
 @media(max-width:430px){.mobile-shell{padding-left:16px;padding-right:16px}.mobile-shell-hero{margin-top:5vh}.mobile-role-grid{grid-template-columns:1fr}.mobile-role-grid article{display:grid;grid-template-columns:30px 1fr;align-items:center}.mobile-role-grid article>span{grid-row:1/3}.mobile-role-grid strong{margin-top:0}.mobile-shell footer{align-items:flex-start;flex-direction:column}}
+
+/* Accessibility: skip link and reduced motion */
+.skip-link { position:fixed; z-index:999; left:16px; top:max(12px,env(safe-area-inset-top)); padding:10px 14px; border-radius:10px; color:#061a3b; background:#ffd45e; font-size:.75rem; font-weight:900; text-decoration:none; transform:translateY(-200%); transition:transform .18s ease; }
+.skip-link:focus { transform:none; }
+:focus-visible { outline:3px solid #24cef4; outline-offset:3px; }
+@media (prefers-reduced-motion:reduce) {
+  *, *::before, *::after { animation-duration:.01ms !important; animation-iteration-count:1 !important; transition-duration:.01ms !important; scroll-behavior:auto !important; }
+}
