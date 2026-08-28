@@ -2,6 +2,10 @@
 .auth-visual { position:relative; min-height:100vh; padding:50px clamp(30px,6vw,90px); display:flex; flex-direction:column; justify-content:space-between; color:white; overflow:hidden; background:linear-gradient(90deg,rgba(3,18,43,.96),rgba(5,32,67,.58)),url("hero-swimmer.jpg") 68% center/cover; }
 .auth-visual::after { content:""; position:absolute; inset:auto -10% -24% 10%; height:55%; border-radius:50%; border:90px solid rgba(23,199,241,.08); }
 .auth-visual > * { position:relative; z-index:1; }
+/* The logo art sits on black and relies on mix-blend-mode:screen to knock that out.
+   The z-index above creates a stacking context, which confines the blend and leaves a
+   black box around the mark. Opting the brand out lets it blend with the photo again. */
+.auth-visual > .brand { z-index:auto; }
 .auth-copy { max-width:650px; }
 .auth-copy h1 { font-size:clamp(3rem,6vw,5.7rem); }
 .auth-copy p { max-width:560px; margin-top:20px; color:#c5d8eb; font-size:1.02rem; }

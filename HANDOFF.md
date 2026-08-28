@@ -82,6 +82,12 @@ preview prices.
   will keep the old one for a year.**
 - Fixed a CSS bleed where `.legal-body a` styling applied to buttons, rendering button
   labels as dark underlined text on a blue fill. Affected the legal pages and the new 404.
+- Reviewed and fixed the sign-in page, which nobody had looked at. The logo showed a black
+  box because `.auth-visual > *` sets `z-index:1`, creating a stacking context that confined
+  the `mix-blend-mode:screen` meant to knock the black out. Also rewrote three pieces of
+  build copy that were being shown to parents ("Use a demonstration account below, or
+  connect real accounts during deployment", a PBKDF2/HttpOnly security note, and
+  "Secure production-foundation preview" in the footer).
 - Security review of `backend/`. The code is in good shape — SQL is parameterised
   throughout, CSV formula injection was already guarded, exports are role-gated, ownership
   checks are consistent, PBKDF2 is 210k iterations with a constant-time compare, and the
@@ -158,6 +164,17 @@ Remaining work, in order:
   real accounts are ever exposed to the open internet, but not a launch blocker.
 - The "Demo ·" labels on pool conditions are deliberate: unverified readings are marked
   rather than passed off as live, and they clear once staff verify. Leave them.
+
+## Missing feature — password reset
+
+There is **no password reset anywhere in the build**: no endpoint, no token flow, no email.
+A parent who forgets their password currently has no route back into their account. As a
+stopgap the sign-in page now offers "Forgotten your password?" as an email to the team, so
+the dead end is at least a human one.
+
+Building it properly needs decisions Andrew has to make first — which email provider sends
+the reset, how long a reset link stays valid, and whether staff and management accounts
+reset the same way or are handled manually. Do not build it blind; it touches authentication.
 
 ## Open decisions for Andrew
 
