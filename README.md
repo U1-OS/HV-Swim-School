@@ -1,4 +1,4 @@
-# HV Swim Bendigo V5.0 Public Launch Experience
+# HV Swim Bendigo V5.1 Public Launch Experience
 
 Premium public website, installable Progressive Web App and connected operations platform for HV Swim Bendigo. The build combines a polished responsive front end with a local FastAPI service, role-based accounts and SQLite data persistence.
 
@@ -14,7 +14,7 @@ The launcher creates its own Python environment and installs the pinned dependen
 - `index.html` — public website
 - `about.html` — Laura-led story, teaching principles and confidence-first approach
 - `locations.html` — locations, weather and pool conditions
-- `shop.html` — public merchandise and uniform catalogue
+- `shop.html` — public merchandise studio with guided kits, richer product specifications, care guidance and a persistent preview cart
 - `enquire.html` — lesson finder and database-backed enquiry form
 - `programs.html` — premium program pathway, connected pricing, live places and guided lesson matcher
 - `shop.html` — premium nine-product storefront with search, variants, persistent preview cart and Shopify/POD launch boundaries
@@ -54,7 +54,9 @@ Demo credentials only work while `HV_ENVIRONMENT=development`. Production mode d
 - Management metrics, roster/class creation, timesheet approvals, communications and audit trail
 - Management website editor for the homepage announcement, enrolment status, hero message and primary call-to-action
 - Enquiry inbox with new, contacted, trial-booked and closed follow-up stages
-- Management merchandise workspace with supplier routing and launch gates
+- Management merchandise workspace with sample tracking, supplier routes, costs, projected margin and quantified launch readiness
+- Guided First Splash, Lesson Day and Pool Deck uniform kits that add coordinated products to the persistent preview cart
+- Product material, care and personalisation guidance with explicit sample-approval boundaries
 - Local catalogue price/status controls before products are approved for Shopify
 - Live Bendigo outdoor weather through the server-side weather service
 - Premium “Today at HV Swim” homepage view combining local weather, staff-verified pool conditions, seasonal venue status and the next connected class place
@@ -76,4 +78,4 @@ Local preview data is stored in `data/hv_swim.db`. The database is intentionally
 
 ## Original generated website asset
 
-The hero photograph and HV Swim merchandise campaign visual were created with the built-in OpenAI image generation tool for this project. The merchandise visual uses the supplied HV Swim Bendigo logo as its brand reference and is presented as a concept until final products and manufacturer specifications are approved.
+The hero photograph and HV Swim merchandise campaign visuals were created with the built-in OpenAI image generation tool for this project. The V5.1 uniform studio visual uses the supplied HV Swim Bendigo logo as its brand reference and is presented as a concept until final products and manufacturer specifications are approved.

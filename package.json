@@ -1,6 +1,6 @@
 {
   "name": "hv-swim-bendigo-mobile",
-  "version": "5.0.0",
+  "version": "5.1.0",
   "private": true,
   "description": "Capacitor foundation for the HV Swim Bendigo iOS and Android apps.",
   "scripts": {

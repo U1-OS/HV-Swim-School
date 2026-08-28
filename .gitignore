@@ -12,3 +12,4 @@ www/
 android/.gradle/
 android/local.properties
 ios/App/Pods/
+_to_delete/

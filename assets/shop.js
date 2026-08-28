@@ -10,6 +10,23 @@
   let catalogueSource = 'planned_catalogue';
   let cart = loadCart();
 
+  const PRODUCT_DETAILS = {
+    'HV-SWIMWEAR': {material:'Chlorine-resistant performance fabric — final blend pending sample',care:'Cool fresh-water rinse after every swim; shade dry',personalisation:'HV Swim identity only; optional name placement under review'},
+    'HV-TOWEL': {material:'Soft, absorbent pool towel — weight and embroidery pending sample',care:'Cold machine wash; avoid fabric softener for best absorbency',personalisation:'Embroidered HV Swim mark; individual name option under review'},
+    'HV-BOTTLE': {material:'Insulated or BPA-free bottle specification to be confirmed',care:'Hand wash lid and seals; bottle care follows final supplier specification',personalisation:'Name field planned after dishwasher and rub testing'},
+    'HV-GOGGLES': {material:'Soft-seal training goggles from an approved swim supplier',care:'Rinse after use; air dry away from direct sun; do not rub lenses',personalisation:'No custom print planned; HV Swim packaging option under review'},
+    'HV-BAG': {material:'Ventilated, quick-dry wet-gear construction',care:'Empty after lessons; wipe clean and air dry fully',personalisation:'Name panel and HV Swim mark planned'},
+    'HV-CAP': {material:'Specialist silicone swim cap',care:'Rinse, pat dry and store flat away from sharp items',personalisation:'Durable team print pending stretch and chlorine testing'},
+    'HV-STAFF-POLO': {material:'Breathable performance knit with embroidered identity',care:'Cold gentle wash; wash inside-out; shade dry',personalisation:'Role or staff name embroidery can be added after uniform approval'},
+    'HV-TEAM-HOODIE': {material:'Mid-weight brushed fleece — final composition pending POD sample',care:'Cold wash inside-out; shade dry; do not iron decoration',personalisation:'HV Swim decoration included; individual names optional'},
+    'HV-INSTRUCTOR-CAP': {material:'Lightweight adjustable performance cap',care:'Hand wash and reshape while damp',personalisation:'Embroidered HV Swim identity; instructor label under review'}
+  };
+  const KITS = {
+    'first-splash': ['HV-GOGGLES','HV-CAP','HV-TOWEL','HV-BOTTLE'],
+    'lesson-day': ['HV-SWIMWEAR','HV-GOGGLES','HV-TOWEL','HV-BAG','HV-BOTTLE'],
+    'pool-deck': ['HV-STAFF-POLO','HV-TEAM-HOODIE','HV-INSTRUCTOR-CAP','HV-BOTTLE']
+  };
+
   const esc = value => String(value ?? '').replace(/[&<>'"]/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]));
   const money = cents => new Intl.NumberFormat('en-AU',{style:'currency',currency:'AUD'}).format(Number(cents || 0) / 100);
   const slug = value => String(value || '').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
@@ -25,7 +42,7 @@
     }
     return product;
   };
-  const visualClass = product => `product-${slug(product.sku || product.title)}`;
+  const visualClass = product => `product-${slug(product.sku || product.title)} ${['Uniforms'].includes(product.category)?'uniform-studio-crop':''}`;
   const visual = product => product.image ? `<img src="${esc(product.image)}" alt="${esc(product.title)}">` : `<div class="shop-product-crop ${visualClass(product)}" role="img" aria-label="${esc(product.title)} concept"></div>`;
   const cartKey = (id,size) => `${id}::${size || 'Standard'}`;
 
@@ -65,6 +82,22 @@
     openCart();
   }
 
+  function addKit(kitId) {
+    const kitProducts=(KITS[kitId]||[]).map(sku=>products.find(product=>product.sku===sku)).filter(Boolean);
+    if (!kitProducts.length) return;
+    kitProducts.forEach(product=>{
+      const selectedSize=sizeList(product)[0]||'Standard';
+      const key=cartKey(product.id,selectedSize);
+      const existing=cart.find(item=>item.key===key);
+      if(existing) existing.quantity=Math.min(20,Number(existing.quantity)+1);
+      else cart.push({key,id:String(product.id),sku:product.sku,title:product.title,category:product.category,size:selectedSize,quantity:1,price_cents:Number(product.price_cents||0),variant_id:product.variant_id||null});
+    });
+    saveCart();
+    const status=document.getElementById('kit-builder-status');
+    if(status){status.classList.add('complete');status.innerHTML=`<span>✓</span><p><strong>${kitProducts.length} products added.</strong> Review sizes and quantities in your preview cart before sending an enquiry.</p>`;}
+    openCart();
+  }
+
   function renderCart() {
     const itemCount = cart.reduce((sum,item)=>sum+Number(item.quantity||0),0);
     const subtotal = cart.reduce((sum,item)=>sum+Number(item.quantity||0)*Number(item.price_cents||0),0);
@@ -98,8 +131,9 @@
     const product=products.find(item=>String(item.id)===String(id));
     if (!product) return;
     const sizes=sizeList(product);
+    const detail=PRODUCT_DETAILS[product.sku]||{material:'Final material specification pending supplier approval',care:'Care instructions published after physical sample approval',personalisation:'Personalisation options to be confirmed'};
     const dialog=document.getElementById('product-dialog');
-    document.getElementById('product-dialog-content').innerHTML=`<div class="dialog-product-visual">${visual(product)}<span class="dialog-concept-label">HV Swim Collection 01</span></div><div class="dialog-product-copy"><span class="shop-category">${esc(product.category)}</span><h2>${esc(product.title)}</h2><strong class="dialog-price">${money(product.price_cents)}</strong><p>${esc(product.description)}</p><div class="product-option"><label for="dialog-size">Preferred option</label><select id="dialog-size">${(sizes.length?sizes:['Standard']).map(size=>`<option>${esc(size)}</option>`).join('')}</select></div><div class="product-option"><label for="dialog-quantity">Quantity</label><select id="dialog-quantity">${[1,2,3,4,5].map(value=>`<option value="${value}">${value}</option>`).join('')}</select></div><div class="data-boundary"><strong>${product.status==='available'?'Connected product':'Collection concept'}:</strong> ${product.status==='available'?'Availability comes from the connected Shopify catalogue; sign-in is required before checkout.':'Add this preferred option to the demo cart. No stock is reserved and no payment is taken until supplier samples and Shopify are approved.'}</div><button class="btn btn-primary" type="button" data-dialog-add="${esc(product.id)}">Add to preview cart</button></div>`;
+    document.getElementById('product-dialog-content').innerHTML=`<div class="dialog-product-visual">${visual(product)}<span class="dialog-concept-label">HV Swim Collection 01</span></div><div class="dialog-product-copy"><span class="shop-category">${esc(product.category)}</span><h2>${esc(product.title)}</h2><strong class="dialog-price">${money(product.price_cents)}</strong><p>${esc(product.description)}</p><dl class="product-specs"><div><dt>Material direction</dt><dd>${esc(detail.material)}</dd></div><div><dt>Care</dt><dd>${esc(detail.care)}</dd></div><div><dt>Personalisation</dt><dd>${esc(detail.personalisation)}</dd></div></dl><div class="product-dialog-options"><div class="product-option"><label for="dialog-size">Preferred option</label><select id="dialog-size">${(sizes.length?sizes:['Standard']).map(size=>`<option>${esc(size)}</option>`).join('')}</select></div><div class="product-option"><label for="dialog-quantity">Quantity</label><select id="dialog-quantity">${[1,2,3,4,5].map(value=>`<option value="${value}">${value}</option>`).join('')}</select></div></div><div class="data-boundary"><strong>${product.status==='available'?'Connected product':'Collection concept'}:</strong> ${product.status==='available'?'Availability comes from the connected Shopify catalogue; sign-in is required before checkout.':'Add this preferred option to the demo cart. No stock is reserved and no payment is taken until supplier samples and Shopify are approved.'}</div><button class="btn btn-primary" type="button" data-dialog-add="${esc(product.id)}">Add to preview cart</button></div>`;
     dialog.showModal();
   }
 
@@ -108,6 +142,7 @@
     document.querySelectorAll('[data-shop-filter]').forEach(item=>item.classList.toggle('active',item===button));
     render();
   }));
+  document.getElementById('kit-grid')?.addEventListener('click',event=>{const button=event.target.closest('[data-kit-add]');if(button)addKit(button.dataset.kitAdd);});
   document.getElementById('shop-search')?.addEventListener('input',event=>{searchTerm=event.target.value.trim().toLowerCase();render();});
   grid.addEventListener('click',event=>{
     const view=event.target.closest('[data-product-view]');

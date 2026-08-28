@@ -171,7 +171,11 @@ CREATE TABLE IF NOT EXISTS products (
   sizes TEXT NOT NULL DEFAULT '[]',
   status TEXT NOT NULL DEFAULT 'planned',
   emoji TEXT NOT NULL,
-  shopify_gid TEXT
+  shopify_gid TEXT,
+  sample_status TEXT NOT NULL DEFAULT 'not_ordered',
+  cost_cents INTEGER,
+  supplier_route TEXT,
+  personalisation TEXT
 );
 CREATE TABLE IF NOT EXISTS integration_connections (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -266,6 +270,15 @@ def initialise_database() -> None:
         }.items():
             if column not in enquiry_columns:
                 db.execute(f"ALTER TABLE enquiries ADD COLUMN {column} {definition}")
+        product_columns = {row[1] for row in db.execute("PRAGMA table_info(products)")}
+        for column, definition in {
+            "sample_status": "TEXT NOT NULL DEFAULT 'not_ordered'",
+            "cost_cents": "INTEGER",
+            "supplier_route": "TEXT",
+            "personalisation": "TEXT",
+        }.items():
+            if column not in product_columns:
+                db.execute(f"ALTER TABLE products ADD COLUMN {column} {definition}")
         created = now_iso()
         base_products = [
             ("HV-SWIMWEAR", "HV Swim Team Swimwear", "Swimwear", "Logo-branded training swimwear for children and adults.", 5995, '["Kids 4-14","Adult XS-XL"]', "planned", "🩱"),
@@ -279,6 +292,22 @@ def initialise_database() -> None:
             ("HV-INSTRUCTOR-CAP", "HV Swim Instructor Cap", "Uniforms", "Lightweight branded cap for outdoor and seasonal pool work.", 2495, '["Adjustable"]', "planned", "◌"),
         ]
         db.executemany("INSERT OR IGNORE INTO products(sku,title,category,description,price_cents,sizes,status,emoji) VALUES(?,?,?,?,?,?,?,?)", base_products)
+        production_defaults = {
+            "HV-SWIMWEAR": ("specialist_uniform", "HV Swim identity; name placement under review"),
+            "HV-TOWEL": ("vistaprint_or_specialist", "Embroidered identity; optional swimmer name"),
+            "HV-BOTTLE": ("vistaprint", "Named bottle after wash and rub testing"),
+            "HV-GOGGLES": ("specialist_uniform", "No product personalisation planned"),
+            "HV-BAG": ("printify_or_vistaprint", "HV Swim mark and swimmer name panel"),
+            "HV-CAP": ("specialist_uniform", "Durable HV Swim team print"),
+            "HV-STAFF-POLO": ("vistaprint", "Embroidered identity; role or staff name optional"),
+            "HV-TEAM-HOODIE": ("printify", "HV Swim decoration; individual name optional"),
+            "HV-INSTRUCTOR-CAP": ("printify_or_vistaprint", "Embroidered identity and instructor label"),
+        }
+        for sku, (supplier_route, personalisation) in production_defaults.items():
+            db.execute(
+                "UPDATE products SET supplier_route=COALESCE(NULLIF(supplier_route,''),?),personalisation=COALESCE(NULLIF(personalisation,''),?) WHERE sku=?",
+                (supplier_route, personalisation, sku),
+            )
         for provider in ("xero", "shopify", "printify", "vistaprint", "email", "sms", "web_push", "pool_sensor"):
             db.execute("INSERT OR IGNORE INTO integration_connections(provider,status,metadata,updated_at) VALUES(?,?,?,?)", (provider, "not_connected", "{}", created))
         site_defaults = {

@@ -36,7 +36,7 @@ SESSION_COOKIE = "hv_session"
 
 app = FastAPI(
     title="HV Swim Bendigo Platform API",
-    version="5.0.0",
+    version="5.1.0",
     docs_url="/api/docs" if not settings.production else None,
     redoc_url=None,
 )
@@ -173,6 +173,10 @@ class SiteSettingsInput(BaseModel):
 class ProductUpdateInput(BaseModel):
     price_cents: int = Field(ge=0, le=100_000)
     status: Literal["planned", "sampling", "approved", "available", "paused"]
+    sample_status: Literal["not_ordered", "ordered", "received", "changes_required", "approved"] = "not_ordered"
+    cost_cents: int | None = Field(default=None, ge=0, le=100_000)
+    supplier_route: Literal["specialist_uniform", "vistaprint", "printify", "printify_or_vistaprint", "vistaprint_or_specialist", "manual_review"] = "manual_review"
+    personalisation: str = Field(default="", max_length=240)
 
 
 class LocationUpdateInput(BaseModel):
@@ -280,7 +284,7 @@ def renumber_waitlist(db: sqlite3.Connection, class_id: int) -> None:
 
 @app.get("/api/health")
 def health() -> dict[str, Any]:
-    return {"ok": True, "service": "HV Swim Bendigo", "version": "5.0.0", "environment": settings.app_env, "time": now_iso()}
+    return {"ok": True, "service": "HV Swim Bendigo", "version": "5.1.0", "environment": settings.app_env, "time": now_iso()}
 
 
 @app.get("/api/public/site-settings")
@@ -996,7 +1000,14 @@ async def merch_production(user: dict[str, Any] = Depends(require_roles("admin")
     with db_session() as db:
         catalogue = rows(db.execute("SELECT * FROM products ORDER BY category,title"))
     for product in catalogue:
-        product["production"] = supplier_plan.get(product["sku"], {"supplier": "manual_review", "method": "Confirm supplier and sample before launch."})
+        planned = supplier_plan.get(product["sku"], {"supplier": "manual_review", "method": "Confirm supplier and sample before launch."})
+        planned["supplier"] = product.get("supplier_route") or planned["supplier"]
+        product["production"] = planned
+        product["margin_cents"] = None if product.get("cost_cents") is None else product["price_cents"] - product["cost_cents"]
+        product["margin_percent"] = None if product.get("cost_cents") is None or not product["price_cents"] else round((product["price_cents"] - product["cost_cents"]) / product["price_cents"] * 100, 1)
+    approved_samples = sum(1 for product in catalogue if product.get("sample_status") == "approved")
+    costed_products = sum(1 for product in catalogue if product.get("cost_cents") is not None)
+    launchable_products = sum(1 for product in catalogue if product.get("sample_status") == "approved" and product.get("status") in {"approved", "available"})
     live_printify = []
     printify_error = None
     if printify_ready():
@@ -1006,6 +1017,13 @@ async def merch_production(user: dict[str, Any] = Depends(require_roles("admin")
             printify_error = f"Printify connection unavailable: {type(exc).__name__}"
     return {
         "catalogue": catalogue,
+        "launch_readiness": {
+            "total_products": len(catalogue),
+            "approved_samples": approved_samples,
+            "costed_products": costed_products,
+            "launchable_products": launchable_products,
+            "readiness_percent": round((approved_samples + costed_products + launchable_products) / (max(len(catalogue), 1) * 3) * 100),
+        },
         "providers": {
             "shopify": {"configured": shopify_ready(), "role": "Storefront, checkout, customer orders and inventory"},
             "printify": {"configured": printify_ready(), "role": "Automated POD mockups, production and fulfilment", "products": live_printify, "error": printify_error},
@@ -1022,9 +1040,13 @@ def update_product(product_id: int, payload: ProductUpdateInput, request: Reques
         product = db.execute("SELECT id,sku,title,price_cents,status FROM products WHERE id=?", (product_id,)).fetchone()
         if not product:
             raise HTTPException(status_code=404, detail="Product not found")
-        db.execute("UPDATE products SET price_cents=?,status=? WHERE id=?", (payload.price_cents, payload.status, product_id))
-        audit(db, user["id"], "update_merchandise_product", "product", product_id, {"sku": product["sku"], "price_cents": payload.price_cents, "status": payload.status}, client_ip(request))
-        return {"saved": True, "id": product_id, "price_cents": payload.price_cents, "status": payload.status}
+        db.execute(
+            "UPDATE products SET price_cents=?,status=?,sample_status=?,cost_cents=?,supplier_route=?,personalisation=? WHERE id=?",
+            (payload.price_cents, payload.status, payload.sample_status, payload.cost_cents, payload.supplier_route, payload.personalisation, product_id),
+        )
+        detail = {"sku": product["sku"], "price_cents": payload.price_cents, "status": payload.status, "sample_status": payload.sample_status, "cost_cents": payload.cost_cents, "supplier_route": payload.supplier_route}
+        audit(db, user["id"], "update_merchandise_product", "product", product_id, detail, client_ip(request))
+        return {"saved": True, "id": product_id, **detail}
 
 
 @app.post("/api/products/cart")
