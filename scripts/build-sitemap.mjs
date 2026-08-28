@@ -56,7 +56,7 @@ let touched = 0;
 for (const [page] of PAGES) {
   const path = join(root, page);
   let html = readFileSync(path, 'utf8');
-  const absoluteImage = `${base}/assets/og-share.jpg`;
+  const absoluteImage = `${base}/assets/og-share-v3.jpg`;
 
   html = html
     .replace(/(<meta property="og:image" content=")[^"]*(">)/, `$1${absoluteImage}$2`)

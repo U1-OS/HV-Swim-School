@@ -11,6 +11,9 @@
   let apiReachable = null;
 
   const esc = value => String(value ?? '').replace(/[&<>'"]/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]));
+  const iconNames = {'⌂':'home','▦':'calendar','◷':'clock','♡':'heart','◇':'status','♢':'bell','°C':'thermometer','▤':'document','✓':'check','◎':'status','♙':'users','◫':'layout','✉':'mail','≈':'waves','◌':'message','↗':'trend','◔':'status','$':'dollar'};
+  const iconSvg = value => `<svg class="ui-icon" aria-hidden="true"><use href="assets/icons.svg#${esc(iconNames[value]||value)}"></use></svg>`;
+  const upgradeLegacyIcons = root => root.querySelectorAll('[aria-hidden="true"]').forEach(element=>{if(element.querySelector('svg'))return;const name=iconNames[element.textContent.trim()];if(name)element.innerHTML=iconSvg(name);});
   const money = cents => new Intl.NumberFormat('en-AU',{style:'currency',currency:'AUD'}).format(Number(cents || 0) / 100);
   const dt = value => value ? new Intl.DateTimeFormat('en-AU',{day:'numeric',month:'short',hour:'numeric',minute:'2-digit',timeZone:'Australia/Melbourne'}).format(new Date(value)) : '—';
   const dOnly = value => value ? new Intl.DateTimeFormat('en-AU',{day:'numeric',month:'short',year:'numeric',timeZone:'Australia/Melbourne'}).format(new Date(`${value}T00:00:00+10:00`)) : '—';
@@ -23,7 +26,7 @@
   const chip = (text, kind='demo') => `<span class="status ${esc(kind)}">${esc(text)}</span>`;
   const statusKind = status => ({confirmed:'open',approved:'open',available:'open',current:'open',connected:'open',open:'open',trial_booked:'open',submitted:'changed',contacted:'changed',sampling:'changed',limited:'changed',expiring:'changed',planned:'demo',not_connected:'changed',draft:'demo',paused:'closed',closed:'closed',cancelled:'closed',changed:'changed',exported:'open'})[status] || 'demo';
   const empty = text => `<div class="empty-state">${esc(text)}</div>`;
-  const metric = (label,value,foot,icon='◇') => `<article class="panel panel-pad p-span-3"><div class="metric-top"><span>${esc(label)}</span><span class="metric-icon" aria-hidden="true">${icon}</span></div><strong class="metric-value">${esc(value)}</strong><span class="metric-foot">${esc(foot)}</span></article>`;
+  const metric = (label,value,foot,icon='status') => `<article class="panel panel-pad p-span-3"><div class="metric-top"><span>${esc(label)}</span><span class="metric-icon" aria-hidden="true">${iconSvg(icon)}</span></div><strong class="metric-value">${esc(value)}</strong><span class="metric-foot">${esc(foot)}</span></article>`;
   const loading = () => `<div class="loading-shell"><div><div class="loading-ring" aria-hidden="true"></div><p>Loading…</p></div></div>`;
 
   const load = async (path, options={}) => {
@@ -110,9 +113,9 @@
   }
 
   const navByRole = {
-    customer: [['overview','⌂','Overview'],['classes','▦','Find a class'],['bookings','◷','My bookings'],['swimmers','♡','Swimmers'],['shop','◇','Merch shop'],['notifications','♢','Notifications']],
-    staff: [['overview','⌂','Today'],['roster','▦','My roster'],['clock','◷','Clock & location'],['pool','°C','Pool checks'],['timesheets','▤','Timesheets'],['qualifications','✓','Qualifications'],['notifications','♢','Notifications']],
-    admin: [['overview','⌂','Command centre'],['enrolments','◎','Enrolment desk'],['accounts','♙','Accounts'],['website','◫','Website content'],['locations','°C','Locations & pools'],['enquiries','✉','Enquiry inbox'],['timesheets','✓','Timesheet approvals'],['roster','▦','Roster builder'],['classes','≈','Class setup'],['compliance','♢','Staff compliance'],['notifications','◌','Communications'],['integrations','◇','Integrations'],['merch','▤','Merchandise'],['audit','↗','Audit trail']]
+    customer: [['overview','home','Overview'],['classes','calendar','Find a class'],['bookings','clock','My bookings'],['swimmers','heart','Swimmers'],['shop','bag','Merch shop'],['notifications','bell','Notifications']],
+    staff: [['overview','home','Today'],['roster','calendar','My roster'],['clock','clock','Clock & location'],['pool','thermometer','Pool checks'],['timesheets','document','Timesheets'],['qualifications','shield','Qualifications'],['notifications','bell','Notifications']],
+    admin: [['overview','home','Command centre'],['enrolments','status','Enrolment desk'],['accounts','users','Accounts'],['website','layout','Website content'],['locations','thermometer','Locations & pools'],['enquiries','mail','Enquiry inbox'],['timesheets','check','Timesheet approvals'],['roster','calendar','Roster builder'],['classes','waves','Class setup'],['compliance','shield','Staff compliance'],['notifications','message','Communications'],['integrations','link','Integrations'],['merch','bag','Merchandise'],['audit','trend','Audit trail']]
   };
 
   const compactSidebar = window.matchMedia('(max-width:820px)');
@@ -215,6 +218,7 @@
       return;
     }
     document.title = `${session.user.display_name} | HV Swim`;
+    document.body.classList.add(`role-${session.user.role}`);
     document.getElementById('platform-user-name').textContent = session.user.display_name;
     document.getElementById('platform-user-role').textContent = roleLabels[session.user.role];
     document.getElementById('platform-role-label').textContent = roleLabels[session.user.role];
@@ -241,14 +245,14 @@
 
   function buildNav() {
     const nav = document.getElementById('platform-nav');
-    nav.innerHTML = navByRole[session.user.role].map(([route,icon,label]) => `<button type="button" data-route="${route}"><span class="nav-icon" aria-hidden="true">${icon}</span>${esc(label)}</button>`).join('');
+    nav.innerHTML = navByRole[session.user.role].map(([route,icon,label]) => `<button type="button" data-route="${route}"><span class="nav-icon" aria-hidden="true">${iconSvg(icon)}</span>${esc(label)}</button>`).join('');
     nav.querySelectorAll('[data-route]').forEach(button => button.addEventListener('click', () => { location.hash=button.dataset.route; closeSidebar({returnFocus:true}); }));
   }
 
   function buildMobileTabbar() {
     const routes={customer:['overview','classes','bookings','shop'],staff:['overview','roster','clock','pool'],admin:['overview','enrolments','locations','enquiries']}[session.user.role];
     const tabbar=document.getElementById('platform-tabbar');
-    tabbar.innerHTML=navByRole[session.user.role].filter(item=>routes.includes(item[0])).map(([route,icon,label])=>`<button type="button" data-route-jump="${route}" data-mobile-route="${route}"><span aria-hidden="true">${icon}</span><strong>${esc(label.replace('Command centre','Home').replace('Locations & pools','Pools').replace('Enquiry inbox','Enquiries').replace('Find a class','Classes').replace('My bookings','Bookings'))}</strong></button>`).join('');
+    tabbar.innerHTML=navByRole[session.user.role].filter(item=>routes.includes(item[0])).map(([route,icon,label])=>`<button type="button" data-route-jump="${route}" data-mobile-route="${route}"><span aria-hidden="true">${iconSvg(icon)}</span><strong>${esc(label.replace('Command centre','Home').replace('Locations & pools','Pools').replace('Enquiry inbox','Enquiries').replace('Find a class','Classes').replace('My bookings','Bookings'))}</strong></button>`).join('');
   }
 
   function updateConnectivity() {
@@ -276,6 +280,7 @@
     const allowed = navByRole[session.user.role].map(item => item[0]);
     let route = location.hash.replace('#','') || 'overview';
     if (!allowed.includes(route)) route='overview';
+    document.body.dataset.portalView=route;
     const routeLabel=navByRole[session.user.role].find(item=>item[0]===route)?.[2]||'Workspace';
     document.title=`${routeLabel} | HV Swim Bendigo`;
     document.querySelectorAll('[data-route]').forEach(button => {const active=button.dataset.route===route;button.classList.toggle('active',active);if(active)button.setAttribute('aria-current','page');else button.removeAttribute('aria-current');});
@@ -289,6 +294,7 @@
       if (!renderer) throw new Error('This workspace view is unavailable');
       await renderer(content);
       if (generation!==routeGeneration) return;
+      upgradeLegacyIcons(content);
       content.removeAttribute('aria-busy'); content.classList.add('route-ready');
       if (preserveScroll) requestAnimationFrame(()=>window.scrollTo({top:previousScroll,behavior:'auto'}));
       else if (focus && !initial) requestAnimationFrame(()=>{window.scrollTo({top:0,behavior:'auto'});const heading=content.querySelector('h1');if(heading){heading.tabIndex=-1;heading.focus({preventScroll:true});}});
@@ -553,6 +559,7 @@
     finally { form.dataset.submitting='false'; if(submit?.isConnected)setBusy(submit,false); }
   }
 
+  upgradeLegacyIcons(document);
   if(page==='login')initLogin();
   if(page==='app')initApp();
 })();

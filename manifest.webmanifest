@@ -27,31 +27,31 @@
   },
   "icons": [
     {
-      "src": "assets/app-icon-192.png",
+      "src": "assets/app-icon-v3-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "assets/app-icon-512.png",
+      "src": "assets/app-icon-v3-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "assets/app-icon-1024.png",
+      "src": "assets/app-icon-v3-1024.png",
       "sizes": "1024x1024",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "assets/app-icon-maskable-192.png",
+      "src": "assets/app-icon-v3-maskable-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "maskable"
     },
     {
-      "src": "assets/app-icon-maskable-512.png",
+      "src": "assets/app-icon-v3-maskable-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
@@ -64,7 +64,7 @@
       "url": "login.html?role=customer",
       "icons": [
         {
-          "src": "assets/app-icon-192.png",
+          "src": "assets/app-icon-v3-192.png",
           "sizes": "192x192"
         }
       ]
@@ -75,7 +75,7 @@
       "url": "login.html?role=staff",
       "icons": [
         {
-          "src": "assets/app-icon-192.png",
+          "src": "assets/app-icon-v3-192.png",
           "sizes": "192x192"
         }
       ]
@@ -86,7 +86,7 @@
       "url": "login.html?role=admin",
       "icons": [
         {
-          "src": "assets/app-icon-192.png",
+          "src": "assets/app-icon-v3-192.png",
           "sizes": "192x192"
         }
       ]
@@ -97,7 +97,7 @@
       "url": "locations.html",
       "icons": [
         {
-          "src": "assets/app-icon-192.png",
+          "src": "assets/app-icon-v3-192.png",
           "sizes": "192x192"
         }
       ]

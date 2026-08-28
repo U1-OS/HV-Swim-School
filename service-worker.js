@@ -1,10 +1,10 @@
-const CACHE = 'hv-swim-v5-shell-28';
+const CACHE = 'hv-swim-v5-shell-29';
 const PUBLIC_DATA_CACHE = 'hv-swim-v5-public-data-2';
 const SHELL = [
   './', './index.html', './about.html', './programs.html', './app.html', './mobile-shell.html', './login.html', './platform.html', './enquire.html', './locations.html', './shop.html', './customer.html', './staff.html', './admin.html', './offline.html',
-  './assets/styles.css?v=5.2.0', './assets/app.js?v=5.2.0', './assets/hv-swim-logo.png', './assets/hero-swimmer.jpg', './assets/og-share.jpg', './assets/merch-collection-v2.jpg', './assets/merch-uniform-studio-v3.jpg',
-  './assets/platform.css?v=5.2.0', './assets/platform.js?v=5.2.1', './assets/public-api.js?v=5.2.0', './assets/programs.js?v=5.2.0', './assets/shop.js?v=5.2.0', './assets/enquire.js?v=5.2.0', './assets/mobile-shell.css?v=5.2.0', './assets/mobile-shell.js?v=5.2.0',
-  './assets/app-icon-192.png', './assets/app-icon-512.png', './assets/app-icon-1024.png', './assets/app-icon-maskable-192.png', './assets/app-icon-maskable-512.png', './manifest.webmanifest'
+  './assets/styles.css?v=5.3.1', './assets/app.js?v=5.3.1', './assets/icons.svg', './assets/hv-swim-logo-v3.png', './assets/hv-swim-mark-v3.png', './assets/fonts/manrope-latin-variable.woff2', './assets/hero-swimmer.jpg', './assets/og-share-v3.jpg', './assets/merch-collection-v2.jpg', './assets/merch-uniform-studio-v3.jpg',
+  './assets/platform.css?v=5.3.1', './assets/platform.js?v=5.3.1', './assets/public-api.js?v=5.3.1', './assets/programs.js?v=5.3.1', './assets/shop.js?v=5.3.1', './assets/enquire.js?v=5.3.1', './assets/mobile-shell.css?v=5.3.1', './assets/mobile-shell.js?v=5.3.1',
+  './assets/app-icon-v3-64.png', './assets/app-icon-v3-180.png', './assets/app-icon-v3-192.png', './assets/app-icon-v3-512.png', './assets/app-icon-v3-1024.png', './assets/app-icon-v3-maskable-192.png', './assets/app-icon-v3-maskable-512.png', './manifest.webmanifest'
 ];
 
 self.addEventListener('install', event => {

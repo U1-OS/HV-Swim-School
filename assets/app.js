@@ -3,6 +3,19 @@
 
   const WEATHER_KEY = 'hv-swim-v4-weather-cache';
   const DAY = 24 * 60 * 60 * 1000;
+  const iconNames = {'♡':'heart','≈':'waves','✓':'check','↗':'arrow-up-right','→':'arrow-right','◇':'settings','°C':'thermometer','☀':'sun','⌂':'home','◎':'status','⌕':'search'};
+  const iconSvg = name => `<svg class="ui-icon" aria-hidden="true"><use href="assets/icons.svg#${name}"></use></svg>`;
+  const upgradeLegacyIcons = (root=document) => {
+    const candidates=[];
+    if(root instanceof Element)candidates.push(root);
+    candidates.push(...root.querySelectorAll('[aria-hidden="true"],.icon-box,.integration-logo,.approach-card-top>span'));
+    candidates.forEach(element=>{
+      if(element.querySelector?.('svg'))return;
+      const value=element.textContent.trim();
+      const name=value==='◇'&&element.closest('[data-cart-open]')?'bag':iconNames[value];
+      if(name)element.innerHTML=iconSvg(name);
+    });
+  };
   const conditions = {
     'wood-street': {
       temperature: 31.8,
@@ -194,20 +207,20 @@
 
   // Live Bendigo weather. Pool temperature remains a separate staff-verified measurement.
   const weatherCodes = {
-    0:['Clear','☀'], 1:['Mostly clear','🌤'], 2:['Partly cloudy','⛅'], 3:['Overcast','☁'],
-    45:['Fog','≋'], 48:['Fog','≋'], 51:['Light drizzle','🌦'], 53:['Drizzle','🌦'], 55:['Heavy drizzle','🌧'],
-    61:['Light rain','🌦'], 63:['Rain','🌧'], 65:['Heavy rain','🌧'], 80:['Rain showers','🌦'], 81:['Rain showers','🌧'],
-    82:['Heavy showers','🌧'], 95:['Thunderstorm','⛈'], 96:['Thunderstorm','⛈'], 99:['Thunderstorm','⛈']
+    0:['Clear','sun'], 1:['Mostly clear','cloud-sun'], 2:['Partly cloudy','cloud-sun'], 3:['Overcast','cloud'],
+    45:['Fog','fog'], 48:['Fog','fog'], 51:['Light drizzle','cloud-rain'], 53:['Drizzle','cloud-rain'], 55:['Heavy drizzle','cloud-rain'],
+    61:['Light rain','cloud-rain'], 63:['Rain','cloud-rain'], 65:['Heavy rain','cloud-rain'], 80:['Rain showers','cloud-rain'], 81:['Rain showers','cloud-rain'],
+    82:['Heavy showers','cloud-rain'], 95:['Thunderstorm','cloud-lightning'], 96:['Thunderstorm','cloud-lightning'], 99:['Thunderstorm','cloud-lightning']
   };
   function renderWeather(data, cached=false) {
     const current = data.current || data;
-    const [summary, icon] = weatherCodes[current.weather_code] || ['Current conditions','◌'];
+    const [summary, icon] = weatherCodes[current.weather_code] || ['Current conditions','status'];
     const temperature = current.temperature_2m == null ? NaN : Number(current.temperature_2m);
     const apparent = current.apparent_temperature == null ? NaN : Number(current.apparent_temperature);
     const wind = current.wind_speed_10m == null ? NaN : Number(current.wind_speed_10m);
     document.querySelectorAll('[data-weather-temp]').forEach(el => el.textContent = Number.isFinite(temperature) ? `${Math.round(temperature)}°C` : '—');
     document.querySelectorAll('[data-weather-summary]').forEach(el => el.textContent = `${summary}${Number.isFinite(apparent) ? ` · feels ${Math.round(apparent)}°C` : ''}`);
-    document.querySelectorAll('[data-weather-icon]').forEach(el => el.textContent = icon);
+    document.querySelectorAll('[data-weather-icon]').forEach(el => el.innerHTML = iconSvg(icon));
     document.querySelectorAll('[data-weather-wind]').forEach(el => el.textContent = Number.isFinite(wind) ? `${Math.round(wind)} km/h` : 'Unavailable');
     document.querySelectorAll('[data-weather-updated]').forEach(el => el.textContent = `${cached ? 'Cached' : 'Live'} · ${formatTime(new Date())}`);
   }
@@ -231,6 +244,7 @@
       }
     }
   }
+  upgradeLegacyIcons();
   if (document.querySelector('[data-weather-card]')) fetchWeather();
   document.querySelectorAll('[data-refresh-weather]').forEach(btn => btn.addEventListener('click', () => { fetchWeather(true); showToast('Refreshing live Bendigo weather…'); }));
 
