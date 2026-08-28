@@ -69,7 +69,7 @@
     grid.innerHTML = visible.map((product,index) => {
       const sizes = sizeList(product);
       return `<article class="shop-card reveal visible" style="--reveal-delay:${Math.min(index*55,220)}ms"><button class="shop-product-visual" type="button" data-product-view="${esc(product.id)}" aria-label="View ${esc(product.title)}">${visual(product)}<span class="shop-product-badge">${product.status==='available'?'Available':'Collection concept'}</span><span class="shop-quick-view">Quick view</span></button><div class="shop-card-copy"><div class="shop-card-heading"><span class="shop-category">${esc(product.category)}</span><span>${sizes.length?`${sizes.length} ${sizes.length===1?'option':'options'}`:'Sizing pending'}</span></div><h3>${esc(product.title)}</h3><p>${esc(product.description)}</p><div class="shop-sizes">${sizes.slice(0,4).map(size=>`<span>${esc(size)}</span>`).join('')||'<span>Final sizing pending</span>'}${sizes.length>4?`<span>+${sizes.length-4}</span>`:''}</div><div class="shop-card-foot"><div><strong>${money(product.price_cents)}</strong><small>Preview price</small></div><button type="button" class="shop-add-button" data-product-add="${esc(product.id)}">Add <span aria-hidden="true">+</span></button></div></div></article>`;
-    }).join('') || '<div class="empty-state">No products match that search. Try another category or clear the search.</div>';
+    }).join('') || '<div class="empty-state"><strong>Nothing matches that search.</strong><p>Try a different category, or clear the search to see the whole collection.</p><button type="button" class="btn btn-outline btn-small" data-clear-search>Show everything</button></div>';
   }
 
   function addToCart(product,size,quantity=1) {
@@ -144,6 +144,14 @@
   }));
   document.getElementById('kit-grid')?.addEventListener('click',event=>{const button=event.target.closest('[data-kit-add]');if(button)addKit(button.dataset.kitAdd);});
   document.getElementById('shop-search')?.addEventListener('input',event=>{searchTerm=event.target.value.trim().toLowerCase();render();});
+  // "Show everything" in the empty state clears both the search and the category filter.
+  grid.addEventListener('click',event=>{
+    if(!event.target.closest('[data-clear-search]'))return;
+    searchTerm='';activeFilter='all';
+    const input=document.getElementById('shop-search');if(input)input.value='';
+    document.querySelectorAll('[data-shop-filter]').forEach(item=>item.classList.toggle('active',item.dataset.shopFilter==='all'));
+    render();
+  });
   grid.addEventListener('click',event=>{
     const view=event.target.closest('[data-product-view]');
     const add=event.target.closest('[data-product-add]');
@@ -185,7 +193,7 @@
     document.getElementById('cart-mode-copy').textContent=live?'Connected products are visible. Sign in before secure checkout.':'Your choices save on this device. No stock is reserved and no payment is taken.';
     render(); renderCart();
   }).catch(()=>{
-    grid.innerHTML='<div class="empty-state">The catalogue is temporarily unavailable. Please enquire with the HV Swim team.</div>';
+    grid.innerHTML='<div class="empty-state"><strong>The collection is not loading right now.</strong><p>This is a temporary problem on our side. The range is still there — get in touch and the team can talk you through it.</p><a class="btn btn-blue btn-small" href="enquire.html">Talk to the team <span aria-hidden="true">&rarr;</span></a></div>';
     document.getElementById('shop-result-count').textContent='Catalogue temporarily unavailable';
     document.getElementById('shop-source').innerHTML='<span class="status closed">Catalogue unavailable</span>';
   });

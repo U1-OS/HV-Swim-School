@@ -61,6 +61,10 @@ preview prices.
   visible. That was wrong — my measurement was counting elements deliberately hidden at that
   breakpoint. Re-measured against the original code and it was fine. Do not go looking for
   that bug.
+- Rewrote every empty and failure state across the public site (`shop.js`, `programs.js`,
+  `enquire.js`, `public-api.js`). They now name what happened, make clear it is not the
+  visitor's fault and never that classes are full, and always offer a next step. The shop's
+  no-results state has a working "Show everything" button that clears the search and filter.
 - Security review of `backend/`. The code is in good shape — SQL is parameterised
   throughout, CSV formula injection was already guarded, exports are role-gated, ownership
   checks are consistent, PBKDF2 is 210k iterations with a constant-time compare, and the

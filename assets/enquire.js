@@ -122,7 +122,7 @@
     }catch(problem){elements.error.textContent=`${problem.message} Please try again or call 0413 462 112.`;elements.submit.disabled=false;elements.submit.innerHTML='Send secure enquiry <span aria-hidden="true">→</span>';}
   });
 
-  fetch('/api/classes',{headers:{Accept:'application/json'}}).then(async response=>{const payload=await response.json();if(!response.ok)throw new Error();classes=payload.classes||[];renderClasses();}).catch(()=>{document.getElementById('wizard-class-grid').innerHTML='<div class="empty-state">The connected timetable is temporarily unavailable. Choose flexible and the team can confirm current options.</div>';});
+  fetch('/api/classes',{headers:{Accept:'application/json'}}).then(async response=>{const payload=await response.json();if(!response.ok)throw new Error();classes=payload.classes||[];renderClasses();}).catch(()=>{document.getElementById('wizard-class-grid').innerHTML='<div class="empty-state"><strong>We cannot show class times at the moment.</strong><p>Keep going anyway — choose &ldquo;flexible&rdquo; below and the team will confirm the current options when they reply.</p></div>';});
 
   if(queryProgram){elements.program.value=queryProgram;document.getElementById('pathway-recommendation').innerHTML=`<span>Selected pathway</span><strong>${esc(queryProgram)}</strong><p>Complete the confidence questions so the team can confirm this starting point.</p>`;}
   if(merchInterest){

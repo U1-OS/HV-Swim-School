@@ -35,7 +35,7 @@
       const available = Number(item.available || 0);
       const query = new URLSearchParams({program:item.title, class:`${days[item.weekday]} ${item.start_time} at ${item.location_name}`});
       return `<article class="availability-card reveal visible" style="--reveal-delay:${Math.min(index * 45, 225)}ms"><div class="class-card-top"><span class="class-day">${esc(days[item.weekday])} · ${esc(item.start_time)}</span><span class="status ${available ? 'open' : 'closed'}">${available ? `${available} ${available === 1 ? 'place' : 'places'}` : 'Waitlist'}</span></div><h3>${esc(item.title)}</h3><p>${esc(item.level)} · ${esc(item.duration_minutes)} minutes<br>${esc(item.location_name)}</p><div class="availability-card-foot"><div><strong>${money(item.price)} per lesson</strong><span>Connected preview price</span></div><a class="text-link" href="enquire.html?${query}">${available ? 'Enquire' : 'Join waitlist'}</a></div></article>`;
-    }).join('') || '<div class="empty-state">No classes match this filter. The team can still discuss tailored availability.</div>';
+    }).join('') || '<div class="empty-state"><strong>No classes match those filters.</strong><p>That does not mean there is nothing suitable — times shift each term and private options are available. Tell us what you need and we will look.</p><a class="btn btn-blue btn-small" href="enquire.html">Find a lesson <span aria-hidden="true">&rarr;</span></a></div>';
   };
 
   fetch('/api/classes', {headers:{Accept:'application/json'}}).then(async response => {
@@ -49,7 +49,7 @@
     document.querySelectorAll('[data-price]').forEach(element => element.textContent = 'Ask the team');
     document.querySelectorAll('[data-place]').forEach(element => element.textContent = 'Availability confirmed personally');
     const grid = document.getElementById('program-availability');
-    if (grid) grid.innerHTML = '<div class="empty-state">The timetable is temporarily unavailable. Enquire and the team will confirm the best current option.</div>';
+    if (grid) grid.innerHTML = '<div class="empty-state"><strong>The timetable is not loading right now.</strong><p>This is a temporary problem on our side, not a sign that classes are full. Send an enquiry and the team will confirm what is open.</p><a class="btn btn-blue btn-small" href="enquire.html">Find a lesson <span aria-hidden="true">&rarr;</span></a></div>';
     document.getElementById('program-availability-source').textContent = 'Live class data needs the connected HV Swim server. No availability has been invented.';
   });
 
