@@ -7,14 +7,14 @@ import json
 import sqlite3
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response, status
 from fastapi.responses import RedirectResponse
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, model_validator
 
 from .config import ROOT, settings
 from .database import audit, db_session, initialise_database, rows
@@ -80,6 +80,11 @@ async def security_headers(request: Request, call_next):
     return response
 
 
+# Times are stored as text and ordered as text in the timetable queries, so the format has
+# to be exact: zero-padded 24-hour HH:MM and nothing else.
+TimeOfDay = Annotated[str, Field(pattern=r"^([01]\d|2[0-3]):[0-5]\d$")]
+
+
 class LoginInput(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8, max_length=200)
@@ -93,9 +98,9 @@ class BookingInput(BaseModel):
 class ClockInput(BaseModel):
     action: Literal["in", "out"]
     location_slug: str = "wood-street"
-    latitude: float | None = None
-    longitude: float | None = None
-    accuracy_metres: float | None = None
+    latitude: float | None = Field(default=None, ge=-90, le=90)
+    longitude: float | None = Field(default=None, ge=-180, le=180)
+    accuracy_metres: float | None = Field(default=None, ge=0, le=100_000)
 
 
 class PoolReadingInput(BaseModel):
@@ -129,7 +134,7 @@ class ClassInput(BaseModel):
     location_slug: str
     instructor_id: int | None = None
     weekday: int = Field(ge=0, le=6)
-    start_time: str
+    start_time: TimeOfDay
     duration_minutes: int = Field(ge=15, le=180)
     capacity: int = Field(ge=1, le=20)
     price_cents: int = Field(ge=0, le=100_000)
@@ -139,9 +144,15 @@ class RosterInput(BaseModel):
     staff_id: int
     location_slug: str
     shift_date: date
-    start_time: str
-    end_time: str
+    start_time: TimeOfDay
+    end_time: TimeOfDay
     role_label: str = Field(default="Instructor", max_length=80)
+
+    @model_validator(mode="after")
+    def check_shift_order(self):
+        if self.end_time <= self.start_time:
+            raise ValueError("A shift must finish after it starts")
+        return self
 
 
 class NotificationInput(BaseModel):

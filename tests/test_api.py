@@ -326,3 +326,56 @@ def test_booking_a_full_class_offers_the_waitlist_rather_than_overfilling(client
     assert response.status_code in (200, 409)
     if response.status_code == 200:
         assert response.json()["status"] == "waitlisted"
+
+
+# --- input validation ----------------------------------------------------------------
+
+def test_class_times_must_be_real_times(client):
+    """Times are stored and ordered as text, so a malformed one corrupts the timetable order."""
+    client.cookies.clear()
+    csrf = sign_in(client, ADMIN)
+    base = {"code": "HV-TEST", "title": "Test Class", "level": "Level 1",
+            "location_slug": "wood-street", "weekday": 1, "duration_minutes": 30,
+            "capacity": 6, "price_cents": 2200}
+    for bad in ("25:99", "banana", "9:30", "24:00", "16:00:00", ""):
+        response = client.post("/api/admin/classes", json={**base, "start_time": bad},
+                               headers={"X-CSRF-Token": csrf})
+        assert response.status_code == 422, f"{bad!r} was accepted as a class start time"
+
+
+def test_a_shift_cannot_finish_before_it_starts(client):
+    client.cookies.clear()
+    csrf = sign_in(client, ADMIN)
+    staff = client.get("/api/admin/staff").json()["staff"]
+    if not staff:
+        pytest.skip("no staff in the seed data")
+    response = client.post(
+        "/api/admin/roster",
+        json={"staff_id": staff[0]["id"], "location_slug": "wood-street",
+              "shift_date": "2026-09-01", "start_time": "17:45", "end_time": "08:45"},
+        headers={"X-CSRF-Token": csrf},
+    )
+    assert response.status_code == 422
+
+
+def test_clock_in_rejects_impossible_coordinates(client):
+    client.cookies.clear()
+    csrf = sign_in(client, STAFF)
+    response = client.post(
+        "/api/staff/clock",
+        json={"action": "in", "location_slug": "wood-street", "latitude": 999, "longitude": -999},
+        headers={"X-CSRF-Token": csrf},
+    )
+    assert response.status_code == 422
+
+
+def test_pool_temperature_outside_a_plausible_range_is_rejected(client):
+    client.cookies.clear()
+    csrf = sign_in(client, STAFF)
+    for bad in (-5, 80):
+        response = client.post(
+            "/api/staff/pool-readings",
+            json={"location_slug": "wood-street", "temperature": bad, "status": "open"},
+            headers={"X-CSRF-Token": csrf},
+        )
+        assert response.status_code == 422, f"{bad} was accepted as a pool temperature"

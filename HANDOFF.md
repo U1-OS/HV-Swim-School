@@ -195,6 +195,12 @@ preview prices.
   every manifest icon is present. It needs nothing installed and runs in about a second.
   Verified by deliberately breaking each case in turn and confirming it was caught.
   Also removed two inert modifier classes it found on the homepage.
+- Tightened input validation where it was missing. `start_time` and `end_time` on classes
+  and rosters were plain strings — "25:99" or "banana" would have been stored, and because
+  the timetable queries `ORDER BY start_time` as text, a malformed value corrupts the order
+  of the whole public timetable rather than just looking wrong. They now require zero-padded
+  24-hour `HH:MM`. A roster shift that finishes before it starts is refused. Clock-in
+  coordinates are bounded to real latitude and longitude. Four tests added (suite now 34).
 - Security review of `backend/`. The code is in good shape — SQL is parameterised
   throughout, CSV formula injection was already guarded, exports are role-gated, ownership
   checks are consistent, PBKDF2 is 210k iterations with a constant-time compare, and the
