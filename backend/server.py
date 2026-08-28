@@ -18,7 +18,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.gzip import GZipMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
-from pydantic import BaseModel, EmailStr, Field, model_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
 
 from .config import ROOT, settings
 from .database import audit, db_session, initialise_database, rows
@@ -39,6 +39,72 @@ from .integrations import (
 from .security import business_date_from_timestamp, business_today, expires_iso, new_token, now_iso, password_hash, password_needs_rehash, password_verify, public_user
 
 SESSION_COOKIE = "hv_session"
+
+SUPPLIER_ROUTE_DETAILS: dict[str, dict[str, str]] = {
+    "specialist_swim": {
+        "label": "Specialist swim supplier",
+        "automation": "manual_purchase_order",
+        "boundary": "Swimwear and training equipment require fit, material, safety and chlorine testing before Shopify publication.",
+    },
+    "specialist_uniform": {
+        "label": "Specialist uniform supplier",
+        "automation": "manual_purchase_order",
+        "boundary": "A controlled uniform quote and approved physical sample are required before ordering.",
+    },
+    "vistaprint": {
+        "label": "VistaPrint manual / bulk",
+        "automation": "manual_bulk_order",
+        "boundary": "No live VistaPrint API sync is implemented; quote, proof and order references are recorded manually before Shopify stock is published.",
+    },
+    "printify": {
+        "label": "Printify → Shopify",
+        "automation": "printify_shopify",
+        "boundary": "API mapping becomes available only after HV Swim supplies its Printify shop ID and token and approves a physical sample.",
+    },
+    "printify_or_vistaprint": {
+        "label": "Printify or VistaPrint comparison",
+        "automation": "supplier_comparison",
+        "boundary": "Compare approved samples and landed costs before locking either automated Printify or manual VistaPrint fulfilment.",
+    },
+    "vistaprint_or_specialist": {
+        "label": "VistaPrint or specialist comparison",
+        "automation": "supplier_comparison",
+        "boundary": "Use a manual quote and sample workflow; the chosen stock item can be sold through Shopify after approval.",
+    },
+    "manual_review": {
+        "label": "Supplier review required",
+        "automation": "manual_review",
+        "boundary": "Confirm a suitable supplier, specification and physical sample before offering this product.",
+    },
+}
+
+PRODUCT_PRODUCTION_METHODS: dict[str, str] = {
+    "HV-SWIMWEAR": "Sample chlorine-resistant team swimwear, verify the full size range and approve every logo placement.",
+    "HV-RASHIE": "Use a specialist UV/chlorine-resistant rashie supplier; test fabric, seams, print durability and sizing.",
+    "HV-SWIM-SHORTS": "Use a specialist aquatic-apparel supplier and approve waist, liner, movement and chlorine durability.",
+    "HV-TOWEL": "Compare embroidered and printed towel samples for absorbency, colour fastness and delivered cost.",
+    "HV-HOODED-TOWEL": "Sample child-sized hooded towels and verify hood fit, absorbency, decoration comfort and wash durability.",
+    "HV-BOTTLE": "Obtain a bulk branded-bottle proof; verify food-contact documentation, lid quality and wash/rub durability.",
+    "HV-INSULATED-TUMBLER": "Compare premium insulated cups and verify food-contact documentation, lid seal, heat cycles, hand comfort and wash durability.",
+    "HV-JUNIOR-WARM-CUP": "Specialist sample gate: verify food-contact documentation, spill resistance and safe grip; label for parent-supervised warm, never hot, drinks.",
+    "HV-GOGGLES": "Source compliant swimming goggles from a specialist; test junior fit, seal, materials and packaging.",
+    "HV-TRAINING-MITTS": "Specialist review is mandatory; approve sizing, flexible material and coach-directed safe-use guidance.",
+    "HV-BAG": "Compare wet-gear durability, ventilation and print quality before selecting Printify or a manual bulk supplier.",
+    "HV-CAP": "Use a specialist silicone-cap printer and approve fit, colour and chlorine-resistant decoration.",
+    "HV-KIDS-SUN-HAT": "Compare embroidered/transfer samples for fit, shade coverage and poolside durability.",
+    "HV-STAFF-POLO": "Approve one embroidered performance-polo sample, then place controlled staff-size bulk orders.",
+    "HV-STAFF-TEE": "Map an approved performance shirt to Printify and Shopify only after a wear, wash and logo sample passes.",
+    "HV-STAFF-SHORTS": "Compare quick-dry uniform suppliers and approve movement, pockets, sizing and logo durability.",
+    "HV-TEAM-HOODIE": "Map the approved hoodie to Printify and Shopify with manual order approval enabled at launch.",
+    "HV-STAFF-PUFFER-VEST": "Obtain a controlled uniform quote and approve embroidery, warmth, movement and sizing.",
+    "HV-STAFF-PUFFER-JACKET": "Obtain a controlled outerwear quote and approve embroidery, weather resistance and sizing.",
+    "HV-STAFF-TRACKPANTS": "Approve a uniform sample for movement, warmth, pockets, wash performance and logo placement.",
+    "HV-INSTRUCTOR-CAP": "Compare embroidered samples for fit, sun coverage and outdoor pool-deck durability.",
+}
+
+
+def fulfilment_mode_for_route(route: str) -> str:
+    return SUPPLIER_ROUTE_DETAILS.get(route, SUPPLIER_ROUTE_DETAILS["manual_review"])["automation"]
 
 
 def validate_production_config(candidate=settings) -> None:
@@ -66,7 +132,7 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(
     title="HV Swim Bendigo Platform API",
-    version="5.4.0",
+    version="5.5.0",
     docs_url="/api/docs" if not settings.production else None,
     openapi_url="/openapi.json" if not settings.production else None,
     redoc_url=None,
@@ -145,6 +211,10 @@ async def security_headers(request: Request, call_next):
 # Times are stored as text and ordered as text in the timetable queries, so the format has
 # to be exact: zero-padded 24-hour HH:MM and nothing else.
 TimeOfDay = Annotated[str, Field(pattern=r"^([01]\d|2[0-3]):[0-5]\d$")]
+SupportCategory = Literal["lessons", "bookings", "billing", "merchandise", "pool_conditions", "accessibility_support", "app_help", "other"]
+SupportStatus = Literal["new", "open", "waiting_customer", "resolved", "closed"]
+SupportPriority = Literal["low", "normal", "high", "urgent"]
+AlertSeverity = Literal["closure", "change", "reopening", "information"]
 
 
 class LoginInput(BaseModel):
@@ -160,6 +230,151 @@ class ChangePasswordInput(BaseModel):
 class BookingInput(BaseModel):
     class_id: int
     swimmer_id: int
+
+
+class AchievementAwardInput(BaseModel):
+    template_code: str = Field(min_length=3, max_length=50, pattern=r"^[a-z0-9-]+$")
+    swimmer_id: int = Field(ge=1)
+    class_id: int | None = Field(default=None, ge=1)
+    evidence_note: str = Field(min_length=3, max_length=600)
+    private_staff_note: str = Field(default="", max_length=1000)
+
+    @model_validator(mode="after")
+    def clean_achievement_notes(self) -> "AchievementAwardInput":
+        self.evidence_note = self.evidence_note.strip()
+        self.private_staff_note = self.private_staff_note.strip()
+        if len(self.evidence_note) < 3:
+            raise ValueError("Family-visible evidence must describe the achievement")
+        return self
+
+
+class AchievementRevokeInput(BaseModel):
+    reason: str = Field(min_length=5, max_length=400)
+
+    @model_validator(mode="after")
+    def clean_revocation_reason(self) -> "AchievementRevokeInput":
+        self.reason = self.reason.strip()
+        if len(self.reason) < 5:
+            raise ValueError("A clear revocation reason is required")
+        return self
+
+
+class PublicSupportTicketInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    category: SupportCategory
+    name: str = Field(min_length=2, max_length=100)
+    email: EmailStr
+    phone: str = Field(default="", max_length=40)
+    subject: str = Field(min_length=3, max_length=120)
+    message: str = Field(min_length=10, max_length=2000)
+    consent_acknowledged: bool
+    website: str = Field(default="", max_length=200)
+
+    @model_validator(mode="after")
+    def require_support_consent(self) -> "PublicSupportTicketInput":
+        self.name = self.name.strip()
+        self.phone = self.phone.strip()
+        self.subject = self.subject.strip()
+        self.message = self.message.strip()
+        if len(self.name) < 2 or len(self.subject) < 3 or len(self.message) < 10:
+            raise ValueError("Complete the required support fields")
+        if not self.website.strip() and not self.consent_acknowledged:
+            raise ValueError("Consent is required before sending a support request")
+        return self
+
+
+class CustomerSupportTicketInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    category: SupportCategory
+    subject: str = Field(min_length=3, max_length=120)
+    message: str = Field(min_length=10, max_length=2000)
+    phone: str = Field(default="", max_length=40)
+
+    @model_validator(mode="after")
+    def clean_customer_ticket(self) -> "CustomerSupportTicketInput":
+        self.subject = self.subject.strip()
+        self.message = self.message.strip()
+        self.phone = self.phone.strip()
+        if len(self.subject) < 3 or len(self.message) < 10:
+            raise ValueError("Complete the required support fields")
+        return self
+
+
+class CustomerSupportReplyInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    message: str = Field(min_length=2, max_length=2000)
+
+    @model_validator(mode="after")
+    def clean_customer_reply(self) -> "CustomerSupportReplyInput":
+        self.message = self.message.strip()
+        if len(self.message) < 2:
+            raise ValueError("Enter a reply")
+        return self
+
+
+class StaffSupportReplyInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    message: str = Field(min_length=2, max_length=3000)
+    internal_note: bool = False
+
+    @model_validator(mode="after")
+    def clean_staff_reply(self) -> "StaffSupportReplyInput":
+        self.message = self.message.strip()
+        if len(self.message) < 2:
+            raise ValueError("Enter a reply or internal note")
+        return self
+
+
+class SupportTicketUpdateInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    status: SupportStatus | None = None
+    priority: SupportPriority | None = None
+    assigned_to: int | None = Field(default=None, ge=1)
+
+    @model_validator(mode="after")
+    def require_support_change(self) -> "SupportTicketUpdateInput":
+        if not self.model_fields_set:
+            raise ValueError("Choose at least one ticket field to update")
+        if "status" in self.model_fields_set and self.status is None:
+            raise ValueError("Status cannot be empty")
+        if "priority" in self.model_fields_set and self.priority is None:
+            raise ValueError("Priority cannot be empty")
+        return self
+
+
+class PublicAlertInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    severity: AlertSeverity
+    title: str = Field(min_length=3, max_length=120)
+    message: str = Field(min_length=5, max_length=600)
+    location_id: int | None = Field(default=None, ge=1)
+
+    @model_validator(mode="after")
+    def clean_alert(self) -> "PublicAlertInput":
+        self.title = self.title.strip()
+        self.message = self.message.strip()
+        if len(self.title) < 3 or len(self.message) < 5:
+            raise ValueError("Complete the alert title and message")
+        return self
+
+
+class PublicAlertResolveInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    reason: str = Field(min_length=5, max_length=300)
+
+    @model_validator(mode="after")
+    def clean_alert_resolution(self) -> "PublicAlertResolveInput":
+        self.reason = self.reason.strip()
+        if len(self.reason) < 5:
+            raise ValueError("A clear resolution reason is required")
+        return self
 
 
 class ClockInput(BaseModel):
@@ -301,8 +516,19 @@ class ProductUpdateInput(BaseModel):
     status: Literal["planned", "sampling", "approved", "available", "paused"]
     sample_status: Literal["not_ordered", "ordered", "received", "changes_required", "approved"] = "not_ordered"
     cost_cents: int | None = Field(default=None, ge=0, le=100_000)
-    supplier_route: Literal["specialist_uniform", "vistaprint", "printify", "printify_or_vistaprint", "vistaprint_or_specialist", "manual_review"] = "manual_review"
+    supplier_route: Literal["specialist_swim", "specialist_uniform", "vistaprint", "printify", "printify_or_vistaprint", "vistaprint_or_specialist", "manual_review"] = "manual_review"
     personalisation: str = Field(default="", max_length=240)
+    shopify_gid: str | None = Field(default=None, max_length=180)
+    printify_product_id: str | None = Field(default=None, max_length=120)
+    supplier_reference: str | None = Field(default=None, max_length=160)
+
+    @model_validator(mode="after")
+    def validate_supplier_mapping(self) -> "ProductUpdateInput":
+        if self.printify_product_id and "printify" not in self.supplier_route:
+            raise ValueError("A Printify product ID can only be set for a Printify-capable supplier route")
+        if self.shopify_gid and not self.shopify_gid.startswith("gid://shopify/Product/"):
+            raise ValueError("Shopify product mapping must use a Shopify Product GID")
+        return self
 
 
 class LocationUpdateInput(BaseModel):
@@ -371,6 +597,269 @@ def location_by_slug(db: sqlite3.Connection, slug: str) -> sqlite3.Row:
     return row
 
 
+def certificate_reference(db: sqlite3.Connection) -> str:
+    """Create a short, non-sequential certificate reference without exposing record IDs."""
+    for _ in range(10):
+        fragment = "".join(character for character in new_token(9).upper() if character.isalnum())[:10]
+        if len(fragment) < 8:
+            continue
+        reference = f"HV-ACH-{business_today().year}-{fragment}"
+        if not db.execute(
+            "SELECT 1 FROM swimmer_achievements WHERE certificate_reference=?", (reference,)
+        ).fetchone():
+            return reference
+    raise HTTPException(status_code=503, detail="A certificate reference could not be created; try again")
+
+
+def achievement_template_rows(db: sqlite3.Connection) -> list[dict[str, Any]]:
+    return rows(
+        db.execute(
+            """SELECT code,title,description,certificate_style,badge_symbol,brand_label,sort_order
+               FROM achievement_templates WHERE active=1 ORDER BY sort_order,title"""
+        )
+    )
+
+
+def eligible_achievement_swimmers(db: sqlite3.Connection, user: dict[str, Any]) -> list[dict[str, Any]]:
+    base_fields = """s.id swimmer_id,s.first_name swimmer_first,s.last_name swimmer_last,s.level,
+                     c.id class_id,c.code class_code,c.title class_title"""
+    if user["role"] == "admin":
+        query = f"""SELECT {base_fields}
+                    FROM swimmers s
+                    LEFT JOIN bookings b ON b.swimmer_id=s.id AND b.status='confirmed'
+                    LEFT JOIN classes c ON c.id=b.class_id
+                    WHERE s.active=1
+                    ORDER BY s.first_name,s.last_name,c.title"""
+        return rows(db.execute(query))
+    query = f"""SELECT DISTINCT {base_fields}
+                FROM swimmers s
+                JOIN bookings b ON b.swimmer_id=s.id AND b.status='confirmed'
+                JOIN classes c ON c.id=b.class_id AND c.instructor_id=?
+                WHERE s.active=1
+                ORDER BY s.first_name,s.last_name,c.title"""
+    return rows(db.execute(query, (user["id"],)))
+
+
+def staff_achievement_rows(db: sqlite3.Connection, user: dict[str, Any]) -> list[dict[str, Any]]:
+    where = "1=1"
+    params: tuple[Any, ...] = ()
+    if user["role"] == "staff":
+        where = """(a.awarded_by=? OR EXISTS (
+                     SELECT 1 FROM bookings eligible_booking
+                     JOIN classes eligible_class ON eligible_class.id=eligible_booking.class_id
+                     WHERE eligible_booking.swimmer_id=a.swimmer_id
+                       AND eligible_booking.status='confirmed' AND eligible_class.instructor_id=?
+                   ))"""
+        params = (user["id"], user["id"])
+    query = f"""SELECT a.id,a.certificate_reference,a.certificate_style,a.evidence_note,a.private_staff_note,
+                       a.status,a.awarded_by,a.awarded_at,a.revoked_by,a.revoked_at,a.revocation_reason,
+                       t.code template_code,t.title template_title,t.description template_description,
+                       t.badge_symbol,t.brand_label,s.id swimmer_id,s.first_name swimmer_first,
+                       s.last_name swimmer_last,s.level,c.id class_id,c.code class_code,c.title class_title,
+                       TRIM(awarder.first_name || ' ' || awarder.last_name) awarded_by_name,
+                       TRIM(COALESCE(revoker.first_name,'') || ' ' || COALESCE(revoker.last_name,'')) revoked_by_name
+                FROM swimmer_achievements a
+                JOIN achievement_templates t ON t.id=a.template_id
+                JOIN swimmers s ON s.id=a.swimmer_id
+                LEFT JOIN classes c ON c.id=a.class_id
+                JOIN users awarder ON awarder.id=a.awarded_by
+                LEFT JOIN users revoker ON revoker.id=a.revoked_by
+                WHERE {where}
+                ORDER BY a.awarded_at DESC,a.id DESC"""
+    return rows(db.execute(query, params))
+
+
+def support_ticket_reference(db: sqlite3.Connection) -> str:
+    for _ in range(10):
+        fragment = "".join(character for character in new_token(9).upper() if character.isalnum())[:10]
+        if len(fragment) < 8:
+            continue
+        reference = f"HV-TKT-{business_today().year}-{fragment}"
+        if not db.execute("SELECT 1 FROM support_tickets WHERE reference=?", (reference,)).fetchone():
+            return reference
+    raise HTTPException(status_code=503, detail="A support reference could not be created; try again")
+
+
+def optional_customer_session(db: sqlite3.Connection, request: Request) -> sqlite3.Row | None:
+    session_id = request.cookies.get(SESSION_COOKIE)
+    if not session_id:
+        return None
+    return db.execute(
+        """SELECT u.* FROM sessions s JOIN users u ON u.id=s.user_id
+           WHERE s.id=? AND s.expires_at>? AND u.active=1 AND u.role='customer'""",
+        (session_id, now_iso()),
+    ).fetchone()
+
+
+def support_messages(db: sqlite3.Connection, ticket_id: int, *, include_internal: bool) -> list[dict[str, Any]]:
+    visibility_clause = "" if include_internal else "AND m.visibility='customer'"
+    records = rows(
+        db.execute(
+            f"""SELECT m.id,m.author_user_id,m.author_role,m.message,m.visibility,m.created_at,
+                       TRIM(COALESCE(u.first_name,'') || ' ' || COALESCE(u.last_name,'')) author_name
+                FROM support_messages m LEFT JOIN users u ON u.id=m.author_user_id
+                WHERE m.ticket_id=? {visibility_clause}
+                ORDER BY m.created_at,m.id""",
+            (ticket_id,),
+        )
+    )
+    if include_internal:
+        return records
+    for record in records:
+        record["author_type"] = "team" if record["author_role"] in {"staff", "admin", "system"} else "customer"
+        record["author_label"] = "HV Swim team" if record["author_type"] == "team" else "You"
+        for private_field in ("author_user_id", "author_role", "author_name", "visibility"):
+            record.pop(private_field, None)
+    return records
+
+
+def customer_support_tickets(db: sqlite3.Connection, user: dict[str, Any]) -> list[dict[str, Any]]:
+    tickets = rows(
+        db.execute(
+            """SELECT t.id,t.reference,t.category,t.name,t.email,t.phone,t.subject,t.status,t.priority,
+                      t.source,t.created_at,t.updated_at,t.resolved_at
+               FROM support_tickets t
+               WHERE t.customer_id=? OR (t.customer_id IS NULL AND LOWER(t.email)=LOWER(?))
+               ORDER BY t.updated_at DESC,t.id DESC""",
+            (user["id"], user["email"]),
+        )
+    )
+    for ticket in tickets:
+        ticket["messages"] = support_messages(db, ticket["id"], include_internal=False)
+    return tickets
+
+
+def staff_support_ticket(db: sqlite3.Connection, ticket_id: int) -> dict[str, Any] | None:
+    record = db.execute(
+        """SELECT t.*,TRIM(COALESCE(assigned.first_name,'') || ' ' || COALESCE(assigned.last_name,'')) assigned_name
+           FROM support_tickets t LEFT JOIN users assigned ON assigned.id=t.assigned_to WHERE t.id=?""",
+        (ticket_id,),
+    ).fetchone()
+    if not record:
+        return None
+    ticket = dict(record)
+    ticket["messages"] = support_messages(db, ticket_id, include_internal=True)
+    return ticket
+
+
+def delivery_boundary(*, in_app_delivered: bool) -> dict[str, str]:
+    return {
+        "in_app": "delivered" if in_app_delivered else "not_available",
+        "email": "not_implemented",
+        "push": "not_implemented",
+    }
+
+
+def public_alert_record(db: sqlite3.Connection, alert_id: int) -> dict[str, Any] | None:
+    record = db.execute(
+        """SELECT a.id,a.severity,a.title,a.message,
+                  COALESCE(l.name,'All HV Swim locations') location_name,a.published_at
+           FROM public_alerts a LEFT JOIN locations l ON l.id=a.location_id WHERE a.id=?""",
+        (alert_id,),
+    ).fetchone()
+    return dict(record) if record else None
+
+
+def sync_pool_public_alert(
+    db: sqlite3.Connection,
+    *,
+    location: sqlite3.Row,
+    pool_status: str,
+    note: str,
+    actor_id: int,
+    pool_reading_id: int,
+    ip_address: str,
+    changed_at: str,
+) -> dict[str, Any] | None:
+    if pool_status in {"closed", "changed"}:
+        severity = "closure" if pool_status == "closed" else "change"
+        title = f"{location['name']} {'closed' if pool_status == 'closed' else 'conditions changed'}"
+        message = note or ("Lessons are currently paused. Check this alert again before travelling." if pool_status == "closed" else "Pool conditions have changed. Check the latest lesson information before travelling.")
+        existing = db.execute(
+            """SELECT id FROM public_alerts
+               WHERE location_id=? AND source='pool_status' AND status='active'
+                 AND severity IN ('closure','change') ORDER BY updated_at DESC LIMIT 1""",
+            (location["id"],),
+        ).fetchone()
+        # A new closure supersedes a previous reopening notice for this location.
+        reopening_ids = [row["id"] for row in db.execute(
+            """SELECT id FROM public_alerts WHERE location_id=? AND source='pool_status'
+               AND status='active' AND severity='reopening'""",
+            (location["id"],),
+        )]
+        for alert_id in reopening_ids:
+            db.execute(
+                """UPDATE public_alerts SET status='resolved',resolved_by=?,resolved_at=?,resolution_note=?,updated_by=?,updated_at=?
+                   WHERE id=?""",
+                (actor_id, changed_at, "Superseded by a new pool condition update", actor_id, changed_at, alert_id),
+            )
+        if existing:
+            alert_id = existing["id"]
+            db.execute(
+                """UPDATE public_alerts SET severity=?,title=?,message=?,published_at=?,updated_by=?,updated_at=?
+                   WHERE id=?""",
+                (severity, title, message, changed_at, actor_id, changed_at, alert_id),
+            )
+            operation = "updated"
+        else:
+            alert_id = db.execute(
+                """INSERT INTO public_alerts
+                   (severity,title,message,location_id,status,source,published_by,published_at,updated_by,updated_at)
+                   VALUES(?,?,?,?,?,?,?,?,?,?)""",
+                (severity, title, message, location["id"], "active", "pool_status", actor_id, changed_at, actor_id, changed_at),
+            ).lastrowid
+            operation = "created"
+        audit(
+            db, actor_id, "sync_pool_public_alert", "public_alert", alert_id,
+            {
+                "operation": operation, "location_id": location["id"], "severity": severity,
+                "pool_reading_id": pool_reading_id, "resolved_reopening_ids": reopening_ids,
+            },
+            ip_address,
+        )
+        return public_alert_record(db, alert_id)
+
+    active_condition_ids = [row["id"] for row in db.execute(
+        """SELECT id FROM public_alerts WHERE location_id=? AND source='pool_status'
+           AND status='active' AND severity IN ('closure','change')""",
+        (location["id"],),
+    )]
+    if not active_condition_ids:
+        return None
+    for alert_id in active_condition_ids:
+        db.execute(
+            """UPDATE public_alerts SET status='resolved',resolved_by=?,resolved_at=?,resolution_note=?,updated_by=?,updated_at=?
+               WHERE id=?""",
+            (actor_id, changed_at, "Pool status verified open", actor_id, changed_at, alert_id),
+        )
+    reopening = db.execute(
+        """SELECT id FROM public_alerts WHERE location_id=? AND source='pool_status'
+           AND status='active' AND severity='reopening' ORDER BY updated_at DESC LIMIT 1""",
+        (location["id"],),
+    ).fetchone()
+    reopening_title = f"{location['name']} reopened"
+    reopening_message = note or "The pool is open and lessons can resume. Check your usual booking details before travelling."
+    if reopening:
+        reopening_id = reopening["id"]
+        db.execute(
+            """UPDATE public_alerts SET title=?,message=?,published_at=?,updated_by=?,updated_at=? WHERE id=?""",
+            (reopening_title, reopening_message, changed_at, actor_id, changed_at, reopening_id),
+        )
+    else:
+        reopening_id = db.execute(
+            """INSERT INTO public_alerts
+               (severity,title,message,location_id,status,source,published_by,published_at,updated_by,updated_at)
+               VALUES('reopening',?,?,?,'active','pool_status',?,?,?,?)""",
+            (reopening_title, reopening_message, location["id"], actor_id, changed_at, actor_id, changed_at),
+        ).lastrowid
+    audit(
+        db, actor_id, "reopen_pool_public_alert", "public_alert", reopening_id,
+        {"resolved_alert_ids": active_condition_ids, "location_id": location["id"], "pool_reading_id": pool_reading_id},
+        ip_address,
+    )
+    return public_alert_record(db, reopening_id)
+
+
 def integration_summary(db: sqlite3.Connection) -> list[dict[str, Any]]:
     output = []
     configuration = {
@@ -424,7 +913,7 @@ def renumber_waitlist(db: sqlite3.Connection, class_id: int) -> None:
 
 @app.get("/api/health")
 def health() -> dict[str, Any]:
-    return {"ok": True, "service": "HV Swim Bendigo", "version": "5.4.0", "environment": settings.app_env, "time": now_iso()}
+    return {"ok": True, "service": "HV Swim Bendigo", "version": "5.5.0", "environment": settings.app_env, "time": now_iso()}
 
 
 @app.get("/api/public/site-settings")
@@ -539,6 +1028,18 @@ async def weather() -> dict[str, Any]:
         raise HTTPException(status_code=503, detail="Live weather is temporarily unavailable")
 
 
+@app.get("/api/public/alerts")
+def public_alerts() -> dict[str, Any]:
+    with db_session() as db:
+        query = """SELECT a.id,a.severity,a.title,a.message,
+                          COALESCE(l.name,'All HV Swim locations') location_name,a.published_at
+                   FROM public_alerts a LEFT JOIN locations l ON l.id=a.location_id
+                   WHERE a.status='active'
+                   ORDER BY CASE a.severity WHEN 'closure' THEN 0 WHEN 'change' THEN 1 WHEN 'reopening' THEN 2 ELSE 3 END,
+                            a.published_at DESC,a.id DESC"""
+        return {"alerts": rows(db.execute(query)), "delivery": {"website_polling": "live", "push": "not_implemented"}}
+
+
 @app.get("/api/classes")
 def list_classes() -> dict[str, Any]:
     with db_session() as db:
@@ -563,6 +1064,507 @@ def customer_swimmers(user: dict[str, Any] = Depends(require_roles("customer", "
         else:
             result = rows(db.execute("SELECT s.*,u.first_name parent_first,u.last_name parent_last FROM swimmers s JOIN users u ON u.id=s.customer_id WHERE s.active=1 ORDER BY s.first_name"))
         return {"swimmers": result}
+
+
+@app.get("/api/achievements/templates")
+def achievement_templates(user: dict[str, Any] = Depends(session_user)) -> dict[str, Any]:
+    with db_session() as db:
+        return {
+            "templates": achievement_template_rows(db),
+            "brand": "HV Swim School Bendigo",
+            "certificate_rendering": "html_print",
+        }
+
+
+@app.get("/api/customer/achievements")
+def customer_achievements(user: dict[str, Any] = Depends(require_roles("customer"))) -> dict[str, Any]:
+    with db_session() as db:
+        query = """SELECT a.id,a.certificate_reference,a.certificate_style,a.evidence_note,a.status,
+                          a.awarded_at,a.revoked_at,a.revocation_reason,t.code template_code,
+                          t.title template_title,t.description template_description,t.badge_symbol,t.brand_label,
+                          s.id swimmer_id,s.first_name swimmer_first,s.last_name swimmer_last,s.level,
+                          c.id class_id,c.code class_code,c.title class_title,
+                          TRIM(awarder.first_name || ' ' || awarder.last_name) awarded_by_name
+                   FROM swimmer_achievements a
+                   JOIN achievement_templates t ON t.id=a.template_id
+                   JOIN swimmers s ON s.id=a.swimmer_id
+                   LEFT JOIN classes c ON c.id=a.class_id
+                   JOIN users awarder ON awarder.id=a.awarded_by
+                   WHERE s.customer_id=?
+                   ORDER BY a.awarded_at DESC,a.id DESC"""
+        return {
+            "achievements": rows(db.execute(query, (user["id"],))),
+            "privacy": {
+                "family_visible_evidence": True,
+                "staff_notes_excluded": True,
+            },
+            "certificate_rendering": "html_print",
+        }
+
+
+SUPPORT_LIMIT_PER_HOUR = 4
+
+
+@app.post("/api/public/support-tickets")
+def create_public_support_ticket(payload: PublicSupportTicketInput, request: Request) -> dict[str, Any]:
+    ip = client_ip(request)
+    if payload.website.strip():
+        return {
+            "id": 0, "reference": "HV-TKT-RECEIVED", "received": True,
+            "message": "Thanks — your message is with the HV Swim team.",
+            "delivery": delivery_boundary(in_app_delivered=False),
+        }
+    with db_session() as db:
+        db.execute("BEGIN IMMEDIATE")
+        cutoff = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
+        recent = db.execute(
+            """SELECT COUNT(*) FROM audit_log
+               WHERE action='create_public_support_ticket' AND ip_address=? AND created_at>?""",
+            (ip, cutoff),
+        ).fetchone()[0]
+        if recent >= SUPPORT_LIMIT_PER_HOUR:
+            raise HTTPException(
+                status_code=429,
+                detail="Several support messages have already been received from this connection. Please wait before trying again.",
+            )
+        account = optional_customer_session(db, request)
+        email = str(payload.email).strip().lower()
+        customer_id = account["id"] if account and account["email"].lower() == email else None
+        created_at = now_iso()
+        reference = support_ticket_reference(db)
+        cursor = db.execute(
+            """INSERT INTO support_tickets
+               (reference,customer_id,category,name,email,phone,subject,status,priority,source,
+                consent_acknowledged,created_at,updated_at)
+               VALUES(?,?,?,?,?,?,?,'new','normal','public_widget',?,?,?)""",
+            (
+                reference, customer_id, payload.category, payload.name.strip(), email,
+                payload.phone.strip() or None, payload.subject.strip(), int(payload.consent_acknowledged),
+                created_at, created_at,
+            ),
+        )
+        ticket_id = cursor.lastrowid
+        db.execute(
+            """INSERT INTO support_messages(ticket_id,author_user_id,author_role,message,visibility,created_at)
+               VALUES(?,?,?,?,?,?)""",
+            (ticket_id, customer_id, "customer" if customer_id else "guest", payload.message.strip(), "customer", created_at),
+        )
+        db.execute(
+            """INSERT INTO notifications(audience_role,title,message,kind,delivery_channels,created_at)
+               VALUES('admin',?,?, 'support','[\"in_app\"]',?)""",
+            (f"New support ticket · {reference}", f"A new {payload.category.replace('_',' ')} support request is waiting in the queue.", created_at),
+        )
+        audit(
+            db, customer_id, "create_public_support_ticket", "support_ticket", ticket_id,
+            {"reference": reference, "category": payload.category, "source": "public_widget"}, ip,
+        )
+        return {
+            "id": ticket_id, "reference": reference, "received": True,
+            "message": "Thanks — your message is with the HV Swim team. Keep this reference for follow-up.",
+            "delivery": delivery_boundary(in_app_delivered=True),
+        }
+
+
+@app.get("/api/support-tickets")
+def list_customer_support_tickets(user: dict[str, Any] = Depends(require_roles("customer"))) -> dict[str, Any]:
+    with db_session() as db:
+        return {
+            "tickets": customer_support_tickets(db, user),
+            "delivery_boundary": {"email": "not_implemented", "push": "not_implemented"},
+        }
+
+
+@app.post("/api/support-tickets")
+def create_customer_support_ticket(
+    payload: CustomerSupportTicketInput,
+    request: Request,
+    user: dict[str, Any] = Depends(require_roles("customer")),
+    x_csrf_token: str | None = Header(default=None),
+) -> dict[str, Any]:
+    csrf_guard(request, user, x_csrf_token)
+    with db_session() as db:
+        created_at = now_iso()
+        reference = support_ticket_reference(db)
+        name = f"{user['first_name']} {user['last_name']}".strip()
+        cursor = db.execute(
+            """INSERT INTO support_tickets
+               (reference,customer_id,category,name,email,phone,subject,status,priority,source,
+                consent_acknowledged,created_at,updated_at)
+               VALUES(?,?,?,?,?,?,?,'new','normal','customer_portal',1,?,?)""",
+            (
+                reference, user["id"], payload.category, name, user["email"].lower(),
+                payload.phone.strip() or user.get("phone") or None, payload.subject.strip(), created_at, created_at,
+            ),
+        )
+        ticket_id = cursor.lastrowid
+        db.execute(
+            """INSERT INTO support_messages(ticket_id,author_user_id,author_role,message,visibility,created_at)
+               VALUES(?,?,'customer',?,'customer',?)""",
+            (ticket_id, user["id"], payload.message.strip(), created_at),
+        )
+        db.execute(
+            """INSERT INTO notifications(audience_role,title,message,kind,delivery_channels,created_at)
+               VALUES('admin',?,?, 'support','[\"in_app\"]',?)""",
+            (f"New account support ticket · {reference}", "A signed-in family sent a support request.", created_at),
+        )
+        audit(
+            db, user["id"], "create_customer_support_ticket", "support_ticket", ticket_id,
+            {"reference": reference, "category": payload.category, "source": "customer_portal"}, client_ip(request),
+        )
+        return {
+            "id": ticket_id, "reference": reference, "created": True,
+            "delivery": delivery_boundary(in_app_delivered=True),
+        }
+
+
+@app.post("/api/support-tickets/{ticket_id}/replies")
+def reply_customer_support_ticket(
+    ticket_id: int,
+    payload: CustomerSupportReplyInput,
+    request: Request,
+    user: dict[str, Any] = Depends(require_roles("customer")),
+    x_csrf_token: str | None = Header(default=None),
+) -> dict[str, Any]:
+    csrf_guard(request, user, x_csrf_token)
+    with db_session() as db:
+        ticket = db.execute(
+            """SELECT id,reference FROM support_tickets
+               WHERE id=? AND (customer_id=? OR (customer_id IS NULL AND LOWER(email)=LOWER(?)))""",
+            (ticket_id, user["id"], user["email"]),
+        ).fetchone()
+        if not ticket:
+            raise HTTPException(status_code=404, detail="Support ticket not found")
+        created_at = now_iso()
+        message_id = db.execute(
+            """INSERT INTO support_messages(ticket_id,author_user_id,author_role,message,visibility,created_at)
+               VALUES(?,?,'customer',?,'customer',?)""",
+            (ticket_id, user["id"], payload.message.strip(), created_at),
+        ).lastrowid
+        db.execute(
+            """UPDATE support_tickets
+               SET customer_id=COALESCE(customer_id,?),status='open',resolved_at=NULL,updated_at=? WHERE id=?""",
+            (user["id"], created_at, ticket_id),
+        )
+        db.execute(
+            """INSERT INTO notifications(audience_role,title,message,kind,delivery_channels,created_at)
+               VALUES('admin',?,?, 'support','[\"in_app\"]',?)""",
+            (f"Family replied · {ticket['reference']}", "A family reply is waiting in the support queue.", created_at),
+        )
+        audit(
+            db, user["id"], "reply_customer_support_ticket", "support_ticket", ticket_id,
+            {"reference": ticket["reference"], "message_id": message_id}, client_ip(request),
+        )
+        return {
+            "replied": True, "message_id": message_id, "status": "open",
+            "delivery": delivery_boundary(in_app_delivered=True),
+        }
+
+
+@app.get("/api/staff/achievements")
+def staff_achievements(user: dict[str, Any] = Depends(require_roles("staff", "admin"))) -> dict[str, Any]:
+    with db_session() as db:
+        return {
+            "achievements": staff_achievement_rows(db, user),
+            "eligible_swimmers": eligible_achievement_swimmers(db, user),
+            "templates": achievement_template_rows(db),
+            "privacy": {
+                "evidence_note": "Family-visible certificate evidence",
+                "private_staff_note": "Staff and management only; excluded from every customer response",
+            },
+            "certificate_rendering": "html_print",
+        }
+
+
+@app.post("/api/staff/achievements")
+def issue_achievement(
+    payload: AchievementAwardInput,
+    request: Request,
+    user: dict[str, Any] = Depends(require_roles("staff", "admin")),
+    x_csrf_token: str | None = Header(default=None),
+) -> dict[str, Any]:
+    csrf_guard(request, user, x_csrf_token)
+    with db_session() as db:
+        # Eligibility and award creation are one decision. Hold the write lock so a
+        # confirmed booking cannot be cancelled between the instructor check and insert.
+        db.execute("BEGIN IMMEDIATE")
+        template = db.execute(
+            "SELECT * FROM achievement_templates WHERE code=? AND active=1", (payload.template_code,)
+        ).fetchone()
+        if not template:
+            raise HTTPException(status_code=404, detail="Achievement template not found")
+        swimmer = db.execute(
+            """SELECT s.id,s.customer_id,s.first_name,s.last_name
+               FROM swimmers s WHERE s.id=? AND s.active=1""",
+            (payload.swimmer_id,),
+        ).fetchone()
+        if not swimmer:
+            raise HTTPException(status_code=404, detail="Eligible swimmer not found")
+
+        selected_class = None
+        if user["role"] == "staff":
+            if payload.class_id is None:
+                raise HTTPException(status_code=400, detail="Choose one of your confirmed classes for this achievement")
+            selected_class = db.execute(
+                """SELECT c.id,c.code,c.title
+                   FROM classes c JOIN bookings b ON b.class_id=c.id
+                   WHERE c.id=? AND c.instructor_id=? AND b.swimmer_id=? AND b.status='confirmed'""",
+                (payload.class_id, user["id"], payload.swimmer_id),
+            ).fetchone()
+            if not selected_class:
+                # A single not-found response avoids confirming whether an unrelated
+                # swimmer or class exists outside this instructor's responsibility.
+                raise HTTPException(status_code=404, detail="Eligible swimmer and class were not found")
+        elif payload.class_id is not None:
+            selected_class = db.execute(
+                """SELECT c.id,c.code,c.title
+                   FROM classes c JOIN bookings b ON b.class_id=c.id
+                   WHERE c.id=? AND b.swimmer_id=? AND b.status='confirmed'""",
+                (payload.class_id, payload.swimmer_id),
+            ).fetchone()
+            if not selected_class:
+                raise HTTPException(status_code=409, detail="The swimmer is not confirmed in the selected class; leave the class blank for a management award")
+
+        awarded_at = now_iso()
+        reference = certificate_reference(db)
+        cursor = db.execute(
+            """INSERT INTO swimmer_achievements
+               (certificate_reference,template_id,swimmer_id,class_id,certificate_style,evidence_note,
+                private_staff_note,status,awarded_by,awarded_at)
+               VALUES(?,?,?,?,?,?,?,?,?,?)""",
+            (
+                reference, template["id"], swimmer["id"], selected_class["id"] if selected_class else None,
+                template["certificate_style"], payload.evidence_note, payload.private_staff_note or None,
+                "active", user["id"], awarded_at,
+            ),
+        )
+        achievement_id = cursor.lastrowid
+        db.execute(
+            """INSERT INTO notifications(user_id,title,message,kind,delivery_channels,created_at)
+               VALUES(?,?,?,?,?,?)""",
+            (
+                swimmer["customer_id"], f"New achievement for {swimmer['first_name']}",
+                f"{swimmer['first_name']} earned {template['title']}. Open Achievements to view certificate {reference}.",
+                "achievement", '["in_app"]', awarded_at,
+            ),
+        )
+        audit(
+            db, user["id"], "issue_swimmer_achievement", "swimmer_achievement", achievement_id,
+            {
+                "certificate_reference": reference, "template_code": template["code"],
+                "swimmer_id": swimmer["id"], "class_id": selected_class["id"] if selected_class else None,
+                "evidence_note_family_visible": True, "private_staff_note_recorded": bool(payload.private_staff_note),
+            },
+            client_ip(request),
+        )
+        issued = next(item for item in staff_achievement_rows(db, user) if item["id"] == achievement_id)
+        return {
+            "awarded": True,
+            "achievement": issued,
+            "notification": {"in_app_delivered": True, "external_channels": {}},
+            "certificate_rendering": "html_print",
+        }
+
+
+@app.post("/api/staff/achievements/{achievement_id}/revoke")
+def revoke_achievement(
+    achievement_id: int,
+    payload: AchievementRevokeInput,
+    request: Request,
+    user: dict[str, Any] = Depends(require_roles("staff", "admin")),
+    x_csrf_token: str | None = Header(default=None),
+) -> dict[str, Any]:
+    csrf_guard(request, user, x_csrf_token)
+    with db_session() as db:
+        db.execute("BEGIN IMMEDIATE")
+        achievement = db.execute(
+            """SELECT a.*,s.customer_id,s.first_name swimmer_first,t.code template_code,t.title template_title
+               FROM swimmer_achievements a
+               JOIN swimmers s ON s.id=a.swimmer_id
+               JOIN achievement_templates t ON t.id=a.template_id
+               WHERE a.id=?""",
+            (achievement_id,),
+        ).fetchone()
+        if not achievement:
+            raise HTTPException(status_code=404, detail="Achievement not found")
+        if user["role"] == "staff" and achievement["awarded_by"] != user["id"]:
+            raise HTTPException(status_code=403, detail="Staff can revoke only achievements they issued")
+        if achievement["status"] == "revoked":
+            raise HTTPException(status_code=409, detail="This achievement has already been revoked")
+
+        revoked_at = now_iso()
+        db.execute(
+            """UPDATE swimmer_achievements
+               SET status='revoked',revoked_by=?,revoked_at=?,revocation_reason=?
+               WHERE id=? AND status='active'""",
+            (user["id"], revoked_at, payload.reason, achievement_id),
+        )
+        db.execute(
+            """INSERT INTO notifications(user_id,title,message,kind,delivery_channels,created_at)
+               VALUES(?,?,?,?,?,?)""",
+            (
+                achievement["customer_id"], f"Achievement update for {achievement['swimmer_first']}",
+                f"Certificate {achievement['certificate_reference']} ({achievement['template_title']}) has been revoked. Reason: {payload.reason}",
+                "achievement", '["in_app"]', revoked_at,
+            ),
+        )
+        audit(
+            db, user["id"], "revoke_swimmer_achievement", "swimmer_achievement", achievement_id,
+            {
+                "certificate_reference": achievement["certificate_reference"],
+                "template_code": achievement["template_code"], "swimmer_id": achievement["swimmer_id"],
+                "class_id": achievement["class_id"], "reason": payload.reason,
+            },
+            client_ip(request),
+        )
+        return {
+            "revoked": True, "achievement_id": achievement_id,
+            "certificate_reference": achievement["certificate_reference"],
+            "revoked_at": revoked_at, "reason": payload.reason,
+            "notification": {"in_app_delivered": True, "external_channels": {}},
+        }
+
+
+@app.get("/api/staff/support-tickets")
+def list_staff_support_tickets(user: dict[str, Any] = Depends(require_roles("staff", "admin"))) -> dict[str, Any]:
+    with db_session() as db:
+        queue = rows(
+            db.execute(
+                """SELECT t.id,t.reference,t.customer_id,t.category,t.name,t.email,t.phone,t.subject,
+                          t.status,t.priority,t.assigned_to,t.source,t.created_at,t.updated_at,t.resolved_at,
+                          TRIM(COALESCE(assigned.first_name,'') || ' ' || COALESCE(assigned.last_name,'')) assigned_name,
+                          (SELECT COUNT(*) FROM support_messages m WHERE m.ticket_id=t.id) message_count,
+                          (SELECT COUNT(*) FROM support_messages m WHERE m.ticket_id=t.id AND m.visibility='internal') internal_note_count
+                   FROM support_tickets t LEFT JOIN users assigned ON assigned.id=t.assigned_to
+                   ORDER BY CASE t.priority WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 WHEN 'normal' THEN 2 ELSE 3 END,
+                            CASE t.status WHEN 'new' THEN 0 WHEN 'open' THEN 1 WHEN 'waiting_customer' THEN 2 WHEN 'resolved' THEN 3 ELSE 4 END,
+                            t.updated_at DESC,t.id DESC"""
+            )
+        )
+        counts = {status: 0 for status in ("new", "open", "waiting_customer", "resolved", "closed")}
+        for ticket in queue:
+            counts[ticket["status"]] += 1
+        return {
+            "tickets": queue,
+            "summary": {"total": len(queue), "guest": sum(1 for item in queue if item["source"] == "public_widget" and item["customer_id"] is None), "by_status": counts},
+            "delivery_boundary": {"email": "not_implemented", "push": "not_implemented"},
+        }
+
+
+@app.get("/api/staff/support-tickets/{ticket_id}")
+def get_staff_support_ticket(ticket_id: int, user: dict[str, Any] = Depends(require_roles("staff", "admin"))) -> dict[str, Any]:
+    with db_session() as db:
+        ticket = staff_support_ticket(db, ticket_id)
+        if not ticket:
+            raise HTTPException(status_code=404, detail="Support ticket not found")
+        return {
+            "ticket": ticket,
+            "privacy": {"internal_notes": "staff_and_management_only", "customer_messages": "visible_to_ticket_owner"},
+            "delivery_boundary": {"email": "not_implemented", "push": "not_implemented"},
+        }
+
+
+@app.post("/api/staff/support-tickets/{ticket_id}/replies")
+def reply_staff_support_ticket(
+    ticket_id: int,
+    payload: StaffSupportReplyInput,
+    request: Request,
+    user: dict[str, Any] = Depends(require_roles("staff", "admin")),
+    x_csrf_token: str | None = Header(default=None),
+) -> dict[str, Any]:
+    csrf_guard(request, user, x_csrf_token)
+    with db_session() as db:
+        db.execute("BEGIN IMMEDIATE")
+        ticket = db.execute("SELECT * FROM support_tickets WHERE id=?", (ticket_id,)).fetchone()
+        if not ticket:
+            raise HTTPException(status_code=404, detail="Support ticket not found")
+        created_at = now_iso()
+        visibility = "internal" if payload.internal_note else "customer"
+        message_id = db.execute(
+            """INSERT INTO support_messages(ticket_id,author_user_id,author_role,message,visibility,created_at)
+               VALUES(?,?,?,?,?,?)""",
+            (ticket_id, user["id"], user["role"], payload.message.strip(), visibility, created_at),
+        ).lastrowid
+        next_status = ticket["status"] if payload.internal_note else "waiting_customer"
+        next_resolved_at = ticket["resolved_at"] if payload.internal_note else None
+        db.execute(
+            """UPDATE support_tickets SET assigned_to=COALESCE(assigned_to,?),status=?,resolved_at=?,updated_at=? WHERE id=?""",
+            (user["id"], next_status, next_resolved_at, created_at, ticket_id),
+        )
+        customer_id = ticket["customer_id"]
+        if customer_id is None:
+            account = db.execute(
+                "SELECT id FROM users WHERE role='customer' AND active=1 AND LOWER(email)=LOWER(?)",
+                (ticket["email"],),
+            ).fetchone()
+            customer_id = account["id"] if account else None
+            if customer_id is not None:
+                db.execute("UPDATE support_tickets SET customer_id=? WHERE id=?", (customer_id, ticket_id))
+        in_app_delivered = False
+        if not payload.internal_note and customer_id is not None:
+            db.execute(
+                """INSERT INTO notifications(user_id,title,message,kind,delivery_channels,created_at)
+                   VALUES(?,?,?,'support','[\"in_app\"]',?)""",
+                (customer_id, f"HV Swim replied · {ticket['reference']}", "A new reply is available in your account messages.", created_at),
+            )
+            in_app_delivered = True
+        audit(
+            db, user["id"], "add_support_internal_note" if payload.internal_note else "reply_staff_support_ticket",
+            "support_ticket", ticket_id,
+            {"reference": ticket["reference"], "message_id": message_id, "visibility": visibility, "status": next_status},
+            client_ip(request),
+        )
+        return {
+            "replied": True, "message_id": message_id, "visibility": visibility,
+            "status": next_status, "delivery": delivery_boundary(in_app_delivered=in_app_delivered),
+        }
+
+
+@app.patch("/api/staff/support-tickets/{ticket_id}")
+def update_staff_support_ticket(
+    ticket_id: int,
+    payload: SupportTicketUpdateInput,
+    request: Request,
+    user: dict[str, Any] = Depends(require_roles("staff", "admin")),
+    x_csrf_token: str | None = Header(default=None),
+) -> dict[str, Any]:
+    csrf_guard(request, user, x_csrf_token)
+    with db_session() as db:
+        ticket = db.execute("SELECT id,reference,status,priority,assigned_to FROM support_tickets WHERE id=?", (ticket_id,)).fetchone()
+        if not ticket:
+            raise HTTPException(status_code=404, detail="Support ticket not found")
+        changes: dict[str, Any] = {}
+        assignments: list[str] = []
+        values: list[Any] = []
+        if "status" in payload.model_fields_set:
+            changes["status"] = payload.status
+            assignments.append("status=?")
+            values.append(payload.status)
+            assignments.append("resolved_at=?")
+            values.append(now_iso() if payload.status in {"resolved", "closed"} else None)
+        if "priority" in payload.model_fields_set:
+            changes["priority"] = payload.priority
+            assignments.append("priority=?")
+            values.append(payload.priority)
+        if "assigned_to" in payload.model_fields_set:
+            if payload.assigned_to is not None:
+                assignee = db.execute(
+                    "SELECT id FROM users WHERE id=? AND role IN ('staff','admin') AND active=1",
+                    (payload.assigned_to,),
+                ).fetchone()
+                if not assignee:
+                    raise HTTPException(status_code=404, detail="Active staff assignee not found")
+            changes["assigned_to"] = payload.assigned_to
+            assignments.append("assigned_to=?")
+            values.append(payload.assigned_to)
+        changed_at = now_iso()
+        assignments.append("updated_at=?")
+        values.extend((changed_at, ticket_id))
+        db.execute(f"UPDATE support_tickets SET {','.join(assignments)} WHERE id=?", values)
+        audit(
+            db, user["id"], "update_support_ticket", "support_ticket", ticket_id,
+            {"reference": ticket["reference"], "changes": changes}, client_ip(request),
+        )
+        return {"saved": True, "ticket": staff_support_ticket(db, ticket_id)}
 
 
 @app.get("/api/customer/bookings")
@@ -716,12 +1718,27 @@ def create_pool_reading(payload: PoolReadingInput, request: Request, user: dict[
         raise HTTPException(status_code=400, detail="An open pool requires a temperature reading")
     with db_session() as db:
         location = location_by_slug(db, payload.location_slug)
-        cursor = db.execute("INSERT INTO pool_readings(location_id,temperature,status,note,verified_by,source,created_at) VALUES(?,?,?,?,?,?,?)", (location["id"], payload.temperature, payload.status, payload.note, user["id"], "manual", now_iso()))
+        created_at = now_iso()
+        cursor = db.execute("INSERT INTO pool_readings(location_id,temperature,status,note,verified_by,source,created_at) VALUES(?,?,?,?,?,?,?)", (location["id"], payload.temperature, payload.status, payload.note, user["id"], "manual", created_at))
         db.execute("UPDATE locations SET public_status=? WHERE id=?", ({"open": "Lessons running", "changed": "Changed conditions", "closed": "Closed / lessons cancelled"}[payload.status], location["id"]))
         audience_message = f"{location['name']}: {payload.note or {'open':'Lessons running','changed':'Changed conditions','closed':'Closed / lessons cancelled'}[payload.status]}"
-        db.execute("INSERT INTO notifications(audience_role,title,message,kind,delivery_channels,created_at) VALUES(?,?,?,?,?,?)", ("customer", "Pool condition updated", audience_message, "pool", '["in_app","push"]', now_iso()))
+        db.execute("INSERT INTO notifications(audience_role,title,message,kind,delivery_channels,created_at) VALUES(?,?,?,?,?,?)", ("customer", "Pool condition updated", audience_message, "pool", '["in_app"]', created_at))
+        alert = sync_pool_public_alert(
+            db,
+            location=location,
+            pool_status=payload.status,
+            note=payload.note.strip(),
+            actor_id=user["id"],
+            pool_reading_id=cursor.lastrowid,
+            ip_address=client_ip(request),
+            changed_at=created_at,
+        )
         audit(db, user["id"], "publish_pool_reading", "pool_reading", cursor.lastrowid, {"location": payload.location_slug, "temperature": payload.temperature, "status": payload.status}, client_ip(request))
-        return {"id": cursor.lastrowid, "published": True, "created_at": now_iso()}
+        return {
+            "id": cursor.lastrowid, "published": True, "created_at": created_at,
+            "public_alert": alert,
+            "delivery": {"website_polling": "live", **delivery_boundary(in_app_delivered=True)},
+        }
 
 
 @app.post("/api/staff/pool-checklists")
@@ -897,6 +1914,96 @@ def update_admin_location(location_id: int, payload: LocationUpdateInput, reques
         return {"saved": True, "id": location_id, "name": location["name"]}
 
 
+@app.get("/api/admin/alerts")
+def admin_alerts(user: dict[str, Any] = Depends(require_roles("admin"))) -> dict[str, Any]:
+    with db_session() as db:
+        query = """SELECT a.*,COALESCE(l.name,'All HV Swim locations') location_name,
+                          TRIM(publisher.first_name || ' ' || publisher.last_name) published_by_name,
+                          TRIM(updater.first_name || ' ' || updater.last_name) updated_by_name,
+                          TRIM(COALESCE(resolver.first_name,'') || ' ' || COALESCE(resolver.last_name,'')) resolved_by_name
+                   FROM public_alerts a LEFT JOIN locations l ON l.id=a.location_id
+                   JOIN users publisher ON publisher.id=a.published_by
+                   JOIN users updater ON updater.id=a.updated_by
+                   LEFT JOIN users resolver ON resolver.id=a.resolved_by
+                   ORDER BY CASE a.status WHEN 'active' THEN 0 ELSE 1 END,a.updated_at DESC,a.id DESC"""
+        alerts = rows(db.execute(query))
+        return {
+            "alerts": alerts,
+            "summary": {"active": sum(1 for item in alerts if item["status"] == "active"), "resolved": sum(1 for item in alerts if item["status"] == "resolved")},
+            "delivery_boundary": {"website_polling": "live", "email": "not_implemented", "push": "not_implemented"},
+        }
+
+
+@app.post("/api/admin/alerts")
+def create_admin_alert(
+    payload: PublicAlertInput,
+    request: Request,
+    user: dict[str, Any] = Depends(require_roles("admin")),
+    x_csrf_token: str | None = Header(default=None),
+) -> dict[str, Any]:
+    csrf_guard(request, user, x_csrf_token)
+    with db_session() as db:
+        if payload.location_id is not None and not db.execute("SELECT id FROM locations WHERE id=?", (payload.location_id,)).fetchone():
+            raise HTTPException(status_code=404, detail="Location not found")
+        published_at = now_iso()
+        alert_id = db.execute(
+            """INSERT INTO public_alerts
+               (severity,title,message,location_id,status,source,published_by,published_at,updated_by,updated_at)
+               VALUES(?,?,?,?,'active','manual',?,?,?,?)""",
+            (payload.severity, payload.title.strip(), payload.message.strip(), payload.location_id, user["id"], published_at, user["id"], published_at),
+        ).lastrowid
+        db.execute(
+            """INSERT INTO notifications(audience_role,title,message,kind,delivery_channels,created_at)
+               VALUES('customer',?,?, 'alert','[\"in_app\"]',?)""",
+            (payload.title.strip(), payload.message.strip(), published_at),
+        )
+        audit(
+            db, user["id"], "create_public_alert", "public_alert", alert_id,
+            {"severity": payload.severity, "location_id": payload.location_id, "source": "manual"}, client_ip(request),
+        )
+        return {
+            "created": True, "alert": public_alert_record(db, alert_id),
+            "delivery": {"website_polling": "live", **delivery_boundary(in_app_delivered=True)},
+        }
+
+
+@app.post("/api/admin/alerts/{alert_id}/resolve")
+def resolve_admin_alert(
+    alert_id: int,
+    payload: PublicAlertResolveInput,
+    request: Request,
+    user: dict[str, Any] = Depends(require_roles("admin")),
+    x_csrf_token: str | None = Header(default=None),
+) -> dict[str, Any]:
+    csrf_guard(request, user, x_csrf_token)
+    with db_session() as db:
+        db.execute("BEGIN IMMEDIATE")
+        alert = db.execute("SELECT id,severity,title,location_id,status FROM public_alerts WHERE id=?", (alert_id,)).fetchone()
+        if not alert:
+            raise HTTPException(status_code=404, detail="Alert not found")
+        if alert["status"] == "resolved":
+            raise HTTPException(status_code=409, detail="This alert has already been resolved")
+        resolved_at = now_iso()
+        db.execute(
+            """UPDATE public_alerts SET status='resolved',resolved_by=?,resolved_at=?,resolution_note=?,updated_by=?,updated_at=?
+               WHERE id=?""",
+            (user["id"], resolved_at, payload.reason.strip(), user["id"], resolved_at, alert_id),
+        )
+        db.execute(
+            """INSERT INTO notifications(audience_role,title,message,kind,delivery_channels,created_at)
+               VALUES('customer',?,?, 'alert','[\"in_app\"]',?)""",
+            (f"Resolved · {alert['title']}", payload.reason.strip(), resolved_at),
+        )
+        audit(
+            db, user["id"], "resolve_public_alert", "public_alert", alert_id,
+            {"severity": alert["severity"], "location_id": alert["location_id"], "reason": payload.reason.strip()}, client_ip(request),
+        )
+        return {
+            "resolved": True, "alert_id": alert_id, "resolved_at": resolved_at,
+            "delivery": {"website_polling": "live", **delivery_boundary(in_app_delivered=True)},
+        }
+
+
 @app.get("/api/admin/exports/enquiries.csv")
 def export_enquiries(request: Request, user: dict[str, Any] = Depends(require_roles("admin"))) -> Response:
     with db_session() as db:
@@ -912,12 +2019,14 @@ def export_enquiries(request: Request, user: dict[str, Any] = Depends(require_ro
 @app.get("/api/admin/exports/products.csv")
 def export_products(request: Request, user: dict[str, Any] = Depends(require_roles("admin"))) -> Response:
     with db_session() as db:
-        records = rows(db.execute("SELECT sku,title,category,price_cents,status,sizes FROM products ORDER BY category,title"))
+        records = rows(db.execute("""SELECT sku,title,category,audience,price_cents,cost_cents,status,sample_status,sizes,
+                                            supplier_route,fulfilment_mode,shopify_gid,printify_product_id,supplier_reference
+                                     FROM products ORDER BY category,title"""))
         audit(db, user["id"], "export_products", "export", "hv-swim-merchandise.csv", {"record_count": len(records)}, client_ip(request))
     return csv_download(
         "hv-swim-merchandise.csv",
-        ["SKU", "Product", "Category", "Retail price AUD", "Status", "Sizes"],
-        [[item["sku"], item["title"], item["category"], f'{item["price_cents"] / 100:.2f}', item["status"], item["sizes"]] for item in records],
+        ["SKU", "Product", "Category", "Audience", "Retail price AUD", "Cost AUD", "Status", "Sample", "Sizes", "Supplier route", "Fulfilment", "Shopify GID", "Printify product ID", "Supplier reference"],
+        [[item["sku"], item["title"], item["category"], item["audience"], f'{item["price_cents"] / 100:.2f}', "" if item["cost_cents"] is None else f'{item["cost_cents"] / 100:.2f}', item["status"], item["sample_status"], item["sizes"], item["supplier_route"], item["fulfilment_mode"], item["shopify_gid"], item["printify_product_id"], item["supplier_reference"]] for item in records],
     )
 
 
@@ -1353,41 +2462,24 @@ async def sync_xero_timesheets(request: Request, user: dict[str, Any] = Depends(
 
 @app.get("/api/products")
 async def products() -> dict[str, Any]:
+    public_product_query = """SELECT id,sku,title,category,description,price_cents,sizes,status,emoji,
+                                     sample_status,supplier_route,personalisation,audience,fulfilment_mode
+                              FROM products ORDER BY category,title"""
     if shopify_ready():
         try:
             return {"source": "shopify", "products": await shopify_products()}
         except Exception as exc:
             with db_session() as db:
-                fallback = rows(db.execute("SELECT * FROM products ORDER BY category,title"))
+                fallback = rows(db.execute(public_product_query))
             return {"source": "local_fallback", "products": fallback, "warning": f"Shopify unavailable: {type(exc).__name__}"}
     with db_session() as db:
-        return {"source": "planned_catalogue", "products": rows(db.execute("SELECT * FROM products ORDER BY category,title"))}
+        return {"source": "planned_catalogue", "products": rows(db.execute(public_product_query))}
 
 
 @app.get("/api/admin/merch-production")
 async def merch_production(user: dict[str, Any] = Depends(require_roles("admin"))) -> dict[str, Any]:
-    supplier_plan = {
-        "HV-SWIMWEAR": {"supplier": "specialist_uniform", "method": "Sample specialist chlorine-resistant swimwear; sell through Shopify after approval."},
-        "HV-TOWEL": {"supplier": "vistaprint_or_specialist", "method": "Quote embroidered or printed towels, approve one physical sample, then stock in Shopify."},
-        "HV-BOTTLE": {"supplier": "vistaprint", "method": "Manual branded-bottle quote and bulk order; hold stock for Shopify fulfilment."},
-        "HV-GOGGLES": {"supplier": "specialist_uniform", "method": "Source compliant swimming equipment from a specialist; avoid generic POD."},
-        "HV-BAG": {"supplier": "printify_or_vistaprint", "method": "Compare POD and bulk samples; connect the selected item to Shopify."},
-        "HV-CAP": {"supplier": "specialist_uniform", "method": "Use a specialist silicone swim-cap supplier and approve print durability."},
-        "HV-STAFF-POLO": {"supplier": "vistaprint", "method": "Embroidered performance uniform ordered in approved staff sizes."},
-        "HV-TEAM-HOODIE": {"supplier": "printify", "method": "POD hoodie produced and fulfilled through Printify's Shopify connection."},
-        "HV-INSTRUCTOR-CAP": {"supplier": "printify_or_vistaprint", "method": "Sample embroidered options before choosing POD or a bulk uniform order."},
-    }
     with db_session() as db:
         catalogue = rows(db.execute("SELECT * FROM products ORDER BY category,title"))
-    for product in catalogue:
-        planned = supplier_plan.get(product["sku"], {"supplier": "manual_review", "method": "Confirm supplier and sample before launch."})
-        planned["supplier"] = product.get("supplier_route") or planned["supplier"]
-        product["production"] = planned
-        product["margin_cents"] = None if product.get("cost_cents") is None else product["price_cents"] - product["cost_cents"]
-        product["margin_percent"] = None if product.get("cost_cents") is None or not product["price_cents"] else round((product["price_cents"] - product["cost_cents"]) / product["price_cents"] * 100, 1)
-    approved_samples = sum(1 for product in catalogue if product.get("sample_status") == "approved")
-    costed_products = sum(1 for product in catalogue if product.get("cost_cents") is not None)
-    launchable_products = sum(1 for product in catalogue if product.get("sample_status") == "approved" and product.get("status") in {"approved", "available"})
     live_printify = []
     printify_error = None
     if printify_ready():
@@ -1395,6 +2487,50 @@ async def merch_production(user: dict[str, Any] = Depends(require_roles("admin")
             live_printify = await printify_products()
         except Exception as exc:
             printify_error = f"Printify connection unavailable: {type(exc).__name__}"
+    live_printify_ids = {str(product.get("id")) for product in live_printify if product.get("id") is not None}
+    for product in catalogue:
+        route = product.get("supplier_route") or "manual_review"
+        route_detail = SUPPLIER_ROUTE_DETAILS.get(route, SUPPLIER_ROUTE_DETAILS["manual_review"])
+        product["production"] = {
+            "supplier": route,
+            "supplier_label": route_detail["label"],
+            "automation": route_detail["automation"],
+            "boundary": route_detail["boundary"],
+            "method": PRODUCT_PRODUCTION_METHODS.get(product["sku"], "Confirm the product specification, supplier and physical sample before launch."),
+        }
+        product["margin_cents"] = None if product.get("cost_cents") is None else product["price_cents"] - product["cost_cents"]
+        product["margin_percent"] = None if product.get("cost_cents") is None or not product["price_cents"] else round((product["price_cents"] - product["cost_cents"]) / product["price_cents"] * 100, 1)
+        printify_capable = "printify" in route
+        printify_mapping = str(product.get("printify_product_id") or "")
+        if not printify_capable:
+            printify_status = "not_applicable"
+        elif not printify_mapping:
+            printify_status = "mapping_required"
+        elif not printify_ready():
+            printify_status = "mapped_connection_required"
+        elif printify_mapping in live_printify_ids:
+            printify_status = "connected"
+        else:
+            printify_status = "mapped_not_found"
+        product["sync"] = {
+            "shopify": "mapped" if product.get("shopify_gid") else "mapping_required",
+            "printify": printify_status,
+            "manual_order_reference": "recorded" if product.get("supplier_reference") else "required",
+        }
+
+    approved_samples = sum(1 for product in catalogue if product.get("sample_status") == "approved")
+    costed_products = sum(1 for product in catalogue if product.get("cost_cents") is not None)
+    launchable_products = sum(1 for product in catalogue if product.get("sample_status") == "approved" and product.get("status") in {"approved", "available"})
+    shopify_mapped = sum(1 for product in catalogue if product.get("shopify_gid"))
+    printify_eligible = sum(1 for product in catalogue if "printify" in (product.get("supplier_route") or ""))
+    printify_mapped = sum(1 for product in catalogue if "printify" in (product.get("supplier_route") or "") and product.get("printify_product_id"))
+    route_summary: dict[str, int] = {}
+    audience_summary: dict[str, int] = {}
+    for product in catalogue:
+        route = product.get("supplier_route") or "manual_review"
+        audience = product.get("audience") or "family"
+        route_summary[route] = route_summary.get(route, 0) + 1
+        audience_summary[audience] = audience_summary.get(audience, 0) + 1
     return {
         "catalogue": catalogue,
         "launch_readiness": {
@@ -1404,12 +2540,28 @@ async def merch_production(user: dict[str, Any] = Depends(require_roles("admin")
             "launchable_products": launchable_products,
             "readiness_percent": round((approved_samples + costed_products + launchable_products) / (max(len(catalogue), 1) * 3) * 100),
         },
-        "providers": {
-            "shopify": {"configured": shopify_ready(), "role": "Storefront, checkout, customer orders and inventory"},
-            "printify": {"configured": printify_ready(), "role": "Automated POD mockups, production and fulfilment", "products": live_printify, "error": printify_error},
-            "vistaprint": {"configured": False, "role": "Manual quotes and bulk ordering for uniforms, bottles and promotional gear", "url": "https://www.vistaprint.com.au/custom-promotional-merch"},
+        "sync_readiness": {
+            "shopify_mapped_products": shopify_mapped,
+            "printify_eligible_products": printify_eligible,
+            "printify_mapped_products": printify_mapped,
+            "unmapped_shopify_products": len(catalogue) - shopify_mapped,
+            "unmapped_printify_products": printify_eligible - printify_mapped,
         },
-        "workflow": ["Approve artwork", "Order physical samples", "Approve sizes and margins", "Publish products to Shopify", "Test checkout and shipping", "Launch collection"],
+        "catalogue_summary": {"by_audience": audience_summary, "by_supplier_route": route_summary},
+        "providers": {
+            "shopify": {"configured": shopify_ready(), "integration_mode": "storefront_api", "role": "Public catalogue, secure checkout, customer orders and inventory"},
+            "printify": {"configured": printify_ready(), "integration_mode": "api_to_shopify", "role": "Eligible POD mockups, production and fulfilment after sample approval", "products": live_printify, "error": printify_error},
+            "vistaprint": {"configured": False, "integration_mode": "manual_purchase_order", "live_api_supported": False, "role": "Manual quotes and bulk ordering for approved uniforms, bottles and promotional gear", "url": "https://www.vistaprint.com.au/custom-promotional-merch"},
+            "specialist_swim": {"configured": False, "integration_mode": "manual_purchase_order", "role": "Chlorine-resistant swimwear and fit/safety-sensitive aquatic equipment"},
+            "premium_teamwear": {"configured": False, "integration_mode": "authorised_reseller_manual", "role": "Premium blank garments may be sourced through authorised resellers; no Nike, Puma, Gildan or other brand connection or licence is claimed"},
+        },
+        "workflow": ["Approve production artwork", "Select supplier and record mapping/reference", "Order physical samples", "Approve sizes, safety and margins", "Publish approved products to Shopify", "Test checkout, fulfilment and returns", "Launch collection"],
+        "integration_boundaries": [
+            "Shopify is the public system for products, variants, inventory and checkout once credentials are configured.",
+            "Printify automation applies only to eligible mapped products after a physical sample is approved.",
+            "VistaPrint and specialist suppliers remain manual quote, proof and purchase-order workflows; no VistaPrint API response is fabricated.",
+            "Named apparel brands are supplier possibilities only through authorised reseller channels; HV Swim must approve the blank and decoration rights before use.",
+        ],
     }
 
 
@@ -1420,11 +2572,30 @@ def update_product(product_id: int, payload: ProductUpdateInput, request: Reques
         product = db.execute("SELECT id,sku,title,price_cents,status FROM products WHERE id=?", (product_id,)).fetchone()
         if not product:
             raise HTTPException(status_code=404, detail="Product not found")
+        printify_product_id = payload.printify_product_id if "printify" in payload.supplier_route else ""
         db.execute(
-            "UPDATE products SET price_cents=?,status=?,sample_status=?,cost_cents=?,supplier_route=?,personalisation=? WHERE id=?",
-            (payload.price_cents, payload.status, payload.sample_status, payload.cost_cents, payload.supplier_route, payload.personalisation, product_id),
+            """UPDATE products
+               SET price_cents=?,status=?,sample_status=?,cost_cents=?,supplier_route=?,fulfilment_mode=?,personalisation=?,
+                   shopify_gid=CASE WHEN ? IS NULL THEN shopify_gid ELSE NULLIF(?, '') END,
+                   printify_product_id=CASE WHEN ? IS NULL THEN printify_product_id ELSE NULLIF(?, '') END,
+                   supplier_reference=CASE WHEN ? IS NULL THEN supplier_reference ELSE NULLIF(?, '') END
+               WHERE id=?""",
+            (
+                payload.price_cents, payload.status, payload.sample_status, payload.cost_cents,
+                payload.supplier_route, fulfilment_mode_for_route(payload.supplier_route), payload.personalisation,
+                payload.shopify_gid, payload.shopify_gid,
+                printify_product_id, printify_product_id,
+                payload.supplier_reference, payload.supplier_reference,
+                product_id,
+            ),
         )
-        detail = {"sku": product["sku"], "price_cents": payload.price_cents, "status": payload.status, "sample_status": payload.sample_status, "cost_cents": payload.cost_cents, "supplier_route": payload.supplier_route}
+        detail = {
+            "sku": product["sku"], "price_cents": payload.price_cents, "status": payload.status,
+            "sample_status": payload.sample_status, "cost_cents": payload.cost_cents,
+            "supplier_route": payload.supplier_route, "fulfilment_mode": fulfilment_mode_for_route(payload.supplier_route),
+            "shopify_gid": payload.shopify_gid, "printify_product_id": printify_product_id,
+            "supplier_reference": payload.supplier_reference,
+        }
         audit(db, user["id"], "update_merchandise_product", "product", product_id, detail, client_ip(request))
         return {"saved": True, "id": product_id, **detail}
 

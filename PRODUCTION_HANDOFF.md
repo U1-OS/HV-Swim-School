@@ -27,6 +27,8 @@ This build is a production foundation, not a substitute for the final deployment
 - Add the approved privacy policy, terms, cancellation policy and photo/media consent wording.
 - Confirm accessibility against WCAG 2.2 AA with keyboard and assistive-technology testing.
 - Set enquiry ownership, response targets and deletion/retention rules before the public form goes live.
+- Assign the asynchronous support-ticket queue to a staffed role, publish a response target and retention period, and train staff that it is not monitored as live chat or an emergency service. The current build creates an internal queue item and reference only; it does not send an external support email.
+- Approve who may issue or revoke swimmer achievements. Families see the achievement and evidence note, while the staff note remains private; issue and revocation events are audited. Treat printable HTML certificates as HV Swim progress records, never as qualifications, licences or industry accreditation.
 - Confirm enrolment authority, waitlist priority rules, payment collection and signed-terms requirements before managers promote real families into classes.
 - Decide whether a released class place should notify the next family automatically or remain a manager-approved action; the current build defaults to audited manager approval.
 - Train managers to use Website content only for approved public wording and to verify every published change on mobile.
@@ -41,6 +43,7 @@ This build is a production foundation, not a substitute for the final deployment
 
 ## 4. Merchandise and Shopify
 
+- Treat all 21 premium catalogue records as planned until each product passes the release gates below; a public concept card or saved-list entry is not inventory or an offer to supply.
 - Use Shopify as the customer-facing source of truth for products, variants, stock, checkout, GST and refunds.
 - Connect Printify to Shopify for suitable on-demand garments and accessories. Keep Printify order approval manual during sampling and launch.
 - Use VistaPrint/manual ordering for selected embroidered uniforms, bottles and bulk promotional products where it wins on quality or price.
@@ -48,6 +51,7 @@ This build is a production foundation, not a substitute for the final deployment
 - Approve the product range, suppliers, sizing, pricing, returns, minimum order quantities and fulfilment method.
 - Request one physical sample of every product/variant family; test logo colour, wash/chlorine resistance, comfort and packaging before publishing.
 - Replace concept images with approved product photography or supplier-authorised mock-ups.
+- Confirm that every named blank brand is sourced and decorated through an authorised reseller. Supplier and brand names are candidates only and must not be presented as HV Swim partners, sponsors, endorsers or licensees without written authority.
 - Create the Shopify catalogue and Storefront access token, then add the domain and token to `.env`.
 - Add the Printify API token and shop ID to `.env` only if the read-only admin catalogue sync is wanted.
 - Test stock, variants, shipping, GST, checkout, refunds and mobile purchases end-to-end.
@@ -57,6 +61,8 @@ This build is a production foundation, not a substitute for the final deployment
 
 - Choose email, SMS and push providers and add sender-domain verification.
 - Approve message templates, quiet hours, emergency escalation and opt-out handling.
+- Active website and connected-app pages poll for urgent closure and changed-condition alerts and clear stale notices if the feed fails. This is not guaranteed off-device delivery and must not replace venue/emergency procedures.
+- To reach a closed/backgrounded PWA or native app, implement and test Web Push plus APNs/FCM registration, consent, device-token lifecycle, provider credentials, delivery receipts and unsubscribe/removal. Browser notification permission by itself is not that service.
 - Use the existing PWA immediately; its offline mode never queues sensitive changes without confirmation.
 - Confirm the production HTTPS app origin and permanent bundle ID, then run `prepare-mobile-app.command` to create and synchronise the Capacitor iOS/Android projects.
 - Follow `MOBILE_APP_README.md` and `mobile/STORE_HANDOFF.md` for Xcode 26, Android API 36, signing, beta testing, privacy disclosures and store assets.
@@ -82,7 +88,7 @@ The public website links to source records rather than claiming school or instru
 - AUSTSWIM lists HV Swim School Bendigo as a Swim School Network member. AUSTSWIM describes that Network as membership, not an audit or accreditation program.
 - Autism Swim publishes an HV Swim provider-directory record. Confirm the organisation's current renewal and expiry directly before describing HV Swim as an Approved Provider.
 
-Before displaying organisation logos or badges, obtain the exact current member/provider artwork issued through HV Swim's own account and confirm the applicable usage rights. Do not scrape, redraw, recolour or use generic corporate logos as substitute membership badges. Do not publish personal AUSTSWIM, SWIM or Autism Swim qualifications for Laura or another instructor without a current certificate/licence type, issuing body and expiry date.
+Before displaying organisation logos or badges, complete `ASSOCIATION_BADGE_REQUIREMENTS.md`: obtain the exact current member/provider artwork issued through HV Swim's own account, record the renewal/expiry evidence and confirm the applicable usage rights. Do not scrape, redraw, recolour or use generic corporate logos as substitute membership badges. Do not publish personal AUSTSWIM, SWIM or Autism Swim qualifications for Laura or another instructor without a current certificate/licence type, issuing body and expiry date.
 
 HV Swim must nominate the canonical public business details, then correct every external directory. Current records disagree with this repository on `76` versus `76B` Wood Street, postcode `3550` versus `3556`, phone `0413 462 112` versus `0458 733 323`, Hotmail versus `bendigo@hvswimschool.com`, and `31` versus `33` Lansell Street. The Autism Swim page also still names Andrea; Andrea has been removed from this repository and that external record needs an owner-requested update.
 

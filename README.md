@@ -1,4 +1,4 @@
-# HV Swim Bendigo V5.4 Premium Platform
+# HV Swim Bendigo V5.5 Premium Platform
 
 Premium public website, installable Progressive Web App and connected operations platform for HV Swim Bendigo. The build combines a polished responsive front end with a FastAPI service, role-based accounts and a SQLite preview database. SQLite is not approved for the final production deployment that will store customer, child or payroll data.
 
@@ -22,7 +22,8 @@ The launcher creates its own Python environment and installs the pinned dependen
 - `mobile-shell.html` — native iOS/Android connection launch experience
 - `MOBILE_APP_README.md` — Mac, Xcode, Android Studio and store-build guide
 - `BRAND_GUIDE.md` — logo, colour, typography and merchandise usage guide
-- `IMAGE_ASSET_PROVENANCE.md` — exact V5.4 image prompts, modes, masters and web outputs
+- `ASSOCIATION_BADGE_REQUIREMENTS.md` — evidence and authorised-artwork gate for third-party member/provider badges
+- `IMAGE_ASSET_PROVENANCE.md` — exact V5.4/V5.5 image prompts, modes, masters and web outputs
 - `prepare-mobile-app.command` — creates and synchronises the Capacitor iOS/Android projects
 - `capacitor.config.json` / `package.json` — Capacitor 8 native project foundation
 - `backend/` — API, security, database and third-party integration boundaries
@@ -55,7 +56,10 @@ Demo credentials only work while `HV_APP_ENV=development`. Production mode disab
 - Management website editor for the homepage announcement, enrolment status, hero message and primary call-to-action
 - Management account and swimmer provisioning with a mandatory first password change
 - Enquiry inbox with new, contacted, trial-booked and closed follow-up stages
-- Management merchandise workspace with sample tracking, supplier routes, costs, projected margin and quantified launch readiness
+- Asynchronous public support tickets with a returned reference and staff queue; the widget is not live chat or an emergency channel, and no external support email is sent yet
+- Family-visible swimmer achievements with evidence, staff-private notes, audited issue/revocation and printable HTML certificates that are not qualifications or accreditation
+- Urgent pool-closure and changed-condition alerts that poll while a website/app page is open; genuine off-device Web Push, APNs and FCM delivery is not active
+- Management merchandise workspace for the premium 21-product plan, with sample tracking, supplier routes, costs, projected margin and quantified launch readiness
 - Guided First Splash, Lesson Day and Pool Deck uniform kits that add coordinated products to the persistent preview cart
 - Product material, care and personalisation guidance with explicit sample-approval boundaries
 - Local catalogue price/status controls before products are approved for Shopify
@@ -79,7 +83,11 @@ Demo credentials only work while `HV_APP_ENV=development`. Production mode disab
 
 Connecting the existing Xero organisation requires an HV Swim-owned OAuth app and mappings. Shopify, Printify, VistaPrint ordering, commercial weather, email, SMS, push, pool sensors, hosting, domain and native app-store distribution likewise require credentials or accounts owned by HV Swim. Those values belong in a private `.env` file created from `.env.example`; secrets must never be placed in HTML or committed to source control. Credentials do not activate email, SMS or push by themselves—the provider adapters and consent workflows are still explicit launch work. The optional Meta Page Plugin is configured but must be tested on the approved production domain.
 
-The website links to public industry directory records without presenting them as instructor accreditation. Use only current member/provider badge files issued through HV Swim's own organisation accounts. Generic or scraped organisation logos are not included. See `PRODUCTION_HANDOFF.md` for the directory-record differences that HV Swim must reconcile before launch.
+The website links to public industry directory records without presenting them as instructor accreditation. Use only current member/provider badge files issued through HV Swim's own organisation accounts. Generic or scraped organisation logos are not included. Follow `ASSOCIATION_BADGE_REQUIREMENTS.md` and `PRODUCTION_HANDOFF.md` before activating any badge.
+
+The 21 merchandise records are a production plan, not available stock. Every product must pass artwork-rights, specification, landed-cost, physical-sample, care/returns and end-to-end Shopify release gates. Supplier and blank-brand names identify possible sourcing routes only; they do not claim a partnership, endorsement, licence or authorised-reseller relationship with HV Swim.
+
+Support messages currently enter the protected management queue and return a reference; external email delivery is not implemented. Urgent notices refresh on active website/app pages, but reaching a device while the site or app is closed still requires a consented production provider, device-token handling and working Web Push/APNs/FCM adapter.
 
 The direct management entry is `http://127.0.0.1:8765/login.html?role=admin`. In development, the page can load the Management demo account from the local server. Production never exposes demo credentials. After signing in, use **Website content** for approved homepage fields, **Enquiry inbox** for family follow-up and **Merchandise** for the launch catalogue.
 

@@ -139,6 +139,94 @@
   const header = document.querySelector('.site-header');
   const updateHeader = () => header?.classList.toggle('scrolled', window.scrollY > 24);
   updateHeader(); window.addEventListener('scroll', updateHeader, { passive:true });
+
+  // Association records are shown consistently at the bottom of every public page.
+  // These are source links and reserved authorised-badge positions — never downloaded or
+  // redrawn corporate logos. Issued artwork can replace the text plates only after the
+  // business records current usage rights and renewal evidence.
+  const footer = document.querySelector('.site-footer');
+  if (footer && !footer.querySelector('.footer-association-strip')) {
+    const strip = document.createElement('div');
+    strip.className = 'container footer-association-strip';
+    strip.setAttribute('aria-label', 'HV Swim aquatic industry directory links');
+    strip.innerHTML = `<div class="footer-association-intro"><span>Industry records</span><strong>Check HV Swim at the source.</strong><small>Authorised member/provider badge artwork is still required.</small></div><div class="footer-association-links"><a href="https://12524.locationlandingpages.com/australia/victoria/california-gully/hv-swim-school-bendigo/2807" target="_blank" rel="noopener"><b>SWIM</b><span>Public school record</span><em>Badge file required</em></a><a href="https://austswim.com.au/australian-swim-school-finder" target="_blank" rel="noopener"><b>AUSTSWIM</b><span>Swim School Network finder</span><em>Issued badge required</em></a><a href="https://autism-swim.org/providers/aquatic-centre-hidden-valley-swim-school-bendigo/" target="_blank" rel="noopener"><b>AUTISM SWIM</b><span>Provider-directory record</span><em>Renewal to confirm</em></a></div>`;
+    const footerBottom = footer.querySelector('.footer-bottom');
+    if (footerBottom) footer.insertBefore(strip, footerBottom);
+    else footer.append(strip);
+  }
+
+  // Urgent website/app alerts. Open pages receive a new closure or changed-condition
+  // notice within the server-provided refresh window. Native/web push while the app is
+  // closed remains a separate production provider boundary.
+  const ALERT_STORAGE_KEY = 'hv-swim-last-device-alert';
+  const escapeAlert = value => String(value ?? '').replace(/[&<>'"]/g, character => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[character]));
+  const severityLabels = { closure:'Pool closure', change:'Changed conditions', reopening:'Reopened', information:'Important update' };
+  const publicAlertRoot = document.createElement('aside');
+  publicAlertRoot.className = 'public-alert-stack';
+  publicAlertRoot.setAttribute('aria-label', 'Important HV Swim updates');
+  publicAlertRoot.setAttribute('aria-live', 'assertive');
+  publicAlertRoot.hidden = true;
+  const alertAnchor = document.querySelector('.shop-launch-bar') || header;
+  if (alertAnchor) alertAnchor.insertAdjacentElement('afterend', publicAlertRoot);
+  else document.body.prepend(publicAlertRoot);
+
+  const deviceAlertAvailable = () => 'Notification' in window && window.isSecureContext && 'serviceWorker' in navigator;
+  async function showDeviceAlert(alert) {
+    if (!deviceAlertAvailable() || Notification.permission !== 'granted') return;
+    let lastShown = '';
+    try { lastShown = localStorage.getItem(ALERT_STORAGE_KEY) || ''; } catch (_) {}
+    if (lastShown === String(alert.id)) return;
+    try {
+      const registration = await navigator.serviceWorker.ready;
+      await registration.showNotification(alert.title, {
+        body:alert.message,
+        tag:`hv-swim-alert-${alert.id}`,
+        renotify:true,
+        icon:'assets/app-icon-v3-192.png',
+        badge:'assets/app-icon-v3-64.png',
+        data:{ url:'locations.html' }
+      });
+      try { localStorage.setItem(ALERT_STORAGE_KEY, String(alert.id)); } catch (_) {}
+    } catch (_) {}
+  }
+
+  function renderPublicAlerts(alerts) {
+    const active = Array.isArray(alerts) ? alerts.slice(0, 3) : [];
+    publicAlertRoot.hidden = !active.length;
+    publicAlertRoot.innerHTML = active.map((alert,index) => {
+      const severity = Object.hasOwn(severityLabels, alert.severity) ? alert.severity : 'information';
+      const locationName = alert.location_name || 'All HV Swim locations';
+      const published = alert.published_at ? formatDateTime(alert.published_at) : 'Published now';
+      const deviceButton = index === 0 && deviceAlertAvailable() && Notification.permission !== 'denied'
+        ? `<button type="button" data-enable-device-alerts>${Notification.permission === 'granted' ? 'Device alerts enabled' : 'Enable device alerts'}</button>` : '';
+      return `<article class="public-alert ${severity}" data-alert-id="${escapeAlert(alert.id)}"><div class="public-alert-icon" aria-hidden="true">${severity === 'closure' ? '!' : severity === 'reopening' ? '✓' : 'i'}</div><div class="public-alert-copy"><span>${escapeAlert(severityLabels[severity])} · ${escapeAlert(locationName)}</span><strong>${escapeAlert(alert.title)}</strong><p>${escapeAlert(alert.message)}</p><small>${escapeAlert(published)} · live website and connected-app notice</small></div><div class="public-alert-actions"><a href="locations.html">View conditions</a>${deviceButton}</div></article>`;
+    }).join('');
+    if (active[0]) showDeviceAlert(active[0]);
+  }
+
+  async function hydratePublicAlerts() {
+    if (!/^https?:$/.test(location.protocol)) return;
+    try {
+      const payload = await requestJSON('/api/public/alerts', { headers:{ Accept:'application/json' }, cache:'no-store' }, 5000);
+      renderPublicAlerts(payload.alerts);
+    } catch (_) {
+      // A missing connection must never leave an old closure looking current.
+      publicAlertRoot.hidden = true;
+      publicAlertRoot.replaceChildren();
+    }
+  }
+  publicAlertRoot.addEventListener('click', async event => {
+    const button = event.target.closest('[data-enable-device-alerts]');
+    if (!button || !deviceAlertAvailable()) return;
+    if (Notification.permission === 'default') await Notification.requestPermission();
+    button.textContent = Notification.permission === 'granted' ? 'Device alerts enabled' : 'Alerts blocked in browser';
+    if (Notification.permission === 'granted') hydratePublicAlerts();
+  });
+  if (/^https?:$/.test(location.protocol)) {
+    hydratePublicAlerts();
+    window.setInterval(() => { if (!document.hidden) hydratePublicAlerts(); }, 15000);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) hydratePublicAlerts(); });
+  }
   const observer = 'IntersectionObserver' in window ? new IntersectionObserver(entries => entries.forEach(entry => {
     if (entry.isIntersecting) { entry.target.classList.add('visible'); observer.unobserve(entry.target); }
   }), { threshold:0, rootMargin:'0px 0px -8% 0px' }) : null;
@@ -274,7 +362,7 @@
     if (!deferredInstallPrompt) { showToast('On iPhone/iPad, use Share → Add to Home Screen. On Mac, use the browser install option.'); return; }
     deferredInstallPrompt.prompt(); await deferredInstallPrompt.userChoice; deferredInstallPrompt = null; button.hidden = true;
   }));
-  if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+  if ('serviceWorker' in navigator && (location.protocol === 'https:' || ['localhost','127.0.0.1'].includes(location.hostname))) {
     navigator.serviceWorker.register('service-worker.js').catch(() => {});
   }
 

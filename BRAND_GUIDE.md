@@ -1,6 +1,6 @@
 # HV Swim Bendigo brand guide
 
-V5.3 refines the existing HV Swim identity rather than replacing it. The rising sun,
+V5.5 refines the existing HV Swim identity rather than replacing it. The rising sun,
 freestyle swimmer, layered wave, navy/cyan/gold palette and `HV SWIM BENDIGO` name remain
 the recognisable core.
 
@@ -59,6 +59,33 @@ production, have a brand designer manually vectorise and typeset the approved ma
 EPS and print-ready PDF, define CMYK/spot colours, and obtain a physical print or embroidery
 proof. Supplier-created DST/PES embroidery files must be approved from a stitched sample;
 they cannot be reliably generated from a website preview.
+
+The premium collection contains 21 planned products. A concept image or catalogue card is
+not approval to manufacture: each product must pass the artwork-rights, exact specification,
+landed-cost, physical-sample, care/returns and Shopify test-order gates in
+`MERCH_PRODUCTION_PLAN.md`. Named suppliers and blank brands are sourcing candidates only.
+Never describe HV Swim as their partner, sponsor, licensee or authorised reseller without
+current written authority, and use only supplier-authorised product imagery.
+
+## Third-party badges and marks
+
+AUSTSWIM, SWIM Schools Australia and Autism Swim artwork remains owned and controlled by
+those organisations. Display only the exact current badge issued to HV Swim after the
+membership/provider evidence, authorised wording and expiry/renewal date required by
+`ASSOCIATION_BADGE_REQUIREMENTS.md` are recorded. A public directory listing is not permission
+to copy a corporate logo, and an industry badge must never be merged into the HV Swim logo.
+
+## Certificates and operational messaging
+
+Printable swimmer certificates are HV Swim progress acknowledgements. They must use the HV
+Swim identity, certificate reference and family-visible evidence without suggesting a formal
+qualification, licence, AUSTSWIM/SWIM accreditation or provider endorsement. Staff-private
+notes never appear on the certificate, and revoked records must no longer present as active.
+
+Use “urgent website/app alert” for the current active-page closure feed and “message HV Swim”
+for the asynchronous support queue. Do not call either feature guaranteed push, emergency
+notification or live chat until the relevant provider-backed service is implemented and
+approved.
 
 ## Image-generation record
 

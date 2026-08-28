@@ -169,6 +169,87 @@ CREATE TABLE IF NOT EXISTS notification_receipts (
   read_at TEXT NOT NULL,
   PRIMARY KEY (notification_id, user_id)
 );
+CREATE TABLE IF NOT EXISTS achievement_templates (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  code TEXT UNIQUE NOT NULL,
+  title TEXT NOT NULL,
+  description TEXT NOT NULL,
+  certificate_style TEXT NOT NULL,
+  badge_symbol TEXT NOT NULL,
+  brand_label TEXT NOT NULL DEFAULT 'HV Swim School Bendigo',
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  active INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS swimmer_achievements (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  certificate_reference TEXT UNIQUE NOT NULL,
+  template_id INTEGER NOT NULL REFERENCES achievement_templates(id),
+  swimmer_id INTEGER NOT NULL REFERENCES swimmers(id),
+  class_id INTEGER REFERENCES classes(id),
+  certificate_style TEXT NOT NULL,
+  evidence_note TEXT NOT NULL,
+  private_staff_note TEXT,
+  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','revoked')),
+  awarded_by INTEGER NOT NULL REFERENCES users(id),
+  awarded_at TEXT NOT NULL,
+  revoked_by INTEGER REFERENCES users(id),
+  revoked_at TEXT,
+  revocation_reason TEXT,
+  CHECK (
+    (status='active' AND revoked_by IS NULL AND revoked_at IS NULL AND revocation_reason IS NULL)
+    OR
+    (status='revoked' AND revoked_by IS NOT NULL AND revoked_at IS NOT NULL AND length(revocation_reason)>=5)
+  )
+);
+CREATE TABLE IF NOT EXISTS support_tickets (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  reference TEXT UNIQUE NOT NULL,
+  customer_id INTEGER REFERENCES users(id),
+  category TEXT NOT NULL CHECK (category IN ('lessons','bookings','billing','merchandise','pool_conditions','accessibility_support','app_help','other')),
+  name TEXT NOT NULL,
+  email TEXT NOT NULL,
+  phone TEXT,
+  subject TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'new' CHECK (status IN ('new','open','waiting_customer','resolved','closed')),
+  priority TEXT NOT NULL DEFAULT 'normal' CHECK (priority IN ('low','normal','high','urgent')),
+  assigned_to INTEGER REFERENCES users(id),
+  source TEXT NOT NULL CHECK (source IN ('public_widget','customer_portal')),
+  consent_acknowledged INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  resolved_at TEXT
+);
+CREATE TABLE IF NOT EXISTS support_messages (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  ticket_id INTEGER NOT NULL REFERENCES support_tickets(id) ON DELETE CASCADE,
+  author_user_id INTEGER REFERENCES users(id),
+  author_role TEXT NOT NULL CHECK (author_role IN ('guest','customer','staff','admin','system')),
+  message TEXT NOT NULL,
+  visibility TEXT NOT NULL DEFAULT 'customer' CHECK (visibility IN ('customer','internal')),
+  created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS public_alerts (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  severity TEXT NOT NULL CHECK (severity IN ('closure','change','reopening','information')),
+  title TEXT NOT NULL,
+  message TEXT NOT NULL,
+  location_id INTEGER REFERENCES locations(id),
+  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','resolved')),
+  source TEXT NOT NULL DEFAULT 'manual' CHECK (source IN ('manual','pool_status')),
+  published_by INTEGER NOT NULL REFERENCES users(id),
+  published_at TEXT NOT NULL,
+  updated_by INTEGER NOT NULL REFERENCES users(id),
+  updated_at TEXT NOT NULL,
+  resolved_by INTEGER REFERENCES users(id),
+  resolved_at TEXT,
+  resolution_note TEXT,
+  CHECK (
+    (status='active' AND resolved_by IS NULL AND resolved_at IS NULL)
+    OR
+    (status='resolved' AND resolved_by IS NOT NULL AND resolved_at IS NOT NULL)
+  )
+);
 CREATE TABLE IF NOT EXISTS products (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   sku TEXT UNIQUE NOT NULL,
@@ -183,7 +264,11 @@ CREATE TABLE IF NOT EXISTS products (
   sample_status TEXT NOT NULL DEFAULT 'not_ordered',
   cost_cents INTEGER,
   supplier_route TEXT,
-  personalisation TEXT
+  personalisation TEXT,
+  audience TEXT NOT NULL DEFAULT 'family',
+  fulfilment_mode TEXT NOT NULL DEFAULT 'manual',
+  printify_product_id TEXT,
+  supplier_reference TEXT
 );
 CREATE TABLE IF NOT EXISTS integration_connections (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -232,6 +317,14 @@ CREATE INDEX IF NOT EXISTS idx_bookings_class ON bookings(class_id, status);
 CREATE INDEX IF NOT EXISTS idx_pool_readings_location ON pool_readings(location_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_notification_receipts_user ON notification_receipts(user_id, read_at DESC);
+CREATE INDEX IF NOT EXISTS idx_swimmer_achievements_swimmer ON swimmer_achievements(swimmer_id, status, awarded_at DESC);
+CREATE INDEX IF NOT EXISTS idx_swimmer_achievements_awarded_by ON swimmer_achievements(awarded_by, awarded_at DESC);
+CREATE INDEX IF NOT EXISTS idx_support_tickets_customer ON support_tickets(customer_id, updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_support_tickets_email ON support_tickets(email COLLATE NOCASE, updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_support_tickets_queue ON support_tickets(status, priority, updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_support_messages_ticket ON support_messages(ticket_id, created_at, id);
+CREATE INDEX IF NOT EXISTS idx_public_alerts_active ON public_alerts(status, severity, published_at DESC);
+CREATE INDEX IF NOT EXISTS idx_public_alerts_location ON public_alerts(location_id, status, source);
 CREATE INDEX IF NOT EXISTS idx_time_entries_status ON time_entries(status, staff_id);
 -- Both rate limits below scan on every sign-in and every public enquiry, and both tables
 -- grow with traffic, so they need covering indexes.
@@ -358,6 +451,10 @@ def initialise_database() -> None:
             "cost_cents": "INTEGER",
             "supplier_route": "TEXT",
             "personalisation": "TEXT",
+            "audience": "TEXT NOT NULL DEFAULT 'family'",
+            "fulfilment_mode": "TEXT NOT NULL DEFAULT 'manual'",
+            "printify_product_id": "TEXT",
+            "supplier_reference": "TEXT",
         }.items():
             if column not in product_columns:
                 db.execute(f"ALTER TABLE products ADD COLUMN {column} {definition}")
@@ -372,32 +469,83 @@ def initialise_database() -> None:
         created = now_iso()
         base_products = [
             ("HV-SWIMWEAR", "HV Swim Team Swimwear", "Swimwear", "Logo-branded training swimwear for children and adults.", 5995, '["Kids 4-14","Adult XS-XL"]', "planned", "🩱"),
+            ("HV-RASHIE", "HV Swim Kids Rashie", "Swimwear", "Chlorine-resistant long-sleeve swimming shirt for lessons and outdoor pool days.", 4495, '["Kids 2","Kids 4","Kids 6","Kids 8","Kids 10","Kids 12","Kids 14"]', "planned", "◊"),
+            ("HV-SWIM-SHORTS", "HV Swim Kids Swim Shorts", "Swimwear", "Comfortable lesson-ready swim shorts with an adjustable waist and approved HV Swim branding.", 3995, '["Kids 2","Kids 4","Kids 6","Kids 8","Kids 10","Kids 12","Kids 14"]', "planned", "▱"),
             ("HV-TOWEL", "HV Swim Logo Towel", "Towels", "Soft pool towel with embroidered HV Swim branding.", 3495, '["One size"]', "planned", "▤"),
+            ("HV-HOODED-TOWEL", "HV Swim Kids Hooded Towel", "Towels", "Warm hooded pool towel sized for children, with a supplier-approved HV Swim decoration.", 5495, '["Toddler","Junior"]', "planned", "▥"),
             ("HV-BOTTLE", "HV Swim Drink Bottle", "Bottles", "Named pool-deck bottle with HV Swim branding.", 1995, '["650ml"]', "planned", "🥤"),
+            ("HV-INSULATED-TUMBLER", "HV Swim Insulated Coffee Cup", "Drinkware", "Premium reusable insulated cup for adults, with a proofed HV Swim decoration.", 3495, '["350ml","470ml"]', "planned", "◉"),
+            ("HV-JUNIOR-WARM-CUP", "HV Swim Junior Warm-Drink Cup", "Drinkware", "Spill-resistant junior cup intended for parent-supervised warm, never hot, drinks.", 2995, '["300ml"]', "planned", "◎"),
             ("HV-GOGGLES", "HV Swim Goggles", "Equipment", "Comfortable training goggles for regular lessons.", 2495, '["Junior","Adult"]', "planned", "🥽"),
+            ("HV-TRAINING-MITTS", "HV Swim Silicone Training Mitts", "Equipment", "Flexible webbed swim-training mitts for coach-directed technique activities.", 1995, '["Junior S","Junior M","Adult S","Adult M"]', "planned", "◈"),
             ("HV-BAG", "HV Swim Pool-Deck Bag", "Bags", "Ventilated swim bag for wet gear and lesson essentials.", 3995, '["One size"]', "planned", "🎒"),
             ("HV-CAP", "HV Swim Team Cap", "Caps", "Silicone swim cap with team branding.", 1495, '["Junior","Adult"]', "planned", "🧢"),
+            ("HV-KIDS-SUN-HAT", "HV Swim Kids Sun Hat", "Caps", "Poolside sun hat with an approved embroidered or transfer HV Swim mark.", 2995, '["Kids S/M","Kids L/XL"]', "planned", "◌"),
             ("HV-STAFF-POLO", "HV Swim Staff Polo", "Uniforms", "Breathable navy performance polo with embroidered HV Swim identity.", 4495, '["XS","S","M","L","XL","2XL"]', "planned", "◈"),
+            ("HV-STAFF-TEE", "HV Swim Staff Performance Shirt", "Uniforms", "Lightweight team shirt for teaching support, events and pool-deck setup.", 3995, '["XS","S","M","L","XL","2XL","3XL"]', "planned", "◇"),
+            ("HV-STAFF-SHORTS", "HV Swim Staff Deck Shorts", "Uniforms", "Quick-dry staff shorts selected for safe, comfortable work around the pool deck.", 4495, '["XS","S","M","L","XL","2XL"]', "planned", "△"),
             ("HV-TEAM-HOODIE", "HV Swim Team Hoodie", "Uniforms", "Warm branded hoodie for staff, families and pool-deck arrivals.", 6495, '["Kids 6-14","Adult XS-2XL"]', "planned", "◇"),
+            ("HV-STAFF-PUFFER-VEST", "HV Swim Staff Puffer Vest", "Uniforms", "Insulated sleeveless layer for arrivals, reception work and cool pool-deck conditions.", 8995, '["XS","S","M","L","XL","2XL"]', "planned", "◐"),
+            ("HV-STAFF-PUFFER-JACKET", "HV Swim Staff Puffer Jacket", "Uniforms", "Warm staff outer layer with controlled logo placement and a supplier-approved size range.", 11995, '["XS","S","M","L","XL","2XL"]', "planned", "◑"),
+            ("HV-STAFF-TRACKPANTS", "HV Swim Staff Track Pants", "Uniforms", "Comfortable staff track pants for travel, setup and cooler pool-deck shifts.", 6995, '["XS","S","M","L","XL","2XL"]', "planned", "▢"),
             ("HV-INSTRUCTOR-CAP", "HV Swim Instructor Cap", "Uniforms", "Lightweight branded cap for outdoor and seasonal pool work.", 2495, '["Adjustable"]', "planned", "◌"),
         ]
         db.executemany("INSERT OR IGNORE INTO products(sku,title,category,description,price_cents,sizes,status,emoji) VALUES(?,?,?,?,?,?,?,?)", base_products)
         production_defaults = {
-            "HV-SWIMWEAR": ("specialist_uniform", "HV Swim identity; name placement under review"),
-            "HV-TOWEL": ("vistaprint_or_specialist", "Embroidered identity; optional swimmer name"),
-            "HV-BOTTLE": ("vistaprint", "Named bottle after wash and rub testing"),
-            "HV-GOGGLES": ("specialist_uniform", "No product personalisation planned"),
-            "HV-BAG": ("printify_or_vistaprint", "HV Swim mark and swimmer name panel"),
-            "HV-CAP": ("specialist_uniform", "Durable HV Swim team print"),
-            "HV-STAFF-POLO": ("vistaprint", "Embroidered identity; role or staff name optional"),
-            "HV-TEAM-HOODIE": ("printify", "HV Swim decoration; individual name optional"),
-            "HV-INSTRUCTOR-CAP": ("printify_or_vistaprint", "Embroidered identity and instructor label"),
+            "HV-SWIMWEAR": ("family", "specialist_swim", "specialist_purchase_order", "HV Swim identity; name placement under review"),
+            "HV-RASHIE": ("kids", "specialist_swim", "specialist_purchase_order", "HV Swim identity; optional swimmer name after chlorine testing"),
+            "HV-SWIM-SHORTS": ("kids", "specialist_swim", "specialist_purchase_order", "HV Swim identity; no name placement until a wear test is approved"),
+            "HV-TOWEL": ("family", "vistaprint_or_specialist", "supplier_comparison", "Embroidered identity; optional swimmer name"),
+            "HV-HOODED-TOWEL": ("kids", "vistaprint_or_specialist", "supplier_comparison", "Embroidered or transfer identity; optional swimmer name"),
+            "HV-BOTTLE": ("family", "vistaprint", "manual_bulk_order", "Named bottle after wash and rub testing"),
+            "HV-INSULATED-TUMBLER": ("family", "vistaprint_or_specialist", "supplier_comparison", "Proofed HV Swim decoration; optional name after wash and heat-cycle testing"),
+            "HV-JUNIOR-WARM-CUP": ("kids", "vistaprint_or_specialist", "supplier_comparison", "Optional name after lid, wash and rub testing; parent-supervised warm drinks only"),
+            "HV-GOGGLES": ("family", "specialist_swim", "specialist_purchase_order", "No product personalisation planned"),
+            "HV-TRAINING-MITTS": ("kids", "specialist_swim", "specialist_purchase_order", "No personalisation until material and safety review is complete"),
+            "HV-BAG": ("family", "printify_or_vistaprint", "supplier_comparison", "HV Swim mark and swimmer name panel"),
+            "HV-CAP": ("family", "specialist_swim", "specialist_purchase_order", "Durable HV Swim team print"),
+            "HV-KIDS-SUN-HAT": ("kids", "printify_or_vistaprint", "supplier_comparison", "Embroidered or transfer HV Swim mark"),
+            "HV-STAFF-POLO": ("staff", "vistaprint", "manual_bulk_order", "Embroidered identity; role or staff name optional"),
+            "HV-STAFF-TEE": ("staff", "printify", "printify_shopify", "HV Swim decoration; staff name optional after a sample is approved"),
+            "HV-STAFF-SHORTS": ("staff", "vistaprint_or_specialist", "supplier_comparison", "Small HV Swim mark; individual names not recommended"),
+            "HV-TEAM-HOODIE": ("family", "printify", "printify_shopify", "HV Swim decoration; individual name optional"),
+            "HV-STAFF-PUFFER-VEST": ("staff", "vistaprint_or_specialist", "manual_bulk_order", "Embroidered HV Swim identity; role optional"),
+            "HV-STAFF-PUFFER-JACKET": ("staff", "vistaprint_or_specialist", "manual_bulk_order", "Embroidered HV Swim identity; role optional"),
+            "HV-STAFF-TRACKPANTS": ("staff", "vistaprint_or_specialist", "manual_bulk_order", "Small HV Swim mark; no individual name planned"),
+            "HV-INSTRUCTOR-CAP": ("staff", "printify_or_vistaprint", "supplier_comparison", "Embroidered identity and instructor label"),
         }
-        for sku, (supplier_route, personalisation) in production_defaults.items():
+        fulfilment_by_route = {
+            "specialist_swim": "specialist_purchase_order",
+            "specialist_uniform": "manual_purchase_order",
+            "vistaprint": "manual_bulk_order",
+            "printify": "printify_shopify",
+            "printify_or_vistaprint": "supplier_comparison",
+            "vistaprint_or_specialist": "supplier_comparison",
+            "manual_review": "manual_review",
+        }
+        for sku, (audience, supplier_route, seeded_fulfilment_mode, personalisation) in production_defaults.items():
             db.execute(
-                "UPDATE products SET supplier_route=COALESCE(NULLIF(supplier_route,''),?),personalisation=COALESCE(NULLIF(personalisation,''),?) WHERE sku=?",
-                (supplier_route, personalisation, sku),
+                """UPDATE products
+                   SET audience=?,supplier_route=COALESCE(NULLIF(supplier_route,''),?),
+                       personalisation=COALESCE(NULLIF(personalisation,''),?)
+                   WHERE sku=?""",
+                (audience, supplier_route, personalisation, sku),
             )
+            selected_route = db.execute("SELECT supplier_route FROM products WHERE sku=?", (sku,)).fetchone()[0]
+            db.execute(
+                "UPDATE products SET fulfilment_mode=? WHERE sku=?",
+                (fulfilment_by_route.get(selected_route, seeded_fulfilment_mode), sku),
+            )
+        # Earlier preview databases used the ambiguous specialist_uniform route for
+        # aquatic products. Keep specialist_uniform valid for apparel while making the
+        # seeded swim products explicit and safe for supplier routing.
+        aquatic_skus = ("HV-SWIMWEAR", "HV-RASHIE", "HV-SWIM-SHORTS", "HV-GOGGLES", "HV-TRAINING-MITTS", "HV-CAP")
+        db.execute(
+            f"""UPDATE products
+                SET supplier_route='specialist_swim',fulfilment_mode='specialist_purchase_order'
+                WHERE sku IN ({','.join('?' for _ in aquatic_skus)}) AND supplier_route='specialist_uniform'""",
+            aquatic_skus,
+        )
         for provider in ("xero", "shopify", "printify", "vistaprint", "weather", "email", "sms", "web_push", "pool_sensor"):
             db.execute("INSERT OR IGNORE INTO integration_connections(provider,status,metadata,updated_at) VALUES(?,?,?,?)", (provider, "not_connected", "{}", created))
         site_defaults = {
@@ -411,6 +559,22 @@ def initialise_database() -> None:
             "primary_cta": "Find the right lesson",
         }
         db.executemany("INSERT OR IGNORE INTO site_settings(key,value,updated_at) VALUES(?,?,?)", [(key, value, created) for key, value in site_defaults.items()])
+        achievement_templates = [
+            ("first-splash", "First Splash", "Celebrating a brave, positive start and a swimmer's first confident steps with HV Swim.", "sunrise-ripple", "wave", 10, created),
+            ("water-confidence", "Water Confidence", "Recognising calm, growing confidence and a positive connection with the water.", "calm-current", "spark", 20, created),
+            ("bubble-breathing", "Bubble Breathing", "Awarded for controlled breathing, steady bubbles and relaxed face-in-the-water practice.", "bubble-trail", "bubbles", 30, created),
+            ("floating-star", "Floating Star", "Celebrating a balanced, relaxed float with safe body position and growing independence.", "star-float", "star", 40, created),
+            ("kicking-champion", "Kicking Champion", "Recognising strong, consistent kicking and determined lesson effort.", "golden-kick", "bolt", 50, created),
+            ("stroke-builder", "Stroke Builder", "Awarded for bringing body position, breathing and technique together into a stronger stroke.", "lane-progress", "lanes", 60, created),
+            ("water-safety-hero", "Water Safety Hero", "Recognising thoughtful water-safety choices, listening and safe pool behaviour.", "safety-shield", "shield", 70, created),
+            ("personal-best", "Personal Best", "Celebrating individual progress, persistence and a result the swimmer can be proud of.", "personal-best", "ribbon", 80, created),
+        ]
+        db.executemany(
+            """INSERT OR IGNORE INTO achievement_templates
+               (code,title,description,certificate_style,badge_symbol,sort_order,created_at)
+               VALUES(?,?,?,?,?,?,?)""",
+            achievement_templates,
+        )
         # Verified business venues are operational configuration, not demo people/data.
         # Seed them idempotently before any early return so a fresh production account can
         # immediately use pool, roster and class workflows.

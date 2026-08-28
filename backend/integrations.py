@@ -117,7 +117,11 @@ async def printify_products() -> list[dict[str, Any]]:
     async with httpx.AsyncClient(timeout=20) as client:
         response = await client.get(
             f"{PRINTIFY_API}/shops/{settings.printify_shop_id}/products.json",
-            headers={"Authorization": f"Bearer {settings.printify_api_token}", "Accept": "application/json"},
+            headers={
+                "Authorization": f"Bearer {settings.printify_api_token}",
+                "Accept": "application/json",
+                "User-Agent": "HV-Swim-Bendigo/5.5",
+            },
         )
         response.raise_for_status()
         payload = response.json()

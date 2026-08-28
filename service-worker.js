@@ -1,9 +1,9 @@
-const CACHE = 'hv-swim-v5-shell-32';
-const PUBLIC_DATA_CACHE = 'hv-swim-v5-public-data-2';
+const CACHE = 'hv-swim-v55-shell-1';
+const PUBLIC_DATA_CACHE = 'hv-swim-v55-public-data-1';
 const SHELL = [
   './', './index.html', './about.html', './programs.html', './app.html', './mobile-shell.html', './login.html', './platform.html', './enquire.html', './locations.html', './shop.html', './customer.html', './staff.html', './admin.html', './offline.html',
-  './assets/styles.css?v=5.4.2', './assets/app.js?v=5.4.2', './assets/icons.svg', './assets/hv-swim-logo-v3.png', './assets/hv-swim-mark-v3.png', './assets/fonts/manrope-latin-variable.woff2', './assets/hero-swimmer.jpg', './assets/hero-programs-v4.jpg', './assets/hero-enquire-v4.jpg', './assets/hero-about-v4-female.jpg', './assets/og-share-v3.jpg', './assets/merch-collection-v2.jpg', './assets/merch-uniform-studio-v3.jpg',
-  './assets/platform.css?v=5.4.2', './assets/platform.js?v=5.4.2', './assets/public-api.js?v=5.4.2', './assets/programs.js?v=5.4.2', './assets/shop.js?v=5.4.2', './assets/enquire.js?v=5.4.2', './assets/mobile-shell.css?v=5.4.2', './assets/mobile-shell.js?v=5.4.2',
+  './assets/styles.css?v=5.5.0', './assets/app.js?v=5.5.0', './assets/support.css?v=5.5.0', './assets/support.js?v=5.5.0', './assets/icons.svg', './assets/hv-swim-logo-v3.png', './assets/hv-swim-logo.png', './assets/hv-swim-mark-v3.png', './assets/fonts/manrope-latin-variable.woff2', './assets/hero-swimmer.jpg', './assets/hero-programs-v4.jpg', './assets/hero-enquire-v4.jpg', './assets/hero-about-v4-female.jpg', './assets/og-share-v3.jpg', './assets/merch-collection-v2.jpg', './assets/merch-uniform-studio-v3.jpg', './assets/merch-kids-premium-v55.jpg', './assets/merch-staff-premium-v55.jpg',
+  './assets/platform.css?v=5.5.0', './assets/platform.js?v=5.5.0', './assets/public-api.js?v=5.5.0', './assets/programs.js?v=5.5.0', './assets/shop-v55.css?v=5.5.0', './assets/shop.js?v=5.5.0', './assets/enquire.js?v=5.5.0', './assets/mobile-shell.css?v=5.5.0', './assets/mobile-shell.js?v=5.5.0',
   './assets/app-icon-v3-64.png', './assets/app-icon-v3-180.png', './assets/app-icon-v3-192.png', './assets/app-icon-v3-512.png', './assets/app-icon-v3-1024.png', './assets/app-icon-v3-maskable-192.png', './assets/app-icon-v3-maskable-512.png', './manifest.webmanifest'
 ];
 
@@ -12,6 +12,19 @@ self.addEventListener('install', event => {
 });
 self.addEventListener('activate', event => {
   event.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(key => ![CACHE,PUBLIC_DATA_CACHE].includes(key)).map(key => caches.delete(key)))).then(() => self.clients.claim()));
+});
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  const relativeUrl = event.notification.data?.url || 'locations.html';
+  const requestedDestination = new URL(relativeUrl, self.registration.scope);
+  const safeFallback = new URL('locations.html', self.registration.scope);
+  const destination = requestedDestination.origin === self.location.origin ? requestedDestination.href : safeFallback.href;
+  event.waitUntil((async () => {
+    const windows = await self.clients.matchAll({ type:'window', includeUncontrolled:true });
+    const existing = windows.find(client => new URL(client.url).origin === new URL(destination).origin);
+    if (existing) { await existing.focus(); if ('navigate' in existing) await existing.navigate(destination); return; }
+    await self.clients.openWindow(destination);
+  })());
 });
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;

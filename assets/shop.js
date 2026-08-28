@@ -7,6 +7,7 @@
   let products = [];
   let activeFilter = 'all';
   let searchTerm = '';
+  let sortOrder = 'featured';
   let catalogueSource = 'planned_catalogue';
   let cart = loadCart();
   let cartOpener = null;
@@ -14,19 +15,31 @@
 
   const PRODUCT_DETAILS = {
     'HV-SWIMWEAR': {material:'Chlorine-resistant performance fabric — final blend pending sample',care:'Cool fresh-water rinse after every swim; shade dry',personalisation:'HV Swim identity only; optional name placement under review'},
+    'HV-RASHIE': {material:'UPF-rated, chlorine-suitable stretch fabric — final specification pending sample',care:'Rinse in cool fresh water after use; shade dry; avoid bleach and softener',personalisation:'HV Swim chest and back placement pending stretch, UV and chlorine testing'},
+    'HV-SWIM-SHORTS': {material:'Quick-dry chlorine-suitable swim fabric with secure waist',care:'Fresh-water rinse after every lesson; shade dry',personalisation:'Small HV Swim placement pending movement and rub testing'},
     'HV-TOWEL': {material:'Soft, absorbent pool towel — weight and embroidery pending sample',care:'Cold machine wash; avoid fabric softener for best absorbency',personalisation:'Embroidered HV Swim mark; individual name option under review'},
+    'HV-HOODED-TOWEL': {material:'Absorbent kids hooded towel or change-towel construction — final size pending sample',care:'Cold machine wash; line dry; avoid fabric softener',personalisation:'Embroidered HV Swim identity with optional first-name placement under review'},
     'HV-BOTTLE': {material:'Insulated or BPA-free bottle specification to be confirmed',care:'Hand wash lid and seals; bottle care follows final supplier specification',personalisation:'Name field planned after dishwasher and rub testing'},
+    'HV-INSULATED-TUMBLER': {material:'Food-contact suitable insulated adult tumbler with secure lid — specification pending sample',care:'Follow final supplier instructions; wash lid components thoroughly',personalisation:'Premium HV Swim decoration pending heat, rub and wash testing'},
+    'HV-JUNIOR-WARM-CUP': {material:'Junior spill-resistant cup from a food-contact suitable supplier — lid and temperature testing required',care:'Adult to clean and inspect the lid and seal after every use',personalisation:'HV Swim identity and name option pending sample; for parent-supervised warm, never hot, drinks only'},
     'HV-GOGGLES': {material:'Soft-seal training goggles from an approved swim supplier',care:'Rinse after use; air dry away from direct sun; do not rub lenses',personalisation:'No custom print planned; HV Swim packaging option under review'},
+    'HV-TRAINING-MITTS': {material:'Flexible silicone or rubber aquatic training mitts from a specialist swim supplier',care:'Rinse thoroughly, dry open and inspect before each use',personalisation:'No decoration planned; coached use and product-safety review required'},
     'HV-BAG': {material:'Ventilated, quick-dry wet-gear construction',care:'Empty after lessons; wipe clean and air dry fully',personalisation:'Name panel and HV Swim mark planned'},
     'HV-CAP': {material:'Specialist silicone swim cap',care:'Rinse, pat dry and store flat away from sharp items',personalisation:'Durable team print pending stretch and chlorine testing'},
+    'HV-KIDS-SUN-HAT': {material:'Lightweight quick-dry sun hat — coverage and UPF claim subject to supplier evidence',care:'Hand wash, reshape and shade dry',personalisation:'Embroidered HV Swim identity pending sample'},
     'HV-STAFF-POLO': {material:'Breathable performance knit with embroidered identity',care:'Cold gentle wash; wash inside-out; shade dry',personalisation:'Role or staff name embroidery can be added after uniform approval'},
+    'HV-STAFF-TEE': {material:'Quick-dry performance tee — fabric weight and decoration pending sample',care:'Cold wash inside-out; shade dry',personalisation:'HV Swim front and optional team-role placement'},
+    'HV-STAFF-SHORTS': {material:'Lightweight performance shorts with practical secure pockets',care:'Cold gentle wash; shade dry',personalisation:'Subtle HV Swim leg placement pending wear test'},
     'HV-TEAM-HOODIE': {material:'Mid-weight brushed fleece — final composition pending POD sample',care:'Cold wash inside-out; shade dry; do not iron decoration',personalisation:'HV Swim decoration included; individual names optional'},
+    'HV-STAFF-PUFFER-VEST': {material:'Insulated, water-resistant vest — supplier specification and warmth rating pending',care:'Follow final outerwear supplier label; close zips before washing',personalisation:'Embroidered HV Swim chest mark pending sample'},
+    'HV-STAFF-PUFFER-JACKET': {material:'Insulated, water-resistant team jacket — final construction pending quote and sample',care:'Follow final supplier care label; dry fully before storage',personalisation:'Embroidered HV Swim chest mark and optional role placement'},
+    'HV-STAFF-TRACKPANTS': {material:'Comfort-stretch team track pant with secure pockets',care:'Cold wash inside-out; shade dry',personalisation:'Subtle HV Swim leg mark pending sample'},
     'HV-INSTRUCTOR-CAP': {material:'Lightweight adjustable performance cap',care:'Hand wash and reshape while damp',personalisation:'Embroidered HV Swim identity; instructor label under review'}
   };
   const KITS = {
-    'first-splash': ['HV-GOGGLES','HV-CAP','HV-TOWEL','HV-BOTTLE'],
-    'lesson-day': ['HV-SWIMWEAR','HV-GOGGLES','HV-TOWEL','HV-BAG','HV-BOTTLE'],
-    'pool-deck': ['HV-STAFF-POLO','HV-TEAM-HOODIE','HV-INSTRUCTOR-CAP','HV-BOTTLE']
+    'first-splash': ['HV-GOGGLES','HV-CAP','HV-HOODED-TOWEL','HV-BOTTLE'],
+    'lesson-day': ['HV-RASHIE','HV-SWIM-SHORTS','HV-GOGGLES','HV-CAP','HV-TRAINING-MITTS','HV-HOODED-TOWEL','HV-BAG','HV-BOTTLE'],
+    'pool-deck': ['HV-STAFF-POLO','HV-STAFF-SHORTS','HV-TEAM-HOODIE','HV-STAFF-TRACKPANTS','HV-STAFF-PUFFER-VEST','HV-INSTRUCTOR-CAP']
   };
 
   const esc = value => String(value ?? '').replace(/[&<>'"]/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]));
@@ -40,13 +53,13 @@
   });
   const categoryFor = product => {
     const value = `${product.productType || ''} ${product.title || ''}`.toLowerCase();
-    if (/swimwear|swimsuit|rash/.test(value)) return 'Swimwear';
-    if (/uniform|polo|hoodie|staff/.test(value)) return 'Uniforms';
+    if (/swimwear|swimsuit|rash|swim shorts/.test(value)) return 'Swimwear';
+    if (/uniform|polo|hoodie|staff|instructor|puffer|track ?pants/.test(value)) return 'Uniforms';
     if (/towel/.test(value)) return 'Towels';
-    if (/bottle|drink/.test(value)) return 'Bottles';
+    if (/bottle|drink|cup|tumbler/.test(value)) return 'Drinkware';
     if (/bag/.test(value)) return 'Bags';
     if (/cap|hat/.test(value)) return 'Caps';
-    if (/goggle|equipment/.test(value)) return 'Equipment';
+    if (/goggle|mitt|paddle|equipment/.test(value)) return 'Equipment';
     return product.productType || 'Other';
   };
   const sizeList = product => {
@@ -66,8 +79,38 @@
     }
     return product;
   };
+  const productText = product => `${product.sku || ''} ${product.title || ''} ${product.description || ''} ${product.category || ''}`.toLowerCase();
+  const audienceFor = product => {
+    const value = productText(product);
+    if (product.category === 'Uniforms' || /staff|instructor|puffer|track ?pants/.test(value)) return 'Staff';
+    if (/junior|kids|rash|swimwear|swim shorts|goggle|training mitt|swim cap/.test(value)) return 'Kids + youth';
+    return 'Family';
+  };
+  const supplierFor = product => {
+    const route = String(product.supplier_route || '').toLowerCase();
+    if (route.includes('printify')) return {label:'Printify eligible',className:'pod'};
+    if (route.includes('vistaprint')) return {label:'Manual bulk route',className:'bulk'};
+    if (route.includes('manual')) return {label:'Manual supplier review',className:'bulk'};
+    if (route.includes('specialist')) return {label:'Swim specialist',className:'specialist'};
+    if (catalogueSource === 'shopify') return {label:'Shopify catalogue',className:'live'};
+    return {label:'Supplier review',className:'review'};
+  };
+  const matchesFilter = (product,filter) => {
+    if (filter === 'all') return true;
+    const value = productText(product);
+    const category = String(product.category || '').toLowerCase();
+    if (filter === 'kids') return audienceFor(product) === 'Kids + youth';
+    if (filter === 'staff' || filter === 'uniforms') return audienceFor(product) === 'Staff';
+    if (filter === 'swimwear') return category === 'swimwear' || /rash|swimwear|swim shorts/.test(value);
+    if (filter === 'towels') return category === 'towels' || /towel/.test(value);
+    if (filter === 'essentials') return ['bottles','drinkware','bags'].includes(category) || /bottle|cup|tumbler|bag|towel|sun hat/.test(value);
+    if (filter === 'equipment') return ['caps','equipment'].includes(category) || /goggle|mitt|cap|hat/.test(value);
+    if (filter === 'outerwear') return /hoodie|puffer|jacket|vest|track ?pants/.test(value);
+    return category === filter.toLowerCase();
+  };
   const visualClass = product => `product-${slug(product.sku || product.title)} ${['Uniforms'].includes(product.category)?'uniform-studio-crop':''}`;
-  const visual = product => product.image ? `<img src="${esc(product.image)}" alt="${esc(product.title)}" loading="lazy" decoding="async">` : `<div class="shop-product-crop ${visualClass(product)}" role="img" aria-label="${esc(product.title)} concept"></div>`;
+  const visual = product => product.image ? `<img src="${esc(product.image)}" alt="${esc(product.title)}" loading="lazy" decoding="async">` : `<div class="shop-product-crop ${visualClass(product)}" role="img" aria-label="${esc(product.title)} concept"><span class="shop-product-monogram" aria-hidden="true">${esc(product.emoji || 'HV')}</span></div>`;
+  const priceMarkup = (product,live=false) => Number(product.price_cents) > 0 ? `<strong>${money(product.price_cents)}</strong><small>${live?'Current price':'Indicative price'}</small>` : '<strong>Price pending</strong><small>Supplier quote required</small>';
   const cartKey = (id,size) => `${id}::${size || 'Standard'}`;
 
   function loadCart() {
@@ -81,11 +124,11 @@
     renderCart();
   }
   function visibleProducts() {
-    return products.filter(product => {
-      const categoryMatch = activeFilter === 'all' || product.category === activeFilter || (activeFilter === 'Caps' && ['Caps','Equipment'].includes(product.category));
-      const searchMatch = !searchTerm || `${product.title} ${product.description} ${product.category}`.toLowerCase().includes(searchTerm);
-      return categoryMatch && searchMatch;
-    });
+    const filtered = products.filter(product => matchesFilter(product,activeFilter) && (!searchTerm || productText(product).includes(searchTerm)));
+    if (sortOrder === 'name') return filtered.sort((a,b)=>String(a.title).localeCompare(String(b.title)));
+    if (sortOrder === 'price-low') return filtered.sort((a,b)=>Number(a.price_cents||0)-Number(b.price_cents||0));
+    if (sortOrder === 'price-high') return filtered.sort((a,b)=>Number(b.price_cents||0)-Number(a.price_cents||0));
+    return filtered;
   }
   function render() {
     const visible = visibleProducts();
@@ -94,9 +137,10 @@
       const sizes = sizeList(product);
       const chooseVariant = catalogueSource === 'shopify';
       const available = product.status === 'available';
-      const badge = available ? 'Available' : (chooseVariant ? 'Currently unavailable' : 'Collection concept');
+      const supplier = supplierFor(product);
+      const badge = available ? 'Available' : (chooseVariant ? 'Currently unavailable' : (product.sample_status === 'approved' ? 'Sample approved' : 'Collection concept'));
       const addLabel = chooseVariant ? (available ? 'Choose option' : 'Unavailable') : 'Save';
-      return `<article class="shop-card reveal visible" style="--reveal-delay:${Math.min(index*55,220)}ms"><button class="shop-product-visual" type="button" data-product-view="${esc(product.id)}" aria-label="View ${esc(product.title)}">${visual(product)}<span class="shop-product-badge">${badge}</span><span class="shop-quick-view">Quick view</span></button><div class="shop-card-copy"><div class="shop-card-heading"><span class="shop-category">${esc(product.category)}</span><span>${sizes.length?`${sizes.length} ${sizes.length===1?'option':'options'}`:'Sizing pending'}</span></div><h3>${esc(product.title)}</h3><p>${esc(product.description)}</p><div class="shop-sizes">${sizes.slice(0,4).map(size=>`<span>${esc(size)}</span>`).join('')||'<span>Final sizing pending</span>'}${sizes.length>4?`<span>+${sizes.length-4}</span>`:''}</div><div class="shop-card-foot"><div><strong>${money(product.price_cents)}</strong><small>${chooseVariant?'Current price':'Indicative price'}</small></div><button type="button" class="shop-add-button" data-product-add="${esc(product.id)}" ${chooseVariant&&!available?'disabled':''}>${addLabel} <span aria-hidden="true">${chooseVariant?'→':'+'}</span></button></div></div></article>`;
+      return `<article class="shop-card reveal visible" data-audience="${slug(audienceFor(product))}" style="--reveal-delay:${Math.min(index*45,180)}ms"><button class="shop-product-visual" type="button" data-product-view="${esc(product.id)}" aria-label="View ${esc(product.title)}">${visual(product)}<span class="shop-product-badge">${badge}</span><span class="shop-quick-view">View details <span aria-hidden="true">→</span></span></button><div class="shop-card-copy"><div class="shop-card-heading"><span class="shop-category">${esc(product.category)}</span><span>${esc(audienceFor(product))}</span></div><h3>${esc(product.title)}</h3><p>${esc(product.description)}</p><div class="shop-production-route ${supplier.className}"><span aria-hidden="true"></span>${esc(supplier.label)}</div><div class="shop-sizes">${sizes.slice(0,4).map(size=>`<span>${esc(size)}</span>`).join('')||'<span>Final sizing pending</span>'}${sizes.length>4?`<span>+${sizes.length-4}</span>`:''}</div><div class="shop-card-foot"><div>${priceMarkup(product,chooseVariant)}</div><button type="button" class="shop-add-button" data-product-add="${esc(product.id)}" ${chooseVariant&&!available?'disabled':''}>${addLabel} <span aria-hidden="true">${chooseVariant?'→':'+'}</span></button></div></div></article>`;
     }).join('') || '<div class="empty-state"><strong>Nothing matches that search.</strong><p>Try a different category, or clear the search to see the whole collection.</p><button type="button" class="btn btn-outline btn-small" data-clear-search>Show everything</button></div>';
   }
 
@@ -127,7 +171,8 @@
       document.getElementById('collection')?.scrollIntoView({behavior:'smooth',block:'start'});
       return;
     }
-    const kitProducts=(KITS[kitId]||[]).map(sku=>products.find(product=>product.sku===sku)).filter(Boolean);
+    const fallbackSkus = {'HV-HOODED-TOWEL':'HV-TOWEL','HV-RASHIE':'HV-SWIMWEAR','HV-SWIM-SHORTS':'HV-SWIMWEAR'};
+    const kitProducts=(KITS[kitId]||[]).map(sku=>products.find(product=>product.sku===sku)||products.find(product=>product.sku===fallbackSkus[sku])).filter((product,index,list)=>product&&list.findIndex(item=>item.id===product.id)===index);
     if (!kitProducts.length) return;
     kitProducts.forEach(product=>{
       const selectedSize=sizeList(product)[0]||'Standard';
@@ -200,36 +245,40 @@
     const dialog=document.getElementById('product-dialog');
     productOpener=opener instanceof HTMLElement?opener:null;
     const live=catalogueSource==='shopify';
+    const supplier=supplierFor(product);
     const available=!live||(product.variants||[]).some(variant=>variant.availableForSale);
     const options=live
       ? `<option value="">Choose an option</option>${(product.variants||[]).map(variant=>`<option value="${esc(variant.id)}" ${variant.availableForSale?'':'disabled'}>${esc(variant.title==='Default Title'?'Standard':variant.title)}${variant.availableForSale?'':' — unavailable'}</option>`).join('')}`
       : (sizes.length?sizes:['Standard']).map(size=>`<option value="${esc(size)}">${esc(size)}</option>`).join('');
-    document.getElementById('product-dialog-content').innerHTML=`<div class="dialog-product-visual">${visual(product)}<span class="dialog-concept-label">HV Swim Collection</span></div><div class="dialog-product-copy"><span class="shop-category">${esc(product.category)}</span><h2 id="product-dialog-title">${esc(product.title)}</h2><strong class="dialog-price">${money(product.price_cents)}</strong><p>${esc(product.description)}</p><dl class="product-specs"><div><dt>Material direction</dt><dd>${esc(detail.material)}</dd></div><div><dt>Care</dt><dd>${esc(detail.care)}</dd></div><div><dt>Personalisation</dt><dd>${esc(detail.personalisation)}</dd></div></dl><div class="product-dialog-options"><div class="product-option"><label for="dialog-size">${live?'Select option':'Preferred option'}</label><select id="dialog-size" required>${options}</select></div><div class="product-option"><label for="dialog-quantity">Quantity</label><select id="dialog-quantity">${[1,2,3,4,5].map(value=>`<option value="${value}">${value}</option>`).join('')}</select></div></div><p class="wizard-error" id="dialog-option-error" role="alert" hidden>Please choose an available option.</p><div class="info-note"><strong>${live?'Live catalogue':'Collection availability'}:</strong> ${live?(available?'Availability and options come from Shopify. Sign in is required before secure checkout.':'This product is currently unavailable in Shopify. You can still review its details and check again later.'):'No stock is reserved and no payment is taken while final samples and suppliers are approved.'}</div><button class="btn btn-primary" type="button" data-dialog-add="${esc(product.id)}" ${available?'':'disabled'}>${live?(available?'Add selected option':'Currently unavailable'):'Save to collection list'}</button></div>`;
+    const dialogPrice=Number(product.price_cents)>0?money(product.price_cents):'Price pending';
+    document.getElementById('product-dialog-content').innerHTML=`<div class="dialog-product-visual">${visual(product)}<span class="dialog-concept-label">HV Swim Collection</span></div><div class="dialog-product-copy"><div class="dialog-product-meta"><span class="shop-category">${esc(product.category)}</span><span>${esc(audienceFor(product))}</span></div><h2 id="product-dialog-title">${esc(product.title)}</h2><strong class="dialog-price">${dialogPrice}</strong><p>${esc(product.description)}</p><div class="shop-production-route ${supplier.className}"><span aria-hidden="true"></span>${esc(supplier.label)} · ${live?'catalogue connected':'not yet live'}</div><dl class="product-specs"><div><dt>Material direction</dt><dd>${esc(detail.material)}</dd></div><div><dt>Care</dt><dd>${esc(detail.care)}</dd></div><div><dt>Personalisation</dt><dd>${esc(detail.personalisation)}</dd></div></dl><div class="product-dialog-options"><div class="product-option"><label for="dialog-size">${live?'Select option':'Preferred option'}</label><select id="dialog-size" required>${options}</select></div><div class="product-option"><label for="dialog-quantity">Quantity</label><select id="dialog-quantity">${[1,2,3,4,5].map(value=>`<option value="${value}">${value}</option>`).join('')}</select></div></div><p class="wizard-error" id="dialog-option-error" role="alert" hidden>Please choose an available option.</p><div class="info-note"><strong>${live?'Live catalogue':'Collection availability'}:</strong> ${live?(available?'Availability and options come from Shopify. Sign in is required before secure checkout.':'This product is currently unavailable in Shopify. You can still review its details and check again later.'):'No stock is reserved and no payment is taken while final samples and suppliers are approved.'}</div><button class="btn btn-primary" type="button" data-dialog-add="${esc(product.id)}" ${available?'':'disabled'}>${live?(available?'Add selected option':'Currently unavailable'):'Save to collection list'}</button></div>`;
     dialog.showModal();
   }
 
-  document.querySelectorAll('[data-shop-filter]').forEach(button=>button.addEventListener('click',()=>{
-    activeFilter=button.dataset.shopFilter;
+  function setActiveFilter(filter,scroll=false) {
+    activeFilter=filter;
     document.querySelectorAll('[data-shop-filter]').forEach(item=>{
-      const selected=item===button;
+      const selected=item.dataset.shopFilter===filter;
       item.classList.toggle('active',selected);
       item.setAttribute('aria-pressed',String(selected));
     });
     render();
+    if(scroll)document.getElementById('collection')?.scrollIntoView({behavior:'smooth',block:'start'});
+  }
+  document.querySelectorAll('[data-shop-filter]').forEach(button=>button.addEventListener('click',()=>setActiveFilter(button.dataset.shopFilter)));
+  document.querySelectorAll('[data-collection-filter]').forEach(button=>button.addEventListener('click',event=>{
+    if(button.matches('a'))event.preventDefault();
+    setActiveFilter(button.dataset.collectionFilter,true);
   }));
   document.getElementById('kit-grid')?.addEventListener('click',event=>{const button=event.target.closest('[data-kit-add]');if(button)addKit(button.dataset.kitAdd);});
   document.getElementById('shop-search')?.addEventListener('input',event=>{searchTerm=event.target.value.trim().toLowerCase();render();});
+  document.getElementById('shop-sort')?.addEventListener('change',event=>{sortOrder=event.target.value;render();});
   // "Show everything" in the empty state clears both the search and the category filter.
   grid.addEventListener('click',event=>{
     if(!event.target.closest('[data-clear-search]'))return;
-    searchTerm='';activeFilter='all';
+    searchTerm='';
     const input=document.getElementById('shop-search');if(input)input.value='';
-    document.querySelectorAll('[data-shop-filter]').forEach(item=>{
-      const selected=item.dataset.shopFilter==='all';
-      item.classList.toggle('active',selected);
-      item.setAttribute('aria-pressed',String(selected));
-    });
-    render();
+    setActiveFilter('all');
   });
   grid.addEventListener('click',event=>{
     const view=event.target.closest('[data-product-view]');
@@ -303,7 +352,9 @@
     catalogueSource=payload.source;
     products=(payload.products||[]).map(product=>normalise(product,payload.source));
     const live=payload.source==='shopify';
-    document.getElementById('shop-source').innerHTML=`<span class="status ${live?'open':'changed'}">${live?'Live Shopify catalogue':'Nine-product collection plan'}</span>`;
+    const catalogueCount=products.length;
+    const sourceLabel=live?'Live Shopify catalogue':`${catalogueCount}-product collection plan`;
+    document.getElementById('shop-source').innerHTML=`<span class="status ${live?'open':'changed'}">${sourceLabel}</span>`;
     document.getElementById('cart-mode-status').className=`status ${live?'open':'changed'}`;
     document.getElementById('cart-mode-status').textContent=live?'Shopify catalogue connected':'Collection in development';
     document.getElementById('cart-mode-copy').textContent=live?'Connected products are visible. Sign in before secure checkout.':'Your choices save on this device. No stock is reserved and no payment is taken.';

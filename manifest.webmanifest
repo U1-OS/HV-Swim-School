@@ -1,7 +1,7 @@
 {
   "name": "HV Swim Bendigo",
   "short_name": "HV Swim",
-  "description": "HV Swim Bendigo lessons, bookings, rosters, pool checks and management operations.",
+  "description": "HV Swim Bendigo lessons, bookings, pool updates, family messages, achievements, rosters and management operations.",
   "id": "./",
   "start_url": "app.html?source=pwa",
   "scope": "./",

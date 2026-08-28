@@ -1,4 +1,36 @@
-# V5.4 image asset provenance
+# V5.5 image asset provenance
+
+The V5.5 premium merchandise campaign concepts were created with OpenAI's built-in
+image generation tool on 29 August 2026 using the approved HV Swim digital logo and the
+existing V5.3 collection photography as visual references. They are concept mock-ups,
+not photographs of manufactured stock. Exact garment, decoration, material and supplier
+claims remain subject to authorised artwork, physical samples and production approval.
+
+## Premium children's collection
+
+- Web asset: `assets/merch-kids-premium-v55.jpg`
+- Editable master: `assets/merch-kids-premium-v55-master.png`
+- Original generation: `/Users/u1/.codex/generated_images/01a03d6d-b161-7e42-bc4f-0b493735cc0a/exec-6265dc86-ac87-4a44-986f-378829860569.png`
+
+Exact prompt:
+
+```text
+Use case: premium ecommerce campaign concept image for an Australian swim school merchandise collection. Create a NEW photorealistic 3:2 landscape studio flat-lay / stepped plinth arrangement, visually matching the refined navy, aqua, royal blue and warm gold lighting of reference image 2. Show a complete children’s lesson-day range: navy-and-aqua long-sleeve rash vest, matching swim shorts, navy hooded towel with generous hood, regular pool towel, silicone swim cap, junior goggles, ventilated swim backpack, insulated drink bottle, sun cap, and a pair of soft silicone webbed swim training mitts. Use the exact HV Swim Bendigo logo artwork from reference image 1 as small, realistic screen-print or embroidery placements on selected suitable items only (rash vest chest, shorts leg, towels, bag, bottle, cap). Keep every product physically plausible, clean and premium, with accurate materials and no people. Do not add any other brand, badge, supplier logo, invented lettering, product labels, price text, floating typography, or watermark. Make the product range feel cohesive and production-ready while remaining clearly a concept mock-up. Strong premium catalogue lighting, clean negative space, sharp commercial product photography, no clutter.
+```
+
+## Premium staff uniform capsule
+
+- Web asset: `assets/merch-staff-premium-v55.jpg`
+- Editable master: `assets/merch-staff-premium-v55-master.png`
+- Original generation: `/Users/u1/.codex/generated_images/01a03d6d-b161-7e42-bc4f-0b493735cc0a/exec-31d38d71-41de-45bb-851d-cbcb17072163.png`
+
+Exact prompt:
+
+```text
+Use case: premium ecommerce campaign concept image for a professional Australian swim school staff uniform range. Create a NEW photorealistic 3:2 landscape studio catalogue scene, matching the navy, aqua, royal blue and warm gold pool-light aesthetic of reference image 2. Display the complete HV Swim staff capsule on elegant matte-black ghost mannequins and stepped plinths: navy performance polo/shirt, navy training shorts, zip hoodie, lightweight puffer vest, weatherproof puffer jacket, tapered tracksuit pants, embroidered instructor cap, and insulated staff bottle. Use the exact HV Swim Bendigo logo artwork from reference image 1 as small, realistic embroidered or transfer placements on suitable chest/leg/cap/bottle areas. Make the apparel cuts practical, modest, contemporary and gender-inclusive, suitable for an Australian pool deck in warm and cold seasons. No visible people or faces. Do not add any other brand, association badge, supplier logo, invented lettering, prices, captions, floating typography or watermark. Sharp commercial product photography, controlled highlights, premium fabric detail, clean negative space, cohesive production-ready concept presentation.
+```
+
+## V5.4 public campaign photography
 
 The V5.4 program, enquiry and about-page hero photographs were created with OpenAI's built-in image generation tool in `photorealistic-natural` mode on 29 August 2026. They are generic campaign imagery: they do not depict Laura, HV Swim staff or HV Swim customers.
 
