@@ -58,7 +58,13 @@
       const open=(payload.classes||[]).filter(item=>Number(item.available)>0).slice(0,6);
       availability.innerHTML=open.map((item,index)=>{const query=new URLSearchParams({program:item.title,class:`${days[item.weekday]} ${item.start_time} at ${item.location_name}`});return `<article class="availability-card reveal visible" style="--reveal-delay:${Math.min(index*60,240)}ms"><span class="class-day">${esc(days[item.weekday])} · ${esc(item.start_time)}</span><h3>${esc(item.title)}</h3><p>${esc(item.level)} · ${esc(item.duration_minutes)} minutes<br>${esc(item.location_name)}</p><div class="availability-card-foot"><div><strong>${item.available} ${item.available===1?'place':'places'} showing</strong><span>${new Intl.NumberFormat('en-AU',{style:'currency',currency:'AUD'}).format(Number(item.price||0))} per lesson · preview</span></div><a class="text-link" href="enquire.html?${query}">Enquire</a></div></article>`;}).join('')||'<div class="empty-state">No open classes are showing. Enquire and the team can discuss the best option.</div>';
       document.getElementById('availability-source').textContent='Connected to the local class database. Places and prices remain preview data until HV Swim imports the approved live timetable.';
-    }).catch(()=>{availability.innerHTML='<div class="empty-state">Class availability is temporarily unavailable. Please use the lesson finder to contact the team.</div>';});
+    }).catch(()=>{
+      availability.innerHTML='<div class="empty-state"><strong>Class times are not loading right now.</strong><p>This is a temporary problem on our side, not a sign that classes are full. Tell us what you are after and we will come back to you with what is open.</p><a class="btn btn-blue btn-small" href="enquire.html">Find a lesson <span aria-hidden="true">&rarr;</span></a></div>';
+      const badge=document.getElementById('availability-connection');
+      if(badge){badge.textContent='Timetable unavailable';badge.classList.remove('open');badge.classList.add('changed');}
+      const note=document.getElementById('availability-connection-note');
+      if(note){note.textContent='We could not reach the class database. Please use the lesson finder or call the team.';}
+    });
   }
 
   const todayGrid=document.getElementById('today-grid');

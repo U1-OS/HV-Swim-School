@@ -50,6 +50,17 @@ preview prices.
 - First accessibility pass — see item 3 under Next up for what was fixed and what remains.
 - Wrote `tests/test_security.py` (verified passing) and `tests/test_api.py` (unrun — see
   the Tests section above). Before this there were 54 endpoints and no automated tests.
+- Rendered the site in a real browser for the first time (Chromium, desktop and mobile) and
+  fixed what that exposed: `.empty-state` had no CSS at all, so every empty or failed state
+  rendered as bare unstyled text; the homepage kept showing a green "Timetable connected"
+  badge even when the class fetch had failed; the failure message gave a parent no way
+  forward. Also made the reveal observer robust at any element height (`threshold:.11`
+  cannot be met by a section taller than the viewport) and added a CSS failsafe so revealed
+  content appears even if JS never runs.
+  **Note for whoever is next:** I first reported that half the page sections never became
+  visible. That was wrong — my measurement was counting elements deliberately hidden at that
+  breakpoint. Re-measured against the original code and it was fine. Do not go looking for
+  that bug.
 - Security review of `backend/`. The code is in good shape — SQL is parameterised
   throughout, CSV formula injection was already guarded, exports are role-gated, ownership
   checks are consistent, PBKDF2 is 210k iterations with a constant-time compare, and the

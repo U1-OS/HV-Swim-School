@@ -88,7 +88,7 @@
   updateHeader(); window.addEventListener('scroll', updateHeader, { passive:true });
   const observer = 'IntersectionObserver' in window ? new IntersectionObserver(entries => entries.forEach(entry => {
     if (entry.isIntersecting) { entry.target.classList.add('visible'); observer.unobserve(entry.target); }
-  }), { threshold:.11 }) : null;
+  }), { threshold:0, rootMargin:'0px 0px -8% 0px' }) : null;
   document.querySelectorAll('.reveal').forEach(el => observer ? observer.observe(el) : el.classList.add('visible'));
 
   // Pool conditions shared by public, customer, staff, admin and app views.
