@@ -64,6 +64,18 @@ The working copy has been destroyed once by cloning the remote on top of it. If 
 folder already exists, use it. Never clone into it, and never resolve a divergence by
 replacing local work with a fresh clone without checking what is only local first.
 
+## Check before you commit
+
+    node scripts/check-site.mjs
+
+It takes a second and needs nothing installed. Every check in it exists because that exact
+fault was found in this repo: a service-worker precache list that had drifted (one wrong
+entry makes `cache.addAll` reject and the PWA silently stops installing), an asset version
+bumped in the pages but not in the worker, a stylesheet class that was never written, a
+script reaching for elements that no longer existed, and manifest icons that were missing.
+
+If you rename or add an asset, run it. If it fails, fix the cause rather than the check.
+
 ## Commits
 
 Small and focused, one concern each. Present-tense summary line describing the change,

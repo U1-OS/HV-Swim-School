@@ -187,6 +187,14 @@ preview prices.
   manifest actually reference, rewrites `start_url`/`scope` to the shell for the packaged
   app, repoints the offline button, and **fails loudly** if anything referenced is missing —
   so this cannot drift again. Verified by building: every reference inside `www/` resolves.
+- Added `scripts/check-site.mjs` and wired it into `AGENTS.md` as a pre-commit step.
+  Three separate faults today came from the same cause — a hand-maintained list drifting
+  from what the code actually uses — so this checks the lot: every local link resolves,
+  every service-worker precache entry exists and its `?v=` matches the pages, every class
+  used in markup has a rule, no script reaches for an element that exists on no page, and
+  every manifest icon is present. It needs nothing installed and runs in about a second.
+  Verified by deliberately breaking each case in turn and confirming it was caught.
+  Also removed two inert modifier classes it found on the homepage.
 - Security review of `backend/`. The code is in good shape — SQL is parameterised
   throughout, CSV formula injection was already guarded, exports are role-gated, ownership
   checks are consistent, PBKDF2 is 210k iterations with a constant-time compare, and the
