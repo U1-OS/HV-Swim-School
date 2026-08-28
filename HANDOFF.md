@@ -104,6 +104,11 @@ preview prices.
   into the menu on open, returns it to the toggle on close, keeps Tab and Shift+Tab inside
   while open, closes on Escape, and closes itself on resize. Verified in a real browser at
   390px — focus stayed inside across 30 tab presses and shift-tabbing back.
+- Fixed validation feedback on the enquiry wizard. It said "Please complete the highlighted
+  field" while highlighting nothing, and never set `aria-invalid`, so a screen-reader user
+  got no indication which field was wrong. It now names the field from its label
+  ("Please fill in "Swimmer's first name" before continuing"), marks it visibly and via
+  `aria-invalid`, and clears both the moment the parent starts fixing it.
 - Security review of `backend/`. The code is in good shape — SQL is parameterised
   throughout, CSV formula injection was already guarded, exports are role-gated, ownership
   checks are consistent, PBKDF2 is 210k iterations with a constant-time compare, and the

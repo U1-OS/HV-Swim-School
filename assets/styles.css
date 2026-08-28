@@ -697,6 +697,9 @@ p { margin: 0; }
 .consent-check { display:flex; gap:10px; align-items:flex-start; margin-top:17px; color:#475c71; font-size:.63rem; cursor:pointer; }
 .consent-check input { margin-top:3px; accent-color:#0878a8; }
 .wizard-error { min-height:24px; margin-top:13px; color:#a23b47; font-size:.65rem; font-weight:750; }
+/* "Please fill in X" has to actually point at something, so mark the field it means. */
+.field-invalid, input.field-invalid, select.field-invalid, textarea.field-invalid { border-color:#c0414f !important; box-shadow:0 0 0 3px rgba(192,65,79,.14); }
+fieldset.field-invalid { border-radius:13px; outline:2px solid #c0414f; outline-offset:4px; }
 .wizard-actions { display:flex; justify-content:space-between; gap:12px; margin-top:10px; padding-top:20px; border-top:1px solid var(--line); }
 .wizard-actions .btn:last-child { margin-left:auto; }
 .enrolment-success { grid-column:1/-1; max-width:880px; margin:auto; padding:55px; text-align:center; border:1px solid #cae5d6; border-radius:30px; background:white; box-shadow:var(--shadow); }

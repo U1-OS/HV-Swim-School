@@ -21,11 +21,33 @@
   };
 
   function stepElement(step){return document.querySelector(`[data-step="${step}"]`);}
+  function fieldLabel(input){
+    const byFor=input.id&&document.querySelector(`label[for="${input.id}"]`);
+    if(byFor)return byFor.textContent.trim().replace(/\s+/g,' ');
+    const group=input.closest('fieldset');
+    const legend=group&&group.querySelector('legend');
+    return legend?legend.textContent.trim().replace(/\s+/g,' '):'';
+  }
+  function markInvalid(input,invalid){
+    const target=input.type==='radio'?(input.closest('fieldset')||input):input;
+    target.classList.toggle('field-invalid',invalid);
+    input.setAttribute('aria-invalid',invalid?'true':'false');
+    if(invalid&&!input.dataset.revalidateBound){
+      input.dataset.revalidateBound='1';
+      const clear=()=>{ if(input.checkValidity()){markInvalid(input,false);elements.error.textContent='';} };
+      input.addEventListener('input',clear); input.addEventListener('change',clear);
+    }
+  }
   function validateStep(step){
     const section=stepElement(step);
+    section.querySelectorAll('[required]').forEach(input=>markInvalid(input,false));
     for(const input of section.querySelectorAll('[required]')){
       if(!input.checkValidity()){
-        elements.error.textContent=input.type==='radio'?'Choose the option that feels closest before continuing.':'Please complete the highlighted field before continuing.';
+        const name=fieldLabel(input);
+        elements.error.textContent=input.type==='radio'
+          ? (name?`Choose an option for “${name}” before continuing.`:'Choose the option that feels closest before continuing.')
+          : (name?`Please fill in “${name}” before continuing.`:'Please complete the highlighted field before continuing.');
+        markInvalid(input,true);
         input.focus({preventScroll:true});
         input.scrollIntoView({behavior:'smooth',block:'center'});
         return false;
