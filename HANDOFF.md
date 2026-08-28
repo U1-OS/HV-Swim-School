@@ -152,6 +152,17 @@ preview prices.
   payroll data would be worse), but a shift over `LONG_SHIFT_REVIEW_HOURS` (12, and Andrew
   should confirm that figure) now raises a management notification and tells the staff
   member it is being checked.
+- **Removed ~3.8KB of dead code from `assets/public-api.js`.** The old lesson-finder widget
+  and single-page enquiry form were replaced by the four-step wizard in `enquire.js`, but
+  their code was left behind pointing at eight element ids that exist on no page
+  (`finder-result`, `finder-button`, `finder-age`, `finder-experience`, `enquiry-form`,
+  `enquiry-status`, `enquiry-submit`, `enquiry-experience`).
+  This mattered more than tidiness: it misled two separate reviews in one session. An
+  earlier pass "fixed" an enquiry-failure message in that block that no visitor could ever
+  see, and a later pass reported a reflected XSS in it that was never reachable. **If you
+  are reviewing a code path, confirm the elements it touches actually exist before drawing
+  a conclusion about it.** Verified after removal: no dead element references remain, no
+  console or page errors on any page, and the live availability failure state still renders.
 - Security review of `backend/`. The code is in good shape — SQL is parameterised
   throughout, CSV formula injection was already guarded, exports are role-gated, ownership
   checks are consistent, PBKDF2 is 210k iterations with a constant-time compare, and the

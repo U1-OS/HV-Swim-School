@@ -14,40 +14,10 @@
     }catch(_){}
   };
   applySiteSettings();
-  const incoming=new URLSearchParams(location.search);
-  const incomingProgram=incoming.get('program'); const incomingClass=incoming.get('class'); const incomingMerch=incoming.get('merch');
-  if(incomingProgram){
-    const experience=document.getElementById('enquiry-experience');
-    if(experience) experience.value=`Interested in: ${incomingProgram}.${incomingClass?` Preferred class: ${incomingClass}.`:''} `;
-    const result=document.getElementById('finder-result');
-    if(result) result.innerHTML=`<strong>${incomingProgram}</strong><span>${incomingClass?`You selected ${incomingClass}. `:''}The HV Swim team will confirm the best level and current availability.</span>`;
-  }
-  if(incomingMerch){
-    const experience=document.getElementById('enquiry-experience');
-    if(experience) experience.value=`Merchandise collection interest: ${incomingMerch}. `;
-    const result=document.getElementById('finder-result');
-    if(result) result.innerHTML='<strong>HV Swim Collection interest</strong><span>Your saved product preferences have been added below so the team can follow up before launch.</span>';
-  }
-  const finder=document.getElementById('finder-button');
-  finder?.addEventListener('click',()=>{
-    const age=document.getElementById('finder-age').value; const experience=document.getElementById('finder-experience').value;
-    let title='Learn to Swim'; let copy='A small-group assessment will help the team place the swimmer at the right skill level.';
-    if(age==='under2'){title='Infant Aquatics';copy='Positive early water experiences with a parent or carer, focused on familiarity and safe foundations.';}
-    if(experience==='support'){title='Private 1:1 Lesson';copy='Individual tuition can match the swimmer’s pace, confidence, communication style and goals.';}
-    else if(experience==='independent'){title='Stroke Development';copy='A technique and endurance pathway for swimmers who are already moving independently.';}
-    else if(age==='teenadult'){title='Adult / Teen Private Assessment';copy='A calm, private starting point shaped around personal confidence and goals.';}
-    document.getElementById('finder-result').innerHTML=`<strong>${title}</strong><span>${copy}</span>`;
-    document.getElementById('enquiry-experience').value=`Lesson finder suggestion: ${title}. `;
-  });
-  document.getElementById('enquiry-form')?.addEventListener('submit',async event=>{
-    event.preventDefault(); const form=event.currentTarget; const data=new FormData(form); const button=document.getElementById('enquiry-submit'); const status=document.getElementById('enquiry-status');
-    button.disabled=true;button.textContent='Sending…';status.textContent='';
-    try{
-      const response=await fetch('/api/public/enquiries',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(Object.fromEntries(data.entries()))});
-      const payload=await response.json();if(!response.ok)throw new Error(payload.detail||'The enquiry could not be sent.');
-      status.textContent=payload.message;status.style.color='#147652';form.reset();button.textContent='Enquiry received';
-    }catch(problem){status.textContent=`${problem.message} Please email sloanswimschool@hotmail.com or call 0413 462 112 and we will get straight back to you.`;status.style.color='#a23642';button.disabled=false;button.textContent='Send secure enquiry';}
-  });
+  // The lesson-finder widget and the old single-page enquiry form that used to live
+  // here were replaced by the four-step wizard in enquire.js. Their code was left
+  // behind, pointing at eight elements that no longer exist on any page, and it has
+  // already misled two separate reviews. Removed.
 
   const availability=document.getElementById('public-availability');
   if(availability){
