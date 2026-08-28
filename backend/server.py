@@ -520,6 +520,20 @@ def staff_clock(payload: ClockInput, request: Request, user: dict[str, Any] = De
         hours = round(max(0, (finish - start).total_seconds() / 3600), 2)
         db.execute("UPDATE time_entries SET clock_out=?,hours=? WHERE id=?", (finish.isoformat(), hours, active["id"]))
         audit(db, user["id"], "clock_out", "time_entry", active["id"], {"hours": hours}, client_ip(request))
+        # A forgotten clock-out records every hour in between, and that figure is headed for
+        # payroll. The true value is never altered — but it must not pass silently.
+        if hours > LONG_SHIFT_REVIEW_HOURS:
+            db.execute(
+                "INSERT INTO notifications(audience_role,title,message,kind,delivery_channels,created_at) VALUES(?,?,?,?,?,?)",
+                ("admin", "Unusually long shift recorded",
+                 f"{user['first_name']} {user['last_name']} recorded {hours} hours in one shift. Check this before approving it for payroll.",
+                 "compliance", '["in_app"]', now_iso()),
+            )
+            return {
+                "status": "clocked_out", "entry_id": active["id"], "clock_out": finish.isoformat(), "hours": hours,
+                "review_required": True,
+                "message": f"Clocked out · {hours} hours. That is longer than a usual shift, so management has been asked to check it before payroll.",
+            }
         return {"status": "clocked_out", "entry_id": active["id"], "clock_out": finish.isoformat(), "hours": hours}
 
 
@@ -1101,6 +1115,9 @@ async def sensor(user: dict[str, Any] = Depends(require_roles("staff", "admin"))
 
 
 ENQUIRY_LIMIT_PER_HOUR = 5
+# Above this, a shift is treated as a probable forgotten clock-out and flagged for
+# management before it reaches payroll. HV Swim should confirm the figure.
+LONG_SHIFT_REVIEW_HOURS = 12
 
 
 @app.post("/api/public/enquiries")

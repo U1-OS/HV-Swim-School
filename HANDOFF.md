@@ -146,6 +146,12 @@ preview prices.
   `uniq_waitlist_waiting`) enforce it at the database level as well. The indexes are created
   defensively so an older database holding duplicates cannot block startup — if that
   happens, clear the duplicates by hand and restart.
+- Reviewed the payroll path. A forgotten clock-out records every hour in between — a shift
+  left open on Friday and closed on Monday books 70-odd hours — and that figure flows
+  straight toward Xero. The recorded value is deliberately **not** altered (silently editing
+  payroll data would be worse), but a shift over `LONG_SHIFT_REVIEW_HOURS` (12, and Andrew
+  should confirm that figure) now raises a management notification and tells the staff
+  member it is being checked.
 - Security review of `backend/`. The code is in good shape — SQL is parameterised
   throughout, CSV formula injection was already guarded, exports are role-gated, ownership
   checks are consistent, PBKDF2 is 210k iterations with a constant-time compare, and the
@@ -245,6 +251,19 @@ Remaining work, in order:
   real accounts are ever exposed to the open internet, but not a launch blocker.
 - The "Demo ·" labels on pool conditions are deliberate: unverified readings are marked
   rather than passed off as live, and they clear once staff verify. Leave them.
+
+## Missing feature — correcting a time entry
+
+Management can **approve** a time entry and nothing else. There is no way to edit, reject
+or return one for correction. So a forgotten clock-out that records 70 hours can only be
+approved or left sitting, and a staff member who forgot to clock out cannot start their
+next shift either — clocking in is refused while an entry is open, with no self-service fix.
+The long-shift flag added above makes the problem visible; it does not solve it.
+
+This needs Andrew's decisions before it is built: who is allowed to correct someone else's
+recorded hours, whether the original figure must be retained alongside the correction (it
+should — `audit_log` already exists for this), and whether a staff member can void their own
+open shift or must ask a manager.
 
 ## Missing feature — password reset
 
