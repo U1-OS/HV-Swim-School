@@ -210,3 +210,81 @@ def test_integration_status_never_returns_credentials(client):
     body = client.get("/api/admin/dashboard").text.lower()
     for secret in ("client_secret", "storefront_token", "api_token", "password_hash", "csrf_token"):
         assert secret not in body, f"{secret} is exposed in the management dashboard payload"
+
+
+# --- public enquiry form -------------------------------------------------------------
+
+ENQUIRY = {
+    "name": "Sam Rivers",
+    "email": "sam@example.com",
+    "swimmer_name": "Ivy",
+    "swimmer_age": "5",
+    "program_interest": "Learn to Swim",
+}
+
+
+def test_enquiry_can_be_submitted_without_an_account(client):
+    client.cookies.clear()
+    response = client.post("/api/public/enquiries", json=ENQUIRY)
+    assert response.status_code == 200, response.text
+    assert response.json()["received"] is True
+    assert response.json()["reference"].startswith("HV-ENQ-")
+
+
+def test_honeypot_submission_is_swallowed(client):
+    """A bot fills every field. It should get a normal-looking reply and store nothing."""
+    client.cookies.clear()
+    response = client.post("/api/public/enquiries", json={**ENQUIRY, "website": "http://spam.example"})
+    assert response.status_code == 200
+    assert response.json()["id"] == 0
+
+
+def test_enquiries_are_rate_limited_per_address(client):
+    """The only unauthenticated write endpoint in the system — it must not be floodable."""
+    client.cookies.clear()
+    statuses = [client.post("/api/public/enquiries", json=ENQUIRY).status_code for _ in range(10)]
+    assert 429 in statuses, "the public enquiry form accepts unlimited submissions"
+    refusal = next(s for s in statuses if s == 429)
+    assert refusal == 429
+
+
+def test_enquiry_rejects_a_malformed_email(client):
+    client.cookies.clear()
+    response = client.post("/api/public/enquiries", json={**ENQUIRY, "email": "not-an-email"})
+    assert response.status_code == 422
+
+
+def test_enquiry_list_is_management_only(client):
+    """Enquiries hold parent contact details and children's names."""
+    client.cookies.clear()
+    assert client.get("/api/admin/enquiries").status_code == 401
+    sign_in(client, FAMILY)
+    assert client.get("/api/admin/enquiries").status_code == 403
+
+
+# --- error handling ------------------------------------------------------------------
+
+def test_unknown_page_returns_the_branded_404_to_a_browser(client):
+    response = client.get("/no-such-page.html", headers={"Accept": "text/html"})
+    assert response.status_code == 404
+    assert "HV Swim" in response.text
+    assert "detail" not in response.text[:200].lower()
+
+
+def test_unknown_api_path_still_returns_json(client):
+    response = client.get("/api/no-such-endpoint", headers={"Accept": "application/json"})
+    assert response.status_code == 404
+    assert response.headers["content-type"].startswith("application/json")
+
+
+# --- caching -------------------------------------------------------------------------
+
+def test_api_responses_are_never_cached(client):
+    client.cookies.clear()
+    assert client.get("/api/health").headers.get("cache-control") == "no-store"
+
+
+def test_versioned_assets_are_cached_hard(client):
+    response = client.get("/assets/styles.css?v=5.1.1")
+    if response.status_code == 200:
+        assert "max-age=31536000" in response.headers.get("cache-control", "")

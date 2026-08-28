@@ -8,9 +8,9 @@
 - **`test_security.py`** — the password and token layer. Needs only `cryptography`, so it
   runs anywhere the backend runs, with or without pytest:
   `python3 tests/test_security.py`. **Verified passing** (15 checks).
-- **`test_api.py`** — role boundaries, ownership isolation, CSRF enforcement, sign-in rate
-  limiting and secret leakage, driven in-process through FastAPI's `TestClient` against a
-  throwaway database. Needs `fastapi` and `pytest`.
+- **`test_api.py`** — role boundaries, ownership isolation, CSRF enforcement, sign-in and
+  enquiry rate limiting, the spam honeypot, 404 handling and cache headers, driven in-process
+  through FastAPI's `TestClient` against a throwaway database. Needs `fastapi` and `pytest`.
   **Not yet executed** — written in an environment with no access to the package index, so
   the assertions are reasoned from the source rather than observed. Run it once and fix any
   fixture mismatches before trusting a green result.

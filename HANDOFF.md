@@ -117,6 +117,15 @@ preview prices.
   success and stores nothing) and a limit of 5 enquiries per IP per hour, whose 429 message
   gives the phone number so a genuine family is never stranded. Added covering indexes for
   both this and the sign-in rate limit, since each runs a scan on every attempt.
+- Reviewed the front-end for XSS, since management, staff and families all enter text that
+  gets rendered into other people's pages. **Found none.** `platform.js`, `shop.js`,
+  `programs.js` and `public-api.js` escape consistently through their `esc()` helpers, and
+  the handful of cases a scan flags turn out to be `textContent`, `document.title`,
+  `URLSearchParams` values, or arguments escaped downstream by `shell()`. Worth re-checking
+  after any new render function, but the pattern in place is sound.
+- Extended `test_api.py` from 19 to 28 tests, covering the enquiry honeypot and rate limit,
+  the branded 404, that the API still returns JSON for unknown paths, and the cache headers.
+  Still unrun — see the Tests section.
 - Security review of `backend/`. The code is in good shape — SQL is parameterised
   throughout, CSV formula injection was already guarded, exports are role-gated, ownership
   checks are consistent, PBKDF2 is 210k iterations with a constant-time compare, and the
