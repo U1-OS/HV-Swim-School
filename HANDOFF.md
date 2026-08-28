@@ -88,6 +88,16 @@ preview prices.
   build copy that were being shown to parents ("Use a demonstration account below, or
   connect real accounts during deployment", a PBKDF2/HttpOnly security note, and
   "Secure production-foundation preview" in the footer).
+- Rebuilt the app icons. They were declared `purpose:"any maskable"` but were not maskable:
+  the logo ran past the inner 80% safe circle, so Android's circular and squircle masks were
+  cropping "HV" and part of "SWIM", and the source art had black letterbox bars top and
+  bottom that showed on the home screen. There are now separate `any` and `maskable` sets on
+  the brand navy, generated from `hv-swim-logo-source.jpg` with the black knocked out.
+  `manifest.webmanifest` also had `id:"/hv-swim-mobile"` against `scope:"./"`, which do not
+  match; `id` is now `"./"`.
+- Verified the service-worker precache list against the filesystem — all 36 entries exist.
+  Worth re-running after any asset rename: a single missing file makes `cache.addAll` reject
+  and the service worker never installs, silently disabling the whole PWA.
 - Security review of `backend/`. The code is in good shape — SQL is parameterised
   throughout, CSV formula injection was already guarded, exports are role-gated, ownership
   checks are consistent, PBKDF2 is 210k iterations with a constant-time compare, and the
