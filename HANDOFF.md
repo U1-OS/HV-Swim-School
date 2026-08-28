@@ -177,6 +177,16 @@ preview prices.
   endpoint, and every `localStorage` access is guarded. The three unreferenced backend
   endpoints (`/api/admin/metrics`, the Xero OAuth callback and the pool-sensor feed) are
   called from outside the browser and are correct as they are.
+- **Fixed the mobile app bundle, which shipped incomplete.** `scripts/build-mobile-web.mjs`
+  copied a hand-written list of files that had drifted from reality: `offline.html`'s
+  stylesheet was never copied, so the offline screen inside the native app rendered
+  completely unstyled; the manifest's `start_url` pointed at `app.html`, which is not in the
+  bundle; offline.html's only button linked to the same missing page; and the two maskable
+  icons added earlier today were not copied either, so the packaged manifest referenced
+  files that were not there. The script now derives what to copy from what the pages and the
+  manifest actually reference, rewrites `start_url`/`scope` to the shell for the packaged
+  app, repoints the offline button, and **fails loudly** if anything referenced is missing —
+  so this cannot drift again. Verified by building: every reference inside `www/` resolves.
 - Security review of `backend/`. The code is in good shape — SQL is parameterised
   throughout, CSV formula injection was already guarded, exports are role-gated, ownership
   checks are consistent, PBKDF2 is 210k iterations with a constant-time compare, and the
