@@ -98,6 +98,12 @@ preview prices.
 - Verified the service-worker precache list against the filesystem — all 36 entries exist.
   Worth re-running after any asset rename: a single missing file makes `cache.addAll` reject
   and the service worker never installs, silently disabling the whole PWA.
+- Fixed the mobile menu, which was a keyboard dead end: opening it moved no focus, Escape
+  did nothing, Tab walked straight out of the overlay to the page hidden behind it, and a
+  menu left open across a resize to desktop kept the page scroll-locked. It now moves focus
+  into the menu on open, returns it to the toggle on close, keeps Tab and Shift+Tab inside
+  while open, closes on Escape, and closes itself on resize. Verified in a real browser at
+  390px — focus stayed inside across 30 tab presses and shift-tabbing back.
 - Security review of `backend/`. The code is in good shape — SQL is parameterised
   throughout, CSV formula injection was already guarded, exports are role-gated, ownership
   checks are consistent, PBKDF2 is 210k iterations with a constant-time compare, and the

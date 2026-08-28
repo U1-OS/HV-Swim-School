@@ -71,14 +71,39 @@
   // Shared navigation and presentation behaviour.
   const menuToggle = document.querySelector('.menu-toggle');
   const nav = document.querySelector('.nav-links');
+  const setMenu = open => {
+    nav?.classList.toggle('open', open);
+    menuToggle?.setAttribute('aria-expanded', String(open));
+    document.body.classList.toggle('no-scroll', open);
+  };
+  const closeMenu = ({ refocus = false } = {}) => {
+    if (!nav?.classList.contains('open')) return;
+    setMenu(false);
+    // Send focus back to the control that opened it, or it lands at the top of the page.
+    if (refocus) menuToggle?.focus();
+  };
   menuToggle?.addEventListener('click', () => {
-    const open = nav?.classList.toggle('open');
-    menuToggle.setAttribute('aria-expanded', String(Boolean(open)));
-    document.body.classList.toggle('no-scroll', Boolean(open));
+    const open = !nav?.classList.contains('open');
+    setMenu(open);
+    if (open) nav?.querySelector('a')?.focus();
   });
-  nav?.querySelectorAll('a').forEach(link => link.addEventListener('click', () => {
-    nav.classList.remove('open'); menuToggle?.setAttribute('aria-expanded','false'); document.body.classList.remove('no-scroll');
-  }));
+  nav?.querySelectorAll('a').forEach(link => link.addEventListener('click', () => closeMenu()));
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape') closeMenu({ refocus: true });
+    if (event.key !== 'Tab' || !nav?.classList.contains('open')) return;
+    // While the overlay menu covers the page, keep Tab inside it.
+    // Document order matters: the toggle sits after the links in the markup, so building
+    // the list any other way leaves a gap where Tab escapes the overlay.
+    const stops = [...document.querySelectorAll('.nav-links a, .menu-toggle')]
+      .filter(el => el.offsetParent !== null);
+    if (!stops.length) return;
+    const first = stops[0];
+    const last = stops[stops.length - 1];
+    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+  });
+  // A menu left open across a resize to desktop would keep the page scroll-locked.
+  window.addEventListener('resize', () => { if (window.innerWidth > 980) closeMenu(); }, { passive: true });
   document.querySelectorAll('[data-year]').forEach(el => el.textContent = String(new Date().getFullYear()));
   document.querySelectorAll('.grid-2,.grid-3,.grid-4,.journey-grid,.availability-grid').forEach(grid => {
     [...grid.children].forEach((item,index) => item.style.setProperty('--reveal-delay',`${Math.min(index * 70, 280)}ms`));
