@@ -48,6 +48,15 @@ preview prices.
   references repointed and the service-worker cache bumped to `hv-swim-v5-shell-16`.
 - Added `robots.txt` (portals disallowed) and `scripts/build-sitemap.mjs`.
 - First accessibility pass — see item 3 under Next up for what was fixed and what remains.
+- Security review of `backend/`. The code is in good shape — SQL is parameterised
+  throughout, CSV formula injection was already guarded, exports are role-gated, ownership
+  checks are consistent, PBKDF2 is 210k iterations with a constant-time compare, and the
+  cookie and CSP settings are sensible. Four things fixed: `login_attempts` was never
+  pruned so email/IP pairs accumulated forever (now deleted after 30 days, and the privacy
+  policy states that figure); the CSRF token was compared with `!=` rather than
+  `hmac.compare_digest`; the CSV injection guard missed tab and carriage-return prefixes;
+  and the three redirect stubs carried an inline `<script>` that the app's own CSP blocks,
+  throwing a console violation on every visit (the meta refresh already did the work).
 - Content truth pass on the public pages: corrected the address in `privacy.html` (it said
   76b Wood Street; the rest of the site says 76), rewrote the enquiry-failure message which
   told parents to check whether "the local server is not running", replaced the hard-coded
@@ -95,6 +104,14 @@ Remaining work, in order:
 ## Also outstanding
 
 - `_to_delete/` is a leftover scratch folder. Delete it; it is gitignored.
+
+## Known and accepted, not bugs
+
+- Sign-in rate limiting is per email + IP. Password spraying — one common password tried
+  across many accounts from one address — is not caught by that shape. Worth revisiting if
+  real accounts are ever exposed to the open internet, but not a launch blocker.
+- The "Demo ·" labels on pool conditions are deliberate: unverified readings are marked
+  rather than passed off as live, and they clear once staff verify. Leave them.
 
 ## Open decisions for Andrew
 

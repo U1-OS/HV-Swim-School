@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import hmac
 import io
 import json
 import sqlite3
@@ -195,6 +196,13 @@ class CartInput(BaseModel):
     quantity: int = Field(default=1, ge=1, le=20)
 
 
+LOGIN_ATTEMPT_RETENTION_DAYS = 30
+
+
+def login_attempt_cutoff() -> str:
+    return (datetime.now(timezone.utc) - timedelta(days=LOGIN_ATTEMPT_RETENTION_DAYS)).isoformat()
+
+
 def client_ip(request: Request) -> str:
     # Uvicorn should be configured with explicit trusted proxy IPs in production.
     # Never trust a client-supplied X-Forwarded-For header directly.
@@ -227,7 +235,7 @@ def require_roles(*roles: str):
 def csrf_guard(request: Request, user: dict[str, Any], token: str | None) -> None:
     if request.method in {"GET", "HEAD", "OPTIONS"}:
         return
-    if not token or token != user["csrf_token"]:
+    if not token or not hmac.compare_digest(token, user["csrf_token"] or ""):
         raise HTTPException(status_code=403, detail="Security token is missing or expired")
 
 
@@ -272,7 +280,7 @@ def csv_download(filename: str, headings: list[str], records: list[list[Any]]) -
         safe = []
         for value in record:
             text = "" if value is None else str(value)
-            safe.append("'" + text if text.startswith(("=", "+", "-", "@")) else text)
+            safe.append("'" + text if text.startswith(("=", "+", "-", "@", "\t", "\r")) else text)
         writer.writerow(safe)
     return Response(output.getvalue(), media_type="text/csv; charset=utf-8", headers={"Content-Disposition": f'attachment; filename="{filename}"'})
 
@@ -327,6 +335,9 @@ def login(payload: LoginInput, request: Request, response: Response) -> dict[str
             db.execute("UPDATE users SET password_hash=? WHERE id=?", (refreshed_hash, user["id"]))
         session_id, csrf = new_token(32), new_token(24)
         db.execute("DELETE FROM sessions WHERE expires_at<=?", (now_iso(),))
+        # Sign-in records exist only for rate limiting. Keeping email/IP pairs longer
+        # than that is a privacy liability, so prune anything past the retention window.
+        db.execute("DELETE FROM login_attempts WHERE created_at<=?", (login_attempt_cutoff(),))
         db.execute("INSERT INTO sessions(id,user_id,csrf_token,created_at,expires_at) VALUES(?,?,?,?,?)", (session_id, user["id"], csrf, now_iso(), expires_iso()))
         audit(db, user["id"], "login", "session", session_id[-8:], ip_address=ip)
         response.set_cookie(SESSION_COOKIE, session_id, max_age=14*24*60*60, httponly=True, secure=settings.production, samesite="lax", path="/")
