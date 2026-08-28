@@ -5,13 +5,13 @@ import hmac
 import io
 import json
 import sqlite3
+from contextlib import asynccontextmanager
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Annotated, Any, Literal
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response, status
-from fastapi.responses import RedirectResponse
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from pydantic import BaseModel, EmailStr, Field, model_validator
@@ -37,19 +37,24 @@ from .security import expires_iso, new_token, now_iso, password_hash, password_n
 
 SESSION_COOKIE = "hv_session"
 
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    if settings.production and settings.session_secret == "local-demo-secret-change-before-production":
+        raise RuntimeError("HV_SESSION_SECRET must be changed before production startup")
+    initialise_database()
+    yield
+
+
 app = FastAPI(
     title="HV Swim Bendigo Platform API",
     version="5.1.0",
     docs_url="/api/docs" if not settings.production else None,
     redoc_url=None,
+    lifespan=lifespan,
 )
 
 
-@app.on_event("startup")
-def startup() -> None:
-    if settings.production and settings.session_secret == "local-demo-secret-change-before-production":
-        raise RuntimeError("HV_SESSION_SECRET must be changed before production startup")
-    initialise_database()
 
 
 @app.middleware("http")

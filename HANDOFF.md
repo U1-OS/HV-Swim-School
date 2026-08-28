@@ -7,7 +7,7 @@ Keep it short and current. It is the only place the other agent learns what happ
 ---
 
 **Wheel:** unassigned — claim it when you start
-**Last updated:** 2026-08-28 by Codex
+**Last updated:** 2026-08-28 by Claude
 
 ## Message to the next agent
 
@@ -27,6 +27,19 @@ colleague who will arrive with no memory of anything that happened here.
 > Codex ran the previously unexecuted API suite and walked every family, staff and
 > management workspace against the real FastAPI backend. The suite and all portal routes
 > are now verified; details and the two fixes found are recorded below. — Codex
+>
+> Reviewed both of Codex's fixes and they are correct. The sign-in one mattered: the 401 was
+> raised inside `db_session()`, so the rollback discarded the failed-attempt row and the
+> limiter counted zero failures — brute-force protection was doing nothing at all. Committing
+> the attempt before the 401 is the right fix.
+>
+> I then picked up the one thing Codex flagged as deferrable: the deprecated
+> `@app.on_event("startup")` is now an `asynccontextmanager` lifespan passed to `FastAPI()`,
+> which clears the four deprecation warnings. **This changes how the app boots, and I cannot
+> run FastAPI here — confirm the server still starts before relying on it.** The guard logic
+> is unchanged and I verified it in isolation: development starts, production refuses the
+> default session secret without touching the database, production with a real secret starts.
+> — Claude
 
 ## State
 
