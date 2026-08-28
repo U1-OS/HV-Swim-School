@@ -7,7 +7,7 @@ Keep it short and current. It is the only place the other agent learns what happ
 ---
 
 **Wheel:** unassigned — claim it when you start
-**Last updated:** 2026-08-28 by Claude
+**Last updated:** 2026-08-28 by Codex
 
 ## Message to the next agent
 
@@ -23,6 +23,10 @@ colleague who will arrive with no memory of anything that happened here.
 > The legal pages are now drafted and linked. What they need next is Andrew's answers to
 > the twelve flagged business questions, not more writing. The data audit below is what
 > they were written from — keep it accurate if the schema changes. — Claude
+>
+> Codex ran the previously unexecuted API suite and walked every family, staff and
+> management workspace against the real FastAPI backend. The suite and all portal routes
+> are now verified; details and the two fixes found are recorded below. — Codex
 
 ## State
 
@@ -217,17 +221,27 @@ preview prices.
   unreachable, and upgraded the homepage structured data from a bare `Organization` to
   `SportsActivityLocation` with the real postal address — local search is how a Bendigo
   swim school gets found.
+- Ran the complete API/security suite for the first time. It exposed two real defects:
+  failed sign-ins were inserted and then rolled back with the 401, so rate limiting never
+  accumulated failures; and unmatched `/api/...` paths fell through to StaticFiles and
+  returned the branded HTML 404. Failed attempts are now committed before the 401 and a
+  final API catch-all preserves JSON errors. The suite is green: 43 passed, 1 skipped.
+- Rendered every family, staff and management route against the running FastAPI backend at
+  desktop width, then checked the management workspace at 390x844. No console errors and no
+  horizontal overflow. Family data, staff rosters/pool forms/timesheets and all 13 management
+  routes render from the real seeded database.
+- The live portal review found the staff clock text was white on a white card: the later
+  `.panel` rule in `platform.css` overrode the intended navy background from `styles.css`.
+  Added a specific `.panel.clock-panel` rule, bumped `platform.css` to `5.1.2` and the PWA
+  shell cache to `hv-swim-v5-shell-24`. Verified the clock visibly ticks each second.
 
-## The portals have still never been seen rendered
+## Portal browser review — completed 2026-08-28
 
-`platform.js` has now been read line by line, but the family, staff and management
-workspaces have **never been opened in a browser** — that needs the FastAPI backend
-running, and it cannot be installed from the environment the last session had.
-Andrew has asked that nothing be faked or simulated to get around this, which is right:
-a mock backend would prove the UI renders against invented data, not that it works.
-
-**Whoever has FastAPI available should run the server and walk all three portals.** It is
-the largest surface in the project with no visual review at all.
+All three role workspaces have now been opened against the real local backend. Every
+management navigation route was clicked and reached its expected H1; family overview data,
+staff clock/pool/timesheet routes, merchandise controls and Xero-ready approvals rendered
+without console warnings or errors. The management mobile layout has a 4-item tab bar and
+no horizontal overflow at 390x844. No write actions were submitted during visual QA.
 
 ## Regression sweep — last run 2026-08-28
 
@@ -243,13 +257,12 @@ elements as invisible that are perfectly fine, and responsive variants are hidde
 
 ## Tests
 
-There is now a `tests/` suite — see `tests/README.md`. `test_security.py` is **verified
-passing** (15 checks, runs with plain `python3`, no pytest needed). `test_api.py` covers
-role boundaries, ownership isolation, CSRF and secret leakage but has **never been
-executed** — it was written without access to a package index, so `fastapi` could not be
-installed. **Whoever picks this up next: run `pytest tests/ -q` first**, fix any fixture
-mismatches, and report the result here. Until then treat `test_api.py` as a reviewed
-specification rather than a passing suite.
+There is now a `tests/` suite — see the updated `tests/README.md`. The full suite is verified passing
+on 2026-08-28: **43 passed, 1 skipped**. The skip is the production-mode demo-account check,
+which is intentionally gated by environment setup. `tests/smoke_test.py` also passes against
+the live server, and `node scripts/check-site.mjs` passes across 19 pages, 36 precached files
+and 7 scripts. FastAPI emits four deprecation warnings for the existing startup event; these
+are non-failing and can be migrated to a lifespan handler separately.
 
 ## Next up
 

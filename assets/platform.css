@@ -57,6 +57,7 @@
 .platform-grid { display:grid; grid-template-columns:repeat(12,minmax(0,1fr)); gap:18px; }
 .p-span-3 { grid-column:span 3; }.p-span-4 { grid-column:span 4; }.p-span-5 { grid-column:span 5; }.p-span-6 { grid-column:span 6; }.p-span-7 { grid-column:span 7; }.p-span-8 { grid-column:span 8; }.p-span-12 { grid-column:span 12; }
 .panel { min-width:0; border:1px solid #d9e3ed; border-radius:19px; background:white; box-shadow:0 8px 28px rgba(3,25,55,.05); overflow:hidden; }
+.panel.clock-panel { color:white; background:linear-gradient(145deg,#082b5f,#063e73); }
 .panel-pad { padding:22px; }
 .panel-head { display:flex; align-items:center; justify-content:space-between; gap:14px; margin-bottom:17px; }
 .panel-head h2 { font-family:Inter,sans-serif; font-size:.92rem; letter-spacing:-.01em; }

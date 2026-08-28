@@ -11,9 +11,7 @@
 - **`test_api.py`** — role boundaries, ownership isolation, CSRF enforcement, sign-in and
   enquiry rate limiting, the spam honeypot, 404 handling and cache headers, driven in-process
   through FastAPI's `TestClient` against a throwaway database. Needs `fastapi` and `pytest`.
-  **Not yet executed** — written in an environment with no access to the package index, so
-  the assertions are reasoned from the source rather than observed. Run it once and fix any
-  fixture mismatches before trusting a green result.
+  **Verified 2026-08-28** as part of the complete suite: 43 passed, 1 intentionally skipped.
 - **`smoke_test.py`** — read-only checks against an already-running server:
   `python3 tests/smoke_test.py http://127.0.0.1:8765`.
 
