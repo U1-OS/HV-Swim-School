@@ -71,6 +71,17 @@ preview prices.
   hero with the logo screen-blended the way the site does it) and added the full Open Graph
   and Twitter card set to all ten public pages. `locations.html` and `app.html` had no Open
   Graph tags at all and now have the complete set.
+- Added a branded `404.html`. A mistyped address or a stale Facebook link previously
+  returned raw JSON (`{"detail":"Not Found"}`). The page now says nothing is wrong with the
+  visitor's booking or account and lists the six places they were probably heading.
+  `backend/server.py` serves it for browser requests only — the API still answers JSON.
+- Added cache headers, which the server was not sending at all. Versioned assets
+  (`?v=5.1.0`) are cached for a year as immutable; unversioned assets for a day; HTML always
+  revalidates so corrected copy and prices are never served stale. **When you change a CSS
+  or JS file you must bump its `?v=` in every page that references it, or returning visitors
+  will keep the old one for a year.**
+- Fixed a CSS bleed where `.legal-body a` styling applied to buttons, rendering button
+  labels as dark underlined text on a blue fill. Affected the legal pages and the new 404.
 - Security review of `backend/`. The code is in good shape — SQL is parameterised
   throughout, CSV formula injection was already guarded, exports are role-gated, ownership
   checks are consistent, PBKDF2 is 210k iterations with a constant-time compare, and the

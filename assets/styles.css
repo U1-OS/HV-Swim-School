@@ -1133,7 +1133,12 @@ textarea { min-height:82px; padding-top:11px; resize:vertical; }
 .legal-body p { margin:0 0 14px; line-height:1.72; color:#3f5a72; }
 .legal-body ul { margin:0 0 16px; padding-left:22px; }
 .legal-body li { margin-bottom:8px; line-height:1.66; color:#3f5a72; }
-.legal-body a { color:#1d6fb0; text-decoration:underline; text-underline-offset:2px; }
+.legal-body a:not(.btn) { color:#1d6fb0; text-decoration:underline; text-underline-offset:2px; }
+.legal-body .btn { text-decoration:none; }
+.legal-body .btn-blue, .legal-body .btn-blue:visited { color:#fff; }
+.legal-body-wide .container { max-width:none; }
+.legal-body-wide ul { max-width:74ch; }
+.legal-body-wide h2, .legal-body-wide p { max-width:74ch; }
 .legal-body strong { color:#123c63; }
 .legal-body .data-boundary { font-size:.78rem; line-height:1.6; }
 .footer-legal { display:flex; flex-wrap:wrap; gap:18px; }

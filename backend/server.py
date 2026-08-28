@@ -11,7 +11,9 @@ from typing import Any, Literal
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response, status
 from fastapi.responses import RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from pydantic import BaseModel, EmailStr, Field
 
 from .config import ROOT, settings
@@ -64,8 +66,17 @@ async def security_headers(request: Request, call_next):
     )
     if settings.production:
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
-    if request.url.path.startswith("/api/"):
+    path = request.url.path
+    if path.startswith("/api/"):
         response.headers["Cache-Control"] = "no-store"
+    elif path.startswith("/assets/") and request.url.query.startswith("v="):
+        # Versioned asset URLs change whenever the file changes, so they can be cached hard.
+        response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+    elif path.startswith("/assets/"):
+        response.headers.setdefault("Cache-Control", "public, max-age=86400")
+    elif path.endswith(".html") or path in {"/", ""}:
+        # Always revalidate pages so corrected copy and prices are never served stale.
+        response.headers["Cache-Control"] = "no-cache"
     return response
 
 
@@ -1102,6 +1113,17 @@ def audit_log(user: dict[str, Any] = Depends(require_roles("admin"))) -> dict[st
     with db_session() as db:
         query = """SELECT a.*,u.first_name,u.last_name FROM audit_log a LEFT JOIN users u ON u.id=a.user_id ORDER BY a.created_at DESC LIMIT 200"""
         return {"audit": rows(db.execute(query))}
+
+
+@app.exception_handler(StarletteHTTPException)
+async def not_found_page(request: Request, exc: StarletteHTTPException):
+    """Browsers asking for a missing page get the branded 404; the API keeps its JSON."""
+    wants_html = "text/html" in request.headers.get("accept", "")
+    if exc.status_code == 404 and wants_html and not request.url.path.startswith("/api/"):
+        page = ROOT / "404.html"
+        if page.exists():
+            return HTMLResponse(page.read_text(encoding="utf-8"), status_code=404)
+    return JSONResponse({"detail": exc.detail}, status_code=exc.status_code, headers=getattr(exc, "headers", None))
 
 
 # Keep this mount last so /api routes take precedence.
