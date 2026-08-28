@@ -6,6 +6,8 @@
   const days=['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
   const esc=value=>String(value??'').replace(/[&<>'"]/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]));
   const money=value=>new Intl.NumberFormat('en-AU',{style:'currency',currency:'AUD'}).format(Number(value||0));
+  const classTime=window.HVSwim?.formatClassTime||(value=>String(value||''));
+  const request=window.HVSwim?.fetchJSON||(async(url,options={})=>{const response=await fetch(url,options);const payload=await response.json();if(!response.ok)throw new Error(payload.detail||'Request unavailable');return payload;});
   const incoming=new URLSearchParams(location.search);
   const queryProgram=incoming.get('program')||'';
   const queryClass=incoming.get('class')||'';
@@ -15,9 +17,10 @@
 
   const elements={
     back:document.getElementById('wizard-back'),next:document.getElementById('wizard-next'),submit:document.getElementById('wizard-submit'),
-    error:document.getElementById('wizard-error'),stepLabel:document.getElementById('wizard-step-label'),progressBar:document.getElementById('wizard-progress-bar'),
+    error:document.getElementById('wizard-error'),stepLabel:document.getElementById('wizard-step-label'),progressBar:document.getElementById('wizard-progress-bar'),progressTrack:document.getElementById('wizard-progress-track'),
     swimmerName:document.getElementById('swimmer-name'),age:document.getElementById('swimmer-age'),goal:document.getElementById('swimmer-goal'),program:document.getElementById('program-interest'),
-    preferredClass:document.getElementById('preferred-class'),preferredDays:document.getElementById('preferred-days'),experience:document.getElementById('experience-summary'),notes:document.getElementById('experience-notes')
+    preferredClass:document.getElementById('preferred-class'),preferredDays:document.getElementById('preferred-days'),experience:document.getElementById('experience-summary'),notes:document.getElementById('experience-notes'),
+    phone:document.getElementById('contact-phone'),contactMethod:document.getElementById('contact-method')
   };
 
   function stepElement(step){return document.querySelector(`[data-step="${step}"]`);}
@@ -38,15 +41,26 @@
       input.addEventListener('input',clear); input.addEventListener('change',clear);
     }
   }
+  function syncPhoneRequirement(){
+    const required=['phone','sms'].includes(elements.contactMethod.value);
+    elements.phone.required=required;
+    elements.phone.setAttribute('aria-required',String(required));
+    const hint=document.getElementById('phone-hint');
+    if(hint)hint.textContent=required?'Required for your selected reply method.':'Optional when email is selected.';
+    if(!required)markInvalid(elements.phone,false);
+  }
   function validateStep(step){
+    if(step===4)syncPhoneRequirement();
     const section=stepElement(step);
     section.querySelectorAll('[required]').forEach(input=>markInvalid(input,false));
     for(const input of section.querySelectorAll('[required]')){
       if(!input.checkValidity()){
         const name=fieldLabel(input);
-        elements.error.textContent=input.type==='radio'
-          ? (name?`Choose an option for “${name}” before continuing.`:'Choose the option that feels closest before continuing.')
-          : (name?`Please fill in “${name}” before continuing.`:'Please complete the highlighted field before continuing.');
+        if(input.type==='radio')elements.error.textContent=name?`Choose an option for “${name}” before continuing.`:'Choose the option that feels closest before continuing.';
+        else if(input.validity.typeMismatch&&input.type==='email')elements.error.textContent='Enter a complete email address, such as name@example.com.';
+        else if(input===elements.phone&&input.validity.valueMissing)elements.error.textContent='Enter a phone number for the reply method you selected.';
+        else if(input===elements.phone&&input.validity.patternMismatch)elements.error.textContent='Enter a complete phone number using numbers, spaces, brackets or +.';
+        else elements.error.textContent=name?`Please fill in “${name}” before continuing.`:'Please complete the highlighted field before continuing.';
         markInvalid(input,true);
         input.focus({preventScroll:true});
         input.scrollIntoView({behavior:'smooth',block:'center'});
@@ -58,15 +72,23 @@
   function showStep(step,scroll=true){
     currentStep=Math.max(1,Math.min(4,step));
     document.querySelectorAll('.wizard-step').forEach(section=>{const active=Number(section.dataset.step)===currentStep;section.hidden=!active;section.classList.toggle('active',active);});
-    document.querySelectorAll('[data-progress]').forEach(item=>{const value=Number(item.dataset.progress);item.classList.toggle('active',value===currentStep);item.classList.toggle('complete',value<currentStep);});
+    document.querySelectorAll('[data-progress]').forEach(item=>{const value=Number(item.dataset.progress);item.classList.toggle('active',value===currentStep);item.classList.toggle('complete',value<currentStep);if(value===currentStep)item.setAttribute('aria-current','step');else item.removeAttribute('aria-current');});
     elements.stepLabel.textContent=`Step ${currentStep} of 4`;
     elements.progressBar.style.width=`${currentStep*25}%`;
+    elements.progressTrack?.setAttribute('aria-valuenow',String(currentStep));
+    elements.progressTrack?.setAttribute('aria-valuetext',`Step ${currentStep} of 4`);
     elements.back.hidden=currentStep===1;
     elements.next.hidden=currentStep===4;
     elements.submit.hidden=currentStep!==4;
     elements.error.textContent='';
     if(currentStep===4)renderReview();
-    if(scroll)document.getElementById('enrolment').scrollIntoView({behavior:'smooth',block:'start'});
+    if(scroll){
+      document.getElementById('enrolment').scrollIntoView({behavior:'smooth',block:'start'});
+      requestAnimationFrame(()=>{
+        const heading=stepElement(currentStep).querySelector('h2');
+        heading?.focus({preventScroll:true});
+      });
+    }
   }
 
   function recommendation(){
@@ -95,10 +117,11 @@
     const sorted=[...classes].sort((a,b)=>Number(classGroup(a.title)!==group)-Number(classGroup(b.title)!==group));
     target.innerHTML=`<label class="wizard-class-card flexible"><input type="radio" name="class_choice" value="Flexible—team recommendation"><span class="class-choice-check">✓</span><div><span class="class-match-label">Best fit</span><strong>Keep me flexible</strong><small>Let HV Swim recommend the program, class and time.</small></div></label>`+sorted.map(item=>{
       const available=Number(item.available||0);
-      const value=`${item.title} · ${days[item.weekday]} ${item.start_time} · ${item.location_name}`;
+      const time=classTime(item.start_time);
+      const value=`${item.title} · ${days[item.weekday]} ${time} · ${item.location_name}`;
       const isMatch=classGroup(item.title)===group;
       const selected=queryClass&&value.toLowerCase().includes(queryClass.toLowerCase().replace(' at ',' · '));
-      return `<label class="wizard-class-card ${isMatch?'recommended':''}"><input type="radio" name="class_choice" value="${esc(value)}" ${selected?'checked':''}><span class="class-choice-check">✓</span><div><span class="class-match-label">${isMatch?'Suggested match':'Other pathway'}</span><strong>${esc(item.title)}</strong><small>${esc(days[item.weekday])} · ${esc(item.start_time)} · ${esc(item.location_name)}</small><p><b>${money(item.price)} preview</b><em class="${available?'available':'waitlist'}">${available?`${available} ${available===1?'place':'places'} showing`:'Waitlist'}</em></p></div></label>`;
+      return `<label class="wizard-class-card ${isMatch?'recommended':''}"><input type="radio" name="class_choice" value="${esc(value)}" ${selected?'checked':''}><span class="class-choice-check">✓</span><div><span class="class-match-label">${isMatch?'Suggested match':'Other pathway'}</span><strong>${esc(item.title)}</strong><small>${esc(days[item.weekday])} · ${esc(time)} · ${esc(item.location_name)}</small><p><b>${money(item.price)} indicative</b><em class="${available?'available':'waitlist'}">${available?`${available} ${available===1?'place':'places'} showing`:'Waitlist'}</em></p></div></label>`;
     }).join('');
     const selected=target.querySelector('[name="class_choice"]:checked');
     if(selected)elements.preferredClass.value=selected.value;
@@ -125,6 +148,7 @@
 
   elements.next.addEventListener('click',()=>{if(validateStep(currentStep)){if(currentStep===2)recommendation();showStep(currentStep+1);}});
   elements.back.addEventListener('click',()=>showStep(currentStep-1));
+  elements.contactMethod.addEventListener('change',syncPhoneRequirement);
   form.addEventListener('change',event=>{if(['confidence','swimmer-goal'].includes(event.target.name)||event.target.id==='swimmer-goal')recommendation();});
   form.addEventListener('submit',async event=>{
     event.preventDefault();
@@ -135,17 +159,20 @@
     delete payload.confidence;delete payload.class_choice;delete payload.preferred_day;
     elements.submit.disabled=true;elements.submit.textContent='Sending securely…';elements.error.textContent='';
     try{
-      const response=await fetch('/api/public/enquiries',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
-      const result=await response.json();if(!response.ok)throw new Error(result.detail||'The enquiry could not be sent.');
+      const result=await request('/api/public/enquiries',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)},12000);
       form.hidden=true;document.querySelector('.enrolment-progress').hidden=true;
       document.getElementById('success-reference').textContent=result.reference||`HV-ENQ-${String(result.id).padStart(4,'0')}`;
-      document.getElementById('enrolment-success').hidden=false;
-      document.getElementById('enrolment-success').scrollIntoView({behavior:'smooth',block:'center'});
+      const success=document.getElementById('enrolment-success');success.hidden=false;
+      success.scrollIntoView({behavior:'smooth',block:'center'});
+      requestAnimationFrame(()=>success.querySelector('h2')?.focus({preventScroll:true}));
     }catch(problem){elements.error.textContent=`${problem.message} Please try again or call 0413 462 112.`;elements.submit.disabled=false;elements.submit.innerHTML='Send secure enquiry <span aria-hidden="true">→</span>';}
   });
 
-  fetch('/api/classes',{headers:{Accept:'application/json'}}).then(async response=>{const payload=await response.json();if(!response.ok)throw new Error();classes=payload.classes||[];renderClasses();}).catch(()=>{document.getElementById('wizard-class-grid').innerHTML='<div class="empty-state"><strong>We cannot show class times at the moment.</strong><p>Keep going anyway — choose &ldquo;flexible&rdquo; below and the team will confirm the current options when they reply.</p></div>';});
+  request('/api/classes',{headers:{Accept:'application/json'}}).then(payload=>{classes=payload.classes||[];renderClasses();}).catch(()=>{document.getElementById('wizard-class-grid').innerHTML='<label class="wizard-class-card flexible"><input type="radio" name="class_choice" value="Flexible—team recommendation"><span class="class-choice-check">✓</span><div><span class="class-match-label">Timetable unavailable</span><strong>Keep me flexible</strong><small>The team will check the current classes and recommend a suitable time when they reply.</small></div></label>';});
 
+  document.querySelectorAll('.wizard-heading h2').forEach(heading=>heading.tabIndex=-1);
+  document.querySelector('#enrolment-success h2')?.setAttribute('tabindex','-1');
+  syncPhoneRequirement();
   if(queryProgram){elements.program.value=queryProgram;document.getElementById('pathway-recommendation').innerHTML=`<span>Selected pathway</span><strong>${esc(queryProgram)}</strong><p>Complete the confidence questions so the team can confirm this starting point.</p>`;}
   if(merchInterest){
     elements.swimmerName.value='Merchandise enquiry';elements.age.value='Adult';elements.program.value='HV Swim Collection';elements.preferredClass.value='Not applicable';elements.notes.value=merchInterest;

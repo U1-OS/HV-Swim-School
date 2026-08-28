@@ -5,8 +5,12 @@ This build is a production foundation, not a substitute for the final deployment
 ## 1. Hosting and security
 
 - Deploy the FastAPI service behind HTTPS on an Australian-region host.
+- Use Python 3.12 or newer and keep the GitHub quality workflow green.
 - Replace SQLite with managed PostgreSQL before real customer use.
-- Set a long random `HV_SESSION_SECRET` and `HV_ENVIRONMENT=production`.
+- Set a long random `HV_SESSION_SECRET` and `HV_APP_ENV=production`.
+- On the first start of an empty production database only, set
+  `HV_BOOTSTRAP_ADMIN_EMAIL` and a unique `HV_BOOTSTRAP_ADMIN_PASSWORD` (12+ characters),
+  then remove both values after the management account has been created.
 - Configure the real public origin in `HV_PUBLIC_URL` and restrict allowed hosts.
 - Add automated encrypted backups, uptime checks, error monitoring and a restore drill.
 - Run an independent penetration test before collecting customer or staff information.
@@ -17,20 +21,22 @@ This build is a production foundation, not a substitute for the final deployment
 - Reconcile the command-centre metric definitions against the production database and assign an owner for each operational KPI.
 - Keep source mode and refresh time visible; never label seeded preview records as live business results.
 - Store exported CSV files only in an approved business location and delete local copies under the agreed retention policy.
-- Confirm staff permissions, password reset and account lifecycle rules.
+- Use the management Accounts workspace to provision families, staff and swimmers; every new account must replace its temporary password at first sign-in.
+- Implement verified password recovery, account deletion, active-session management and manager MFA before public/app-store launch.
 - Have an Australian privacy professional review consent, retention and child-safeguarding language.
 - Add the approved privacy policy, terms, cancellation policy and photo/media consent wording.
 - Confirm accessibility against WCAG 2.2 AA with keyboard and assistive-technology testing.
 - Set enquiry ownership, response targets and deletion/retention rules before the public form goes live.
 - Confirm enrolment authority, waitlist priority rules, payment collection and signed-terms requirements before managers promote real families into classes.
-- Decide whether a released class place should notify the next family automatically or remain a manager-approved action; V5.1 defaults to audited manager approval.
+- Decide whether a released class place should notify the next family automatically or remain a manager-approved action; V5.2 defaults to audited manager approval.
 - Train managers to use Website content only for approved public wording and to verify every published change on mobile.
 
 ## 3. Existing Xero organisation
 
 - Register a private Xero OAuth application and add its client ID, secret and callback URL.
-- Map HV Swim staff to Xero employee IDs and confirm pay-calendar/timesheet rules.
-- Test approved hours in dry-run mode, then set `XERO_SYNC_ENABLED=true` only after sign-off.
+- Map HV Swim staff to Xero employee and payroll-calendar IDs in the management workspace and confirm the earnings rate.
+- Use the audited readiness preview to identify incomplete mappings. It never transmits payroll data.
+- Import Xero pay-period boundaries and implement idempotent export tracking against the current AU Payroll API before any live transmission is enabled. `XERO_SYNC_ENABLED` is intentionally not sufficient to bypass this lock.
 - Keep payroll approval in Xero; this website must never store Xero usernames or passwords.
 
 ## 4. Merchandise and Shopify
@@ -61,6 +67,12 @@ This build is a production foundation, not a substitute for the final deployment
 - Keep daily staff verification as the operational source of truth.
 - If a venue exposes a sensor feed, add its endpoint and token only after confirming reliability, units and outage behaviour.
 - Do not display a stale sensor or manual reading as current; the build marks readings older than 24 hours for review.
+
+## 7. Weather and lesson calendar
+
+- Add an Open-Meteo commercial customer API key for production. The free endpoint is used only for local development.
+- Keep the server-side cache enabled so each visitor does not create a new provider request.
+- Add approved term dates, public holidays, venue closures and one-off lesson exceptions before treating recurring “today” class suggestions as an authoritative operating run sheet.
 
 ## Launch sign-off
 

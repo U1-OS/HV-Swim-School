@@ -1,12 +1,12 @@
-# HV Swim Bendigo V5.1 Public Launch Experience
+# HV Swim Bendigo V5.2 Production Foundation
 
-Premium public website, installable Progressive Web App and connected operations platform for HV Swim Bendigo. The build combines a polished responsive front end with a local FastAPI service, role-based accounts and SQLite data persistence.
+Premium public website, installable Progressive Web App and connected operations platform for HV Swim Bendigo. The build combines a polished responsive front end with a FastAPI service, role-based accounts and a SQLite preview database. SQLite is not approved for the final production deployment that will store customer, child or payroll data.
 
 ## Preview on this Mac
 
 Double-click `start-hv-swim.command`, then use the Start Here page that opens in your default browser. On first launch, macOS may ask you to confirm opening the file. Keep the Terminal window open while previewing; close it to stop the local server.
 
-The launcher creates its own Python environment and installs the pinned dependencies on first use. It starts the site at `http://127.0.0.1:8765` and opens `START_HERE.html`.
+The launcher creates its own Python environment and installs the pinned dependencies on first use. It starts the site at `http://127.0.0.1:8765` and opens `START_HERE.html`. Production uses Python 3.12 or newer; the GitHub quality workflow verifies that baseline.
 
 ## Main files
 
@@ -14,11 +14,9 @@ The launcher creates its own Python environment and installs the pinned dependen
 - `index.html` — public website
 - `about.html` — Laura-led story, teaching principles and confidence-first approach
 - `locations.html` — locations, weather and pool conditions
-- `shop.html` — public merchandise studio with guided kits, richer product specifications, care guidance and a persistent preview cart
-- `enquire.html` — lesson finder and database-backed enquiry form
+- `shop.html` — public merchandise studio with guided kits, product specifications, care guidance, variants and a persistent preview cart
+- `enquire.html` — four-step lesson finder and database-backed enquiry form
 - `programs.html` — premium program pathway, connected pricing, live places and guided lesson matcher
-- `shop.html` — premium nine-product storefront with search, variants, persistent preview cart and Shopify/POD launch boundaries
-- `enquire.html` — four-step enrolment concierge with program matching, connected class preferences, structured management handoff and confirmation references
 - `login.html` / `platform.html` — secure shared platform entry and role-based workspace
 - `app.html` — installable app experience
 - `mobile-shell.html` — native iOS/Android connection launch experience
@@ -34,7 +32,7 @@ The launcher creates its own Python environment and installs the pinned dependen
 - Staff: `staff@hvswim.demo` / `StaffDemo!26`
 - Management: `admin@hvswim.demo` / `AdminDemo!26`
 
-Demo credentials only work while `HV_ENVIRONMENT=development`. Production mode disables them.
+Demo credentials only work while `HV_APP_ENV=development`. Production mode disables them.
 
 ## Working in this build
 
@@ -53,20 +51,22 @@ Demo credentials only work while `HV_ENVIRONMENT=development`. Production mode d
 - Staff-verified water temperatures, opening checklists and public condition updates
 - Management metrics, roster/class creation, timesheet approvals, communications and audit trail
 - Management website editor for the homepage announcement, enrolment status, hero message and primary call-to-action
+- Management account and swimmer provisioning with a mandatory first password change
 - Enquiry inbox with new, contacted, trial-booked and closed follow-up stages
 - Management merchandise workspace with sample tracking, supplier routes, costs, projected margin and quantified launch readiness
 - Guided First Splash, Lesson Day and Pool Deck uniform kits that add coordinated products to the persistent preview cart
 - Product material, care and personalisation guidance with explicit sample-approval boundaries
 - Local catalogue price/status controls before products are approved for Shopify
-- Live Bendigo outdoor weather through the server-side weather service
+- Cached Bendigo outdoor weather through the server-side weather service; production requires a commercial Open-Meteo key
 - Premium “Today at HV Swim” homepage view combining local weather, staff-verified pool conditions, seasonal venue status and the next connected class place
-- Shopify storefront/cart, Printify catalogue and Xero OAuth/payroll integration boundaries
+- Cached Shopify storefront/cart and Printify catalogue boundaries
+- Xero OAuth connection, staff mapping and an audited payroll-readiness preview; outbound payroll transmission remains locked until real pay periods and idempotent export tracking are implemented
 - VistaPrint/manual and specialist-swim supplier plans for products unsuitable for generic POD
 - PWA manifest, app icons, offline public shell and mobile-first interfaces
 
 ## External activation boundaries
 
-Real Xero, Shopify, Printify, VistaPrint ordering, email, SMS, push, pool sensors, hosting, domain and native app-store distribution require credentials or accounts owned by HV Swim. Those values belong in a private `.env` file created from `.env.example`; secrets must never be placed in HTML or committed to source control.
+Real Xero, Shopify, Printify, VistaPrint ordering, commercial weather, email, SMS, push, pool sensors, hosting, domain and native app-store distribution require credentials or accounts owned by HV Swim. Those values belong in a private `.env` file created from `.env.example`; secrets must never be placed in HTML or committed to source control. Credentials do not activate email, SMS or push by themselves—the provider adapters and consent workflows are still explicit launch work.
 
 The direct management entry is `http://127.0.0.1:8765/login.html?role=admin`. In development, the page can load the Management demo account from the local server. Production never exposes demo credentials. After signing in, use **Website content** for approved homepage fields, **Enquiry inbox** for family follow-up and **Merchandise** for the launch catalogue.
 
@@ -76,6 +76,19 @@ Pool water temperature is not inferred from outdoor weather. It remains a daily 
 
 Local preview data is stored in `data/hv_swim.db`. The database is intentionally excluded from the delivery ZIP so every fresh copy starts with clean seeded demonstration data. Production should use managed PostgreSQL, encrypted backups and environment-specific secrets.
 
+## Quality checks
+
+Use Python 3.12+ and Node.js 22+, then run:
+
+```sh
+python -m pip install -r requirements-dev.txt
+python -m pytest tests/ -q
+node scripts/check-site.mjs
+node scripts/build-mobile-web.mjs
+```
+
+The same backend, static-site and mobile-shell checks run automatically for pushes and pull requests in the private GitHub repository.
+
 ## Original generated website asset
 
-The hero photograph and HV Swim merchandise campaign visuals were created with the built-in OpenAI image generation tool for this project. The V5.1 uniform studio visual uses the supplied HV Swim Bendigo logo as its brand reference and is presented as a concept until final products and manufacturer specifications are approved.
+The hero photograph and HV Swim merchandise campaign visuals were created with the built-in OpenAI image generation tool for this project. The V5.2 uniform studio visual uses the supplied HV Swim Bendigo logo as its brand reference and is presented as a concept until final products and manufacturer specifications are approved.

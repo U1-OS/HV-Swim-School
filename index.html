@@ -21,9 +21,9 @@
   <link rel="icon" href="assets/hv-swim-logo.png">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="assets/app-icon-192.png">
-  <link rel="stylesheet" href="assets/styles.css?v=5.1.1">
-  <script defer src="assets/app.js?v=5.1.2"></script>
-  <script defer src="assets/public-api.js?v=5.1.2"></script>
+  <link rel="stylesheet" href="assets/styles.css?v=5.2.0">
+  <script defer src="assets/app.js?v=5.2.0"></script>
+  <script defer src="assets/public-api.js?v=5.2.0"></script>
   <script type="application/ld+json">{
   "@context": "https://schema.org",
   "@type": "SportsActivityLocation",
@@ -53,7 +53,7 @@
   <header class="site-header">
     <div class="container nav-wrap">
       <a class="brand" href="index.html" aria-label="HV Swim Bendigo home">
-        <img src="assets/hv-swim-logo.png" alt="HV Swim Bendigo">
+        <img src="assets/hv-swim-logo.png" width="400" height="265" alt="HV Swim Bendigo">
         <span class="brand-copy"><strong>HV Swim Bendigo</strong><span>Confidence for life</span></span>
       </a>
       <nav class="nav-links" id="main-nav" aria-label="Main navigation">
@@ -97,11 +97,11 @@
       <aside class="hero-float reveal" aria-label="Latest pool condition">
         <div class="hero-float-top">
           <div><strong>Wood Street pool</strong><p>Latest condition from the staff portal.</p></div>
-          <span class="status demo" data-home-status>Demo</span>
+          <span class="status demo" data-home-status>Awaiting check</span>
         </div>
-        <div style="display:flex;align-items:end;justify-content:space-between;margin-top:17px;gap:12px">
-          <div class="temp-bubble" style="text-align:left"><strong data-home-temp>31.8°C</strong><span data-home-updated>Sample reading</span></div>
-          <a class="text-link" style="color:#76dbf5" href="locations.html">Details</a>
+        <div class="hero-condition-row">
+          <div class="temp-bubble"><strong data-home-temp>31.8°C</strong><span data-home-updated>Sample reading</span></div>
+          <a class="text-link" href="locations.html">Details</a>
         </div>
       </aside>
       <div class="hero-wave"></div>
@@ -118,19 +118,20 @@
 
     <section class="today-section" aria-labelledby="today-title">
       <div class="container today-panel reveal">
-        <div class="today-panel-head"><div><div class="eyebrow">Connected public information</div><h2 id="today-title">Today at HV Swim.</h2></div><div class="today-live"><span class="live-pulse" aria-hidden="true"></span><strong>Live Bendigo view</strong><small id="today-updated">Connecting now…</small></div></div>
+        <div class="today-panel-head"><div><div class="eyebrow">Your day at a glance</div><h2 id="today-title">Today at HV Swim.</h2></div><div class="today-live"><span class="live-pulse" aria-hidden="true"></span><strong>Current Bendigo view</strong><small id="today-updated" role="status" aria-live="polite">Connecting now…</small></div></div>
         <div class="today-grid" id="today-grid">
-          <article class="today-card"><div class="today-card-icon" aria-hidden="true">☀</div><div><span>Bendigo weather</span><strong id="today-weather-temp">—</strong><p id="today-weather-detail">Loading local conditions…</p></div><a href="locations.html">Full forecast →</a></article>
-          <article class="today-card"><div class="today-card-icon" aria-hidden="true">°C</div><div><span>Wood Street water</span><strong id="today-pool-temp">—</strong><p id="today-pool-detail">Checking the latest staff reading…</p></div><a href="locations.html#wood-street">Pool details →</a></article>
-          <article class="today-card lesson"><div class="today-card-icon" aria-hidden="true">→</div><div><span>Next available lesson</span><strong id="today-class-title">Connecting…</strong><p id="today-class-detail">Checking connected places…</p></div><a id="today-class-link" href="enquire.html">Enquire →</a></article>
+          <article class="today-card"><div class="today-card-icon" aria-hidden="true">☀</div><div><span>Bendigo weather</span><strong id="today-weather-temp">—</strong><p id="today-weather-detail" aria-live="polite">Loading local conditions…</p></div><a href="locations.html">Full forecast →</a></article>
+          <article class="today-card"><div class="today-card-icon" aria-hidden="true">°C</div><div><span>Wood Street water</span><strong id="today-pool-temp">—</strong><p id="today-pool-detail" aria-live="polite">Checking the latest staff reading…</p></div><a href="locations.html#wood-street">Pool details →</a></article>
+          <article class="today-card lesson"><div class="today-card-icon" aria-hidden="true">→</div><div><span>Next available lesson</span><strong id="today-class-title">Connecting…</strong><p id="today-class-detail" aria-live="polite">Checking current places…</p></div><a id="today-class-link" href="enquire.html">Enquire →</a></article>
         </div>
         <div class="today-panel-foot"><p><span class="status closed" id="today-seasonal-status">Seasonal venue</span><strong>Bendigo East Swimming Pool:</strong> <span id="today-seasonal-copy">checking current public status…</span></p><a class="btn btn-soft btn-small" href="locations.html">All locations &amp; conditions</a></div>
-        <p class="micro today-boundary" id="today-boundary">Weather comes from Open-Meteo. Water temperature is staff-verified unless a pool sensor is connected. Class places remain preview data until the production timetable is approved.</p>
+        <p class="micro today-boundary" id="today-boundary">Outdoor weather updates from the connected weather service. Water temperature is checked and published by staff; class places and fees are confirmed before enrolment.</p>
       </div>
     </section>
 
-    <div class="swim-ticker" aria-label="HV Swim values">
-      <div class="ticker-track">
+    <div class="swim-ticker">
+      <span class="sr-only">HV Swim values: confidence, water safety, belonging, small groups and personal progress.</span>
+      <div class="ticker-track" aria-hidden="true">
         <span>Confidence</span><i></i><span>Water safety</span><i></i><span>Belonging</span><i></i><span>Small groups</span><i></i><span>Personal progress</span><i></i><span>Confidence</span><i></i><span>Water safety</span><i></i><span>Belonging</span><i></i><span>Small groups</span><i></i><span>Personal progress</span><i></i>
       </div>
     </div>
@@ -175,13 +176,13 @@
           <div><div class="eyebrow">Connected timetable</div><h2>Find a lesson that fits.</h2><p class="lead" style="margin-top:16px">See a snapshot of classes with room available, then sign in or enquire so the team can confirm the right level.</p></div>
           <a class="btn btn-soft" href="enquire.html">Get a personalised match</a>
         </div>
-        <div class="availability-toolbar reveal"><span class="status open" id="availability-connection">Timetable connected</span><p id="availability-connection-note">Availability updates from the HV Swim class database.</p></div>
+        <div class="availability-toolbar reveal"><span class="status open" id="availability-connection">Timetable connected</span><p id="availability-connection-note">Current published availability is shown below.</p></div>
         <div class="availability-grid" id="public-availability" aria-live="polite">
           <article class="availability-card loading-card"><span></span><span></span><span></span></article>
           <article class="availability-card loading-card"><span></span><span></span><span></span></article>
           <article class="availability-card loading-card"><span></span><span></span><span></span></article>
         </div>
-        <p class="micro availability-boundary" id="availability-source">Preview timetable data is illustrative until HV Swim imports the live enrolment list.</p>
+        <p class="micro availability-boundary" id="availability-source">HV Swim confirms class fit, availability and billing before enrolment.</p>
       </div>
     </section>
 
@@ -221,9 +222,9 @@
     <section class="section navy merch-section" id="merch">
       <div class="merch-orb" aria-hidden="true"></div>
       <div class="container merch-wrap">
-        <div class="merch-copy reveal"><div class="eyebrow">The HV Swim collection</div><h2>Made for every lesson day.</h2><p class="lead" style="margin-top:18px">A premium uniform and pool-gear capsule for swimmers, families and staff—now with guided starter kits, product care and a sample-first production plan.</p><div class="merch-tags"><span>Swimwear</span><span>Uniforms</span><span>Drinkware</span><span>Pool gear</span></div><div class="merch-actions"><a class="btn btn-primary" href="shop.html#kit-builder">Build a lesson-day kit <span aria-hidden="true">→</span></a><span class="status changed">Shopify-ready</span></div><p class="micro merch-note">The catalogue, guided kit builder and persistent preview cart work now. Live stock, checkout, payment and fulfilment activate only after samples and supplier connections are approved.</p></div>
+        <div class="merch-copy reveal"><div class="eyebrow">The HV Swim collection</div><h2>Made for every lesson day.</h2><p class="lead space-top-18">A premium uniform and pool-gear capsule for swimmers, families and staff—with guided starter kits, practical care guidance and a sample-first production plan.</p><div class="merch-tags"><span>Swimwear</span><span>Uniforms</span><span>Drinkware</span><span>Pool gear</span></div><div class="merch-actions"><a class="btn btn-primary" href="shop.html#kit-builder">Build a lesson-day kit <span aria-hidden="true">→</span></a><span class="status changed">Preparing to launch</span></div><p class="micro merch-note">Save a preferred collection list now. Stock, checkout, payment and fulfilment will open after physical samples and suppliers are approved.</p></div>
         <figure class="merch-campaign reveal">
-          <img src="assets/merch-uniform-studio-v3.jpg" alt="HV Swim Bendigo uniform and merchandise studio collection concept" loading="lazy">
+          <img src="assets/merch-uniform-studio-v3.jpg" width="1536" height="1024" alt="HV Swim Bendigo uniform and merchandise studio collection concept" loading="lazy">
           <figcaption><span><strong>HV Swim Collection 01</strong><small>Premium concept visual</small></span><span class="campaign-arrow" aria-hidden="true">↗</span></figcaption>
         </figure>
       </div>
@@ -262,7 +263,7 @@
 
   <footer class="site-footer">
     <div class="container footer-main">
-      <div class="footer-brand"><img src="assets/hv-swim-logo.png" alt="HV Swim Bendigo"><p>Personal swimming lessons focused on confidence, water safety and progress for every age and ability.</p></div>
+      <div class="footer-brand"><img src="assets/hv-swim-logo.png" width="400" height="265" alt="HV Swim Bendigo"><p>Personal swimming lessons focused on confidence, water safety and progress for every age and ability.</p></div>
       <div class="footer-col"><strong>Explore</strong><a href="programs.html">Programs &amp; pricing</a><a href="#availability">Availability</a><a href="locations.html">Locations</a><a href="about.html">Our approach</a><a href="shop.html">Merch shop</a></div>
       <div class="footer-col"><strong>Platform</strong><a href="login.html?role=customer">Family account</a><a href="login.html?role=staff">Staff account</a><a href="login.html?role=admin">Website admin</a></div>
       <div class="footer-col"><strong>Contact</strong><a href="tel:+61413462112">0413 462 112</a><a href="mailto:sloanswimschool@hotmail.com">sloanswimschool@hotmail.com</a><a href="https://www.facebook.com/hvswimschoolbendigo" target="_blank" rel="noopener">Facebook</a></div>
