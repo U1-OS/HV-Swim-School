@@ -245,7 +245,9 @@
         const response = await fetch(endpoint, { signal: AbortSignal.timeout ? AbortSignal.timeout(8000) : undefined });
         if (!response.ok) throw new Error('Weather unavailable'); data = await response.json();
       }
-      localStorage.setItem(WEATHER_KEY, JSON.stringify({ savedAt:Date.now(), data }));
+      // Caching is a convenience. If storage is unavailable the fetch still succeeded,
+      // so the reading must still be shown rather than falling through to the error path.
+      try { localStorage.setItem(WEATHER_KEY, JSON.stringify({ savedAt:Date.now(), data })); } catch (_) {}
       renderWeather(data, false);
     } catch (_) {
       if (cached?.data) { renderWeather(cached.data, true); }
@@ -378,6 +380,8 @@
   document.querySelectorAll('[data-demo-shop]').forEach(button => button.addEventListener('click', () => showToast('Demo product only — Shopify catalogue and checkout are not connected yet.')));
   document.querySelectorAll('[data-reset-demo]').forEach(button => button.addEventListener('click', () => {
     if (!window.confirm('Reset the HV Swim V4 browser demo data on this device?')) return;
-    localStorage.removeItem(STORAGE_KEY); state = cloneDefaults(); saveState(); location.reload();
+    // Storage can throw outright where site data is blocked; the reset must still run.
+    try { localStorage.removeItem(STORAGE_KEY); } catch (_) {}
+    state = cloneDefaults(); saveState(); location.reload();
   }));
 })();

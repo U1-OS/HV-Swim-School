@@ -163,6 +163,20 @@ preview prices.
   are reviewing a code path, confirm the elements it touches actually exist before drawing
   a conclusion about it.** Verified after removal: no dead element references remain, no
   console or page errors on any page, and the live availability failure state still renders.
+- **Service worker was caching failed responses.** Its catch-all handler stored every
+  response it saw, including 404s and 500s, so one transient server error could be pinned in
+  the cache and served to that visitor from then on. It also tried to cache opaque
+  cross-origin responses, which `cache.put` rejects, producing unhandled console errors.
+  It now stores only successful same-origin responses.
+- Fixed two storage-related faults in `app.js`: a successful weather fetch was discarded if
+  writing it to the cache threw (so anyone with site data blocked never saw live weather,
+  despite the request having worked), and the demo-reset handler could not complete for the
+  same reason. Verified with storage forced to throw: no page errors, site fully usable.
+- Swept the whole codebase for stale references after the `public-api.js` discovery: no JS
+  references an element id that exists on no page, no front-end call targets a missing
+  endpoint, and every `localStorage` access is guarded. The three unreferenced backend
+  endpoints (`/api/admin/metrics`, the Xero OAuth callback and the pool-sensor feed) are
+  called from outside the browser and are correct as they are.
 - Security review of `backend/`. The code is in good shape — SQL is parameterised
   throughout, CSV formula injection was already guarded, exports are role-gated, ownership
   checks are consistent, PBKDF2 is 210k iterations with a constant-time compare, and the

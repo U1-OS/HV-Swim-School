@@ -1,8 +1,8 @@
-const CACHE = 'hv-swim-v5-shell-22';
+const CACHE = 'hv-swim-v5-shell-23';
 const PUBLIC_DATA_CACHE = 'hv-swim-v4-public-data-1';
 const SHELL = [
   './', './index.html', './about.html', './programs.html', './app.html', './mobile-shell.html', './login.html', './platform.html', './enquire.html', './locations.html', './shop.html', './customer.html', './staff.html', './admin.html', './offline.html',
-  './assets/styles.css?v=5.1.1', './assets/app.js?v=5.1.1', './assets/hv-swim-logo.png', './assets/hero-swimmer.jpg', './assets/og-share.jpg', './assets/merch-collection-v2.jpg', './assets/merch-uniform-studio-v3.jpg',
+  './assets/styles.css?v=5.1.1', './assets/app.js?v=5.1.2', './assets/hv-swim-logo.png', './assets/hero-swimmer.jpg', './assets/og-share.jpg', './assets/merch-collection-v2.jpg', './assets/merch-uniform-studio-v3.jpg',
   './assets/platform.css?v=5.1.1', './assets/platform.js?v=5.1.1', './assets/public-api.js?v=5.1.2', './assets/programs.js?v=5.1.1', './assets/shop.js?v=5.1.1', './assets/enquire.js?v=5.1.1', './assets/mobile-shell.css?v=5.1.0', './assets/mobile-shell.js?v=5.1.0',
   './assets/app-icon-192.png', './assets/app-icon-512.png', './assets/app-icon-1024.png', './assets/app-icon-maskable-192.png', './assets/app-icon-maskable-512.png', './manifest.webmanifest'
 ];
@@ -33,8 +33,13 @@ self.addEventListener('fetch', event => {
     return;
   }
   event.respondWith(fetch(event.request).then(response => {
-    const copy = response.clone();
-    caches.open(CACHE).then(cache => cache.put(event.request, copy));
+    // Only store successful same-origin responses. Caching a 404 or a 500 would pin that
+    // error for the life of the cache, and cache.put rejects on opaque cross-origin
+    // responses, which surfaced as unhandled errors in the console.
+    if (response.ok && response.type === 'basic') {
+      const copy = response.clone();
+      caches.open(CACHE).then(cache => cache.put(event.request, copy)).catch(() => {});
+    }
     return response;
   }).catch(() => caches.match(event.request).then(match => match || (event.request.mode === 'navigate' ? caches.match('./offline.html') : Response.error()))));
 });
