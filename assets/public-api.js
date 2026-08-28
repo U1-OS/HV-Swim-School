@@ -46,7 +46,7 @@
       const response=await fetch('/api/public/enquiries',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(Object.fromEntries(data.entries()))});
       const payload=await response.json();if(!response.ok)throw new Error(payload.detail||'The enquiry could not be sent.');
       status.textContent=payload.message;status.style.color='#147652';form.reset();button.textContent='Enquiry received';
-    }catch(problem){status.textContent=`${problem.message} Please email sloanswimschool@hotmail.com if the local server is not running.`;status.style.color='#a23642';button.disabled=false;button.textContent='Send secure enquiry';}
+    }catch(problem){status.textContent=`${problem.message} Please email sloanswimschool@hotmail.com or call 0413 462 112 and we will get straight back to you.`;status.style.color='#a23642';button.disabled=false;button.textContent='Send secure enquiry';}
   });
 
   const availability=document.getElementById('public-availability');

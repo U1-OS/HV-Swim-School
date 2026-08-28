@@ -48,6 +48,13 @@ preview prices.
   references repointed and the service-worker cache bumped to `hv-swim-v5-shell-16`.
 - Added `robots.txt` (portals disallowed) and `scripts/build-sitemap.mjs`.
 - First accessibility pass — see item 3 under Next up for what was fixed and what remains.
+- Content truth pass on the public pages: corrected the address in `privacy.html` (it said
+  76b Wood Street; the rest of the site says 76), rewrote the enquiry-failure message which
+  told parents to check whether "the local server is not running", replaced the hard-coded
+  homepage fallbacks that read "Demo · lessons running" to any visitor when the API is
+  unreachable, and upgraded the homepage structured data from a bare `Organization` to
+  `SportsActivityLocation` with the real postal address — local search is how a Bendigo
+  swim school gets found.
 
 ## Next up
 
@@ -92,6 +99,14 @@ Remaining work, in order:
 ## Open decisions for Andrew
 
 - Refund, cancellation and make-up rules; data retention periods; ABN; complaints contact.
+- **Opening hours are published nowhere on the site.** Parents look for them and they belong
+  in the structured data too. Not invented — needs Andrew's actual hours.
+- Confirm the public contact details are current: the site uses
+  `sloanswimschool@hotmail.com` and 0413 462 112 throughout. An earlier draft of this
+  project used a different address and number, so one of them is out of date.
+- `START_HERE.html` prints the three demo account passwords. It is disallowed in
+  `robots.txt` and the accounts only work in development mode, but the page should not be
+  deployed to a public host as-is.
 - Which merch products go first, and through which supplier route.
 - Whether Shopify gets connected now or after physical samples are approved.
 - Real logo master file — the current asset is website-grade, not print-grade.
