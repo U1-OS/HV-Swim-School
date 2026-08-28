@@ -68,6 +68,28 @@ def test_public_endpoints_need_no_session(client):
         assert client.get(path).status_code == 200, path
 
 
+def test_public_site_serves_only_explicitly_approved_files(client):
+    for path in ("/", "/index.html", "/assets/styles.css", "/service-worker.js", "/robots.txt"):
+        assert client.get(path).status_code == 200, path
+
+    # These paths all exist in a normal checkout. None may ever become a public download,
+    # even if a future deployment also places an .env file or production database here.
+    private_paths = (
+        "/.env",
+        "/.env.example",
+        "/.git/config",
+        "/AGENTS.md",
+        "/HANDOFF.md",
+        "/backend/config.py",
+        "/data/hv_swim.db",
+        "/tests/test_api.py",
+    )
+    for path in private_paths:
+        response = client.get(path, headers={"Accept": "application/octet-stream"})
+        assert response.status_code == 404, path
+        assert "session_secret" not in response.text.lower(), path
+
+
 def test_public_class_list_never_exposes_swimmer_identities(client):
     body = client.get("/api/classes").text.lower()
     for leak in ("medical", "date_of_birth", "emergency_contact", "swimmer_id"):
