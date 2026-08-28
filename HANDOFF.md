@@ -126,6 +126,17 @@ preview prices.
 - Extended `test_api.py` from 19 to 28 tests, covering the enquiry honeypot and rate limit,
   the branded 404, that the API still returns JSON for unknown paths, and the cache headers.
   Still unrun — see the Tests section.
+- Read through `assets/platform.js` (the 3 portals, ~75KB) and fixed two real defects.
+  The staff **"Clock & work location" clock was frozen**: it displays seconds but used
+  `setTimeout`, so it ticked exactly once and then stopped — staff timing a clock-in were
+  reading a stopped clock. It now ticks on an interval that is cleared when the route
+  changes, which also closes a leak where each visit left another interval running against
+  a detached element. Second, **a failed session load left the portal on its loading
+  spinner forever**: a 401 redirects to sign-in, but a server or connection failure was
+  swallowed silently. It now explains what happened, reassures that the account is
+  unchanged, and offers retry.
+  The rest of the file is in good shape — event delegation is registered once rather than
+  per render, geolocation failure is handled, and escaping is consistent.
 - Security review of `backend/`. The code is in good shape — SQL is parameterised
   throughout, CSV formula injection was already guarded, exports are role-gated, ownership
   checks are consistent, PBKDF2 is 210k iterations with a constant-time compare, and the
@@ -142,6 +153,17 @@ preview prices.
   unreachable, and upgraded the homepage structured data from a bare `Organization` to
   `SportsActivityLocation` with the real postal address — local search is how a Bendigo
   swim school gets found.
+
+## The portals have still never been seen rendered
+
+`platform.js` has now been read line by line, but the family, staff and management
+workspaces have **never been opened in a browser** — that needs the FastAPI backend
+running, and it cannot be installed from the environment the last session had.
+Andrew has asked that nothing be faked or simulated to get around this, which is right:
+a mock backend would prove the UI renders against invented data, not that it works.
+
+**Whoever has FastAPI available should run the server and walk all three portals.** It is
+the largest surface in the project with no visual review at all.
 
 ## Regression sweep — last run 2026-08-28
 

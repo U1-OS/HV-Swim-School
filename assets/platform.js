@@ -6,6 +6,7 @@
   const weekday = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
   let session = { user: null, csrf: null };
   let integrationCache = [];
+  let clockTimer = null;   // the staff clock ticks on this; cleared whenever the route changes
 
   const esc = value => String(value ?? '').replace(/[&<>'"]/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]));
   const money = cents => new Intl.NumberFormat('en-AU',{style:'currency',currency:'AUD'}).format(Number(cents || 0) / 100);
@@ -75,7 +76,26 @@
   async function initApp() {
     try {
       const auth = await api('/api/auth/me'); session = { user:auth.user, csrf:auth.csrf_token };
-    } catch (_) { return; }
+    } catch (problem) {
+      // A 401 has already redirected to the sign-in page. Anything else — server down,
+      // connection dropped — used to leave the loading spinner up forever with no
+      // explanation, so say what happened and offer a way out.
+      if (String(problem.message).includes('Sign in required')) return;
+      const content = document.getElementById('platform-content');
+      if (content) {
+        content.className = '';
+        content.innerHTML = `<div class="panel panel-pad"><h2>We can't reach your account right now.</h2>`
+          + `<p class="fine" style="margin-top:10px">${esc(problem.message)}</p>`
+          + `<p class="fine" style="margin-top:6px">Your lessons and details are safe — this is a connection problem, not a change to your account.</p>`
+          + `<div style="display:flex;gap:10px;margin-top:18px;flex-wrap:wrap">`
+          + `<button class="btn btn-blue" type="button" id="session-retry">Try again</button>`
+          + `<a class="btn btn-soft" href="index.html">Back to the website</a></div></div>`;
+        // Attached rather than inline: the app's CSP is script-src 'self', which blocks
+        // inline handlers outright.
+        document.getElementById('session-retry')?.addEventListener('click', () => location.reload());
+      }
+      return;
+    }
     document.title = `${session.user.display_name} | HV Swim`;
     document.getElementById('platform-user-name').textContent = session.user.display_name;
     document.getElementById('platform-user-role').textContent = roleLabels[session.user.role];
@@ -131,6 +151,9 @@
     if (!allowed.includes(route)) route='overview';
     document.querySelectorAll('[data-route]').forEach(button => button.classList.toggle('active',button.dataset.route===route));
     document.querySelectorAll('[data-mobile-route]').forEach(button => button.classList.toggle('active',button.dataset.mobileRoute===route));
+    // Leaving a view must stop its timers, or every visit to the clock screen leaves
+    // another interval running against a detached element.
+    if (clockTimer) { clearInterval(clockTimer); clockTimer = null; }
     const content = document.getElementById('platform-content'); content.className=''; content.innerHTML=loading();
     try {
       const renderer = renderers[session.user.role]?.[route];
@@ -200,7 +223,7 @@
   async function staffClock(content) {
     const data=await api('/api/staff/time-entries'); const active=data.time_entries.find(e=>!e.clock_out);
     content.innerHTML=shell('Clock & work location','Capture accurate hours and an optional location confirmation.',`<div class="platform-grid"><section class="panel panel-pad p-span-5 clock-panel"><div class="panel-head"><h2 style="color:white">Current shift</h2>${chip(active?'Clocked in':'Ready',active?'open':'demo')}</div><div class="clock-time" id="live-clock">--:--</div><p class="clock-state">${active?`Started ${dt(active.clock_in)} at ${esc(active.location_name)}`:'Choose a venue to begin your shift.'}</p><div class="field"><label style="color:#b7cbe0" for="clock-location">Work location</label><select id="clock-location" ${active?'disabled':''}><option value="wood-street">Wood Street Indoor Pool</option><option value="bendigo-east">Bendigo East Swimming Pool</option></select></div><button class="btn btn-primary" style="width:100%;margin-top:13px" data-action="clock" data-clock-action="${active?'out':'in'}">Clock ${active?'out':'in'}</button><p class="micro" style="margin-top:11px;color:#a9bfd7">Device location is requested only when you press Clock in.</p></section><section class="panel panel-pad p-span-7"><div class="panel-head"><h2>Recent entries</h2></div><div class="api-list">${data.time_entries.slice(0,8).map(e=>`<div class="api-row"><div class="api-row-main"><strong>${dt(e.clock_in)} · ${esc(e.location_name)}</strong><span>${e.clock_out?`${dt(e.clock_out)} · ${Number(e.hours||0).toFixed(2)} hours`:'Active shift'}</span></div>${chip(e.status,statusKind(e.status))}</div>`).join('')||empty('No time entries yet.')}</div></section></div>`);
-    const clock=document.getElementById('live-clock'); const update=()=>clock&&(clock.textContent=new Intl.DateTimeFormat('en-AU',{hour:'numeric',minute:'2-digit',second:'2-digit',timeZone:'Australia/Melbourne'}).format(new Date())); update(); setTimeout(update,1000);
+    const clock=document.getElementById('live-clock'); const update=()=>clock&&(clock.textContent=new Intl.DateTimeFormat('en-AU',{hour:'numeric',minute:'2-digit',second:'2-digit',timeZone:'Australia/Melbourne'}).format(new Date())); update(); clockTimer=setInterval(update,1000);
   }
 
   async function staffPool(content) {
