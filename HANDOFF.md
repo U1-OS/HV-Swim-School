@@ -48,6 +48,8 @@ preview prices.
   references repointed and the service-worker cache bumped to `hv-swim-v5-shell-16`.
 - Added `robots.txt` (portals disallowed) and `scripts/build-sitemap.mjs`.
 - First accessibility pass — see item 3 under Next up for what was fixed and what remains.
+- Wrote `tests/test_security.py` (verified passing) and `tests/test_api.py` (unrun — see
+  the Tests section above). Before this there were 54 endpoints and no automated tests.
 - Security review of `backend/`. The code is in good shape — SQL is parameterised
   throughout, CSV formula injection was already guarded, exports are role-gated, ownership
   checks are consistent, PBKDF2 is 210k iterations with a constant-time compare, and the
@@ -64,6 +66,16 @@ preview prices.
   unreachable, and upgraded the homepage structured data from a bare `Organization` to
   `SportsActivityLocation` with the real postal address — local search is how a Bendigo
   swim school gets found.
+
+## Tests
+
+There is now a `tests/` suite — see `tests/README.md`. `test_security.py` is **verified
+passing** (15 checks, runs with plain `python3`, no pytest needed). `test_api.py` covers
+role boundaries, ownership isolation, CSRF and secret leakage but has **never been
+executed** — it was written without access to a package index, so `fastapi` could not be
+installed. **Whoever picks this up next: run `pytest tests/ -q` first**, fix any fixture
+mismatches, and report the result here. Until then treat `test_api.py` as a reviewed
+specification rather than a passing suite.
 
 ## Next up
 
