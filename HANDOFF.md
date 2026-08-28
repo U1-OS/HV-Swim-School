@@ -126,6 +126,18 @@ preview prices.
   `SportsActivityLocation` with the real postal address — local search is how a Bendigo
   swim school gets found.
 
+## Regression sweep — last run 2026-08-28
+
+All 12 public pages (plus 404 and sign-in) rendered in Chromium at 1440x900 and 390x844:
+**no JavaScript errors, no console errors, no horizontal overflow, no content left
+invisible.** The only console output is `fetch` failing for `/api/...`, which is expected
+when the pages are opened straight from disk with no backend running.
+
+One measurement gotcha, since it caught me twice: when checking `.reveal` elements, scroll
+in steps well under one viewport with a pause between each and a settle at the end, and
+exclude elements that are `display:none` at that breakpoint. Coarse scrolling reports
+elements as invisible that are perfectly fine, and responsive variants are hidden by design.
+
 ## Tests
 
 There is now a `tests/` suite — see `tests/README.md`. `test_security.py` is **verified
