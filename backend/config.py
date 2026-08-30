@@ -47,6 +47,7 @@ def resolved_app_environment() -> str:
 class Settings:
     app_env: str = resolved_app_environment()
     session_secret: str = os.getenv("HV_SESSION_SECRET", "local-demo-secret-change-before-production")
+    data_encryption_key: str = os.getenv("HV_DATA_ENCRYPTION_KEY", "")
     public_url: str = os.getenv("HV_PUBLIC_URL", "http://localhost:8765").rstrip("/")
     bootstrap_admin_email: str = os.getenv("HV_BOOTSTRAP_ADMIN_EMAIL", "").strip().lower()
     bootstrap_admin_password: str = os.getenv("HV_BOOTSTRAP_ADMIN_PASSWORD", "")

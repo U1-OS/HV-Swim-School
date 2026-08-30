@@ -1,6 +1,6 @@
-# HV Swim Bendigo V5.9.0 Premium Platform
+# HV Swim Bendigo V5.10.0 Premium Platform
 
-Premium public website, installable Progressive Web App and connected operations platform for HV Swim Bendigo. The build combines a polished responsive front end with a FastAPI service, role-based accounts and a SQLite preview database. SQLite is not approved for the final production deployment that will store customer, child or payroll data.
+Premium public website and connected operations platform for HV Swim Bendigo. The build combines a polished responsive front end with a FastAPI service, role-based accounts and a SQLite preview database. SQLite is not approved for the final production deployment that will store customer, child or payroll data.
 
 ## Preview on this Mac
 
@@ -14,18 +14,16 @@ The launcher creates its own Python environment and installs the pinned dependen
 - `index.html` — public website
 - `about.html` — Laura-led story, teaching principles and confidence-first approach
 - `locations.html` — locations, weather and pool conditions
-- `shop.html` — public merchandise studio with guided kits, product specifications, care guidance, variants and a persistent preview cart
+- `shop.html` — public merchandise studio with guided product plans, specifications and care guidance; cart/checkout stay hidden until an approved live Shopify catalogue is connected
 - `enquire.html` — four-step lesson finder and database-backed enquiry form
 - `programs.html` — premium program pathway, connected pricing, live places and guided lesson matcher
 - `login.html` / `platform.html` — secure shared platform entry and role-based workspace
-- `app.html` — installable app experience
-- `mobile-shell.html` — native iOS/Android connection launch experience
-- `MOBILE_APP_README.md` — Mac, Xcode, Android Studio and store-build guide
+- `app.html` / `mobile-shell.html` — paused mobile source retained for a later phase; neither route is publicly served
+- `MOBILE_APP_README.md` — paused mobile-phase notes retained for future planning
 - `BRAND_GUIDE.md` — logo, colour, typography and merchandise usage guide
 - `ASSOCIATION_BADGE_REQUIREMENTS.md` — evidence and authorised-artwork gate for third-party member/provider badges
 - `IMAGE_ASSET_PROVENANCE.md` — exact V5.4/V5.6 image prompts, modes, masters and web outputs
-- `prepare-mobile-app.command` — creates and synchronises the Capacitor iOS/Android projects
-- `capacitor.config.json` / `package.json` — Capacitor 8 native project foundation
+- `prepare-mobile-app.command` / `capacitor.config.json` — paused Capacitor source retained outside the current website scope
 - `backend/` — API, security, database and third-party integration boundaries
 - `PRODUCTION_HANDOFF.md` — activation and deployment checklist
 
@@ -39,25 +37,24 @@ Demo credentials only work while `HV_APP_ENV=development`. Production mode disab
 
 ## Working in this build
 
-- PBKDF2 password hashing, HttpOnly sessions, CSRF protection, rate limiting and role permissions
+- PBKDF2 password hashing, HttpOnly/SameSite=Strict sessions, one-way session-token storage, CSRF protection, rate limiting and role permissions
 - Real Google and Apple OpenID Connect foundation for family sign-up/sign-in, with
   PKCE/state/nonce protection, verified server-side identity tokens and provider tokens
   deliberately excluded from storage; staff and management identities remain invitation-only
-- Family swimmers, editable emergency/allergy/medication/support profiles, class availability, bookings, cancellations, waitlists and notices
+- Family swimmers, editable emergency/allergy/medication/support profiles encrypted at rest, class availability, bookings, cancellations, waitlists and notices
+- Automatic permanent family (`HVS-…`) and student (`HVS-S-…`) numbers, guaranteed again at lesson purchase and snapshotted into the Xero lesson-charge record so website, family, student and accounting records can be reconciled
 - Family absence reporting against the active term calendar, with a visible two-credit
   allowance per swimmer and an explicit no-make-up/no-automatic-refund boundary
 - Filtered family class finder with live capacity meters and visible waitlist positions
-- Staff rosters, reviewed timesheets, pool checks, achievements and qualification tracking without clock-in tracking
+- Staff clock-on/clock-off with break recording, manual weekly/daily hour entry, permanent worker numbers, management approval, rosters, pool checks, achievements and private certificate-document tracking
+- Role-protected incident/injury reporting linked to the family, student and worker numbers, with encrypted sensitive narratives, family-visible references and management follow-up status
 - Date-based staff lesson registers with attendance, family-reported absence status,
   parent/guardian-on-site enforcement, photo-clearance snapshots and privacy-limited notes
 - Source-labelled management dashboard with class utilisation, enquiry workload, hours pipeline and pool readiness
 - Management enrolment desk with today's run sheet, weekly capacity board and audited waitlist promotion
 - Management term operations with draft/active/closed calendars, absence-credit ledger,
   term-aware “today” schedules and all-staff lesson-register oversight
-- App-style mobile tab navigation tailored to family, staff and management roles
-- Native-ready Capacitor 8 launch shell for iOS and Android
-- Safe-area layouts, offline public-data cache and honest connection status
-- 1024px store icon source, store-listing draft and Apple/Google release gates
+- Responsive website navigation tailored to family, staff and management roles
 - Location manager for public status, venue details, parking and accessibility information
 - Safe CSV exports for enquiries, staff hours and the merchandise catalogue
 - Staff-verified water temperatures, opening checklists and public condition updates
@@ -70,10 +67,10 @@ Demo credentials only work while `HV_APP_ENV=development`. Production mode disab
 - Management account and swimmer provisioning with a mandatory first password change
 - Enquiry inbox with new, contacted, trial-booked and closed follow-up stages
 - Asynchronous public support tickets with a returned reference and staff queue; the widget is not live chat or an emergency channel, and no external support email is sent yet
-- Family-visible swimmer achievements with evidence, staff-private notes, audited issue/revocation and printable HTML certificates that are not qualifications or accreditation
-- Urgent pool-closure and changed-condition alerts that poll while a website/app page is open; genuine off-device Web Push, APNs and FCM delivery is not active
+- Family-visible swimmer achievements with evidence, staff-private notes, audited issue/revocation and eight printable certificate styles that are not qualifications or accreditation
+- Family-controlled in-portal lesson reminders plus urgent pool-closure and changed-condition alerts that poll while a website page is open; email/SMS and off-device push are not active
 - Management merchandise workspace for the premium 24-product plan, with sample tracking, supplier routes, costs, projected margin and quantified launch readiness
-- Guided First Splash, Lesson Day and Family Club kits that add coordinated public products to the persistent preview cart
+- Guided First Splash, Lesson Day and Family Club product plans that remain non-orderable until the approved Shopify catalogue is connected
 - Role-protected staff uniform catalogue available only inside the Staff and Management workspaces; staff products are excluded from the public product API
 - Product material, care and personalisation guidance with explicit sample-approval boundaries
 - Local catalogue price/status controls before products are approved for Shopify
@@ -91,9 +88,9 @@ Demo credentials only work while `HV_APP_ENV=development`. Production mode disab
   Checkout, with staff uniforms kept inside protected staff/management views. Neither route
   fabricates payments when credentials or launch gates are incomplete.
 - VistaPrint/manual and specialist-swim supplier plans for products unsuitable for generic POD
-- PWA manifest, app icons, offline public shell and mobile-first interfaces
+- Mobile-first website interfaces and an offline public fallback
 - Refined transparent HV Swim logo system, simplified digital mark, refreshed social image,
-  new native/PWA icon family and locally hosted Manrope typography
+  refreshed website icon family and locally hosted Manrope typography
 - Cohesive premium visual system across the public site, sign-in, family, staff and
   management experiences with improved role-aware navigation and responsive density
 
@@ -104,7 +101,7 @@ family access requires an Apple Developer Services ID and generated, rotated cli
 those values are present, both buttons remain visible but disabled as “Setup required”; the
 preview never fabricates a provider login. Connecting the existing Xero organisation requires
 an HV Swim-owned OAuth app and mappings. Shopify, Printify, VistaPrint ordering, commercial
-weather, email, SMS, push, pool sensors, hosting, domain and native app-store distribution
+weather, email, SMS, push, pool sensors, hosting and domain
 likewise require credentials or accounts owned by HV Swim. Those values belong in a private
 `.env` file created from `.env.example`; secrets must never be placed in HTML or committed to
 source control. Credentials do not activate email, SMS or push by themselves—the provider
@@ -115,7 +112,7 @@ The website never presents directory membership as instructor accreditation. Man
 
 The 24 merchandise records are a production plan, not available stock. The public store separates premium swimwear, embroidered towels and hooded ponchos, goggles/equipment, named drinkware and POD family wear while showing each proposed production route. Staff uniforms are excluded from the public API and appear only in role-protected Staff and Management workspaces. Every product must pass artwork-rights, specification, landed-cost, physical-sample, care/returns and end-to-end Shopify release gates. Supplier and blank-brand names identify possible sourcing routes only; they do not claim a partnership, endorsement, licence or authorised-reseller relationship with HV Swim.
 
-Support messages currently enter the protected management queue and return a reference; external email delivery is not implemented. Urgent notices refresh on active website/app pages, but reaching a device while the site or app is closed still requires a consented production provider, device-token handling and working Web Push/APNs/FCM adapter.
+Support messages currently enter the protected management queue and return a reference; external email delivery is not implemented. Lesson reminders and urgent notices refresh inside active website sessions. Reaching a closed browser or sending email/SMS still requires a consented production provider and a tested delivery adapter.
 
 The direct management entry is `http://127.0.0.1:8765/login.html?role=admin`. In development, the page can load the Management demo account from the local server. Production never exposes demo credentials. After signing in, use **Term operations** for approved calendar dates and credit oversight, **Lesson registers** for attendance review, **Website content** for approved homepage fields, **Enquiry inbox** for family follow-up and **Merchandise** for the launch catalogue.
 
@@ -123,7 +120,7 @@ Pool water temperature is not inferred from outdoor weather. It remains a daily 
 
 ## Data and reset
 
-Local preview data is stored in `data/hv_swim.db`. The database is intentionally excluded from the delivery ZIP so every fresh copy starts with clean seeded demonstration data. Production should use managed PostgreSQL, encrypted backups and environment-specific secrets.
+Local preview data is stored in `data/hv_swim.db`. The database is intentionally excluded from the delivery ZIP so every fresh copy starts with clean seeded demonstration data. Production must use managed PostgreSQL, encrypted backups, a strong `HV_SESSION_SECRET`, a separate strong `HV_DATA_ENCRYPTION_KEY` and environment-specific secrets.
 
 ## Quality checks
 
@@ -133,10 +130,9 @@ Use Python 3.12+ and Node.js 22+, then run:
 python -m pip install -r requirements-dev.txt
 python -m pytest tests/ -q
 node scripts/check-site.mjs
-node scripts/build-mobile-web.mjs
 ```
 
-The same backend, static-site and mobile-shell checks run automatically for pushes and pull requests in the private GitHub repository.
+The same backend and static-site checks run automatically for pushes and pull requests in the private GitHub repository. The native-app phase is paused and is not part of the current release gate.
 
 ## Generated visual assets
 

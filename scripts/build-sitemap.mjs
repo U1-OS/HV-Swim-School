@@ -23,7 +23,6 @@ const PAGES = [
   ['locations.html', '0.8', 'weekly'],
   ['about.html', '0.7', 'monthly'],
   ['shop.html', '0.7', 'weekly'],
-  ['app.html', '0.5', 'monthly'],
   ['privacy.html', '0.3', 'yearly'],
   ['terms.html', '0.3', 'yearly'],
   ['photo-consent.html', '0.3', 'yearly'],

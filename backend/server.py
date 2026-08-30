@@ -14,6 +14,7 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Annotated, Any, Literal
 from urllib.parse import parse_qs, quote, urlparse
+from zoneinfo import ZoneInfo
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response, status
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
@@ -48,9 +49,12 @@ from .oauth import (
     provider_ready as oauth_provider_ready,
     verify_identity_token as oauth_verify_identity_token,
 )
-from .security import business_date_from_timestamp, business_today, expires_iso, new_token, now_iso, password_hash, password_needs_rehash, password_verify, public_user
+from .security import business_date_from_timestamp, business_today, decrypt_sensitive, encrypt_sensitive, expires_iso, new_token, now_iso, password_hash, password_needs_rehash, password_verify, public_user, token_digest
 
 SESSION_COOKIE = "hv_session"
+MELBOURNE_TZ = ZoneInfo("Australia/Melbourne")
+SWIMMER_SENSITIVE_FIELDS = ("emergency_contact", "medical_notes", "allergies", "medications", "support_notes")
+INCIDENT_SENSITIVE_FIELDS = ("what_happened", "injury_observed", "first_aid_applied", "further_action", "witnesses")
 
 SUPPLIER_ROUTE_DETAILS: dict[str, dict[str, str]] = {
     "specialist_swim": {
@@ -131,6 +135,8 @@ def validate_production_config(candidate=settings) -> None:
     }
     if candidate.session_secret in insecure_secrets or len(candidate.session_secret) < 32:
         raise RuntimeError("HV_SESSION_SECRET must be a unique random value of at least 32 characters")
+    if len(candidate.data_encryption_key) < 32 or candidate.data_encryption_key == candidate.session_secret:
+        raise RuntimeError("HV_DATA_ENCRYPTION_KEY must be a separate random value of at least 32 characters")
     if not candidate.public_url.startswith("https://"):
         raise RuntimeError("HV_PUBLIC_URL must use HTTPS in production")
     xero_configured = bool(candidate.xero_client_id and candidate.xero_client_secret and candidate.xero_redirect_uri)
@@ -159,7 +165,7 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(
     title="HV Swim Bendigo Platform API",
-    version="5.9.0",
+    version="5.10.0",
     docs_url="/api/docs" if not settings.production else None,
     openapi_url="/openapi.json" if not settings.production else None,
     redoc_url=None,
@@ -201,6 +207,16 @@ async def security_headers(request: Request, call_next):
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["Cache-Control"] = "no-store"
         return response
+    content_length = request.headers.get("content-length")
+    if request_path.startswith("/api/") and content_length:
+        try:
+            if int(content_length) > 2_000_000:
+                response = JSONResponse(status_code=413, content={"detail": "Request body is too large"})
+                response.headers["X-Content-Type-Options"] = "nosniff"
+                response.headers["Cache-Control"] = "no-store"
+                return response
+        except ValueError:
+            return JSONResponse(status_code=400, content={"detail": "Invalid Content-Length header"})
     content_type = request.headers.get("content-type", "").lower()
     if request_path.startswith("/api/") and request_path != "/api/auth/oauth/apple/callback" and content_type.startswith(
         ("application/x-www-form-urlencoded", "multipart/form-data")
@@ -212,12 +228,15 @@ async def security_headers(request: Request, call_next):
     response = await call_next(request)
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "SAMEORIGIN"
+    response.headers["X-Permitted-Cross-Domain-Policies"] = "none"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Cross-Origin-Opener-Policy"] = "same-origin"
+    response.headers["Origin-Agent-Cluster"] = "?1"
     response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=(self)"
     response.headers["Content-Security-Policy"] = (
         "default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; "
-        "script-src 'self'; connect-src 'self'; frame-src https://www.facebook.com; form-action 'self' mailto:; "
-        "base-uri 'self'; frame-ancestors 'self'"
+        "script-src 'self'; object-src 'none'; connect-src 'self'; frame-src https://www.facebook.com; "
+        "form-action 'self' mailto:; base-uri 'self'; frame-ancestors 'self'"
     )
     if settings.production:
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
@@ -445,11 +464,10 @@ class PublicAlertResolveInput(BaseModel):
 
 
 class ClockInput(BaseModel):
-    action: Literal["in", "out"]
+    model_config = ConfigDict(extra="forbid")
+
+    action: Literal["in", "break_start", "break_end", "out"]
     location_slug: str = "wood-street"
-    latitude: float | None = Field(default=None, ge=-90, le=90)
-    longitude: float | None = Field(default=None, ge=-180, le=180)
-    accuracy_metres: float | None = Field(default=None, ge=0, le=100_000)
 
 
 class PoolReadingInput(BaseModel):
@@ -472,8 +490,92 @@ class SubmitTimesheetInput(BaseModel):
     entry_ids: list[int]
 
 
+class DailyHoursInput(BaseModel):
+    work_date: date
+    hours: float = Field(gt=0, le=16)
+
+
+class HoursEntryInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    week_start: date
+    location_slug: str
+    entry_mode: Literal["weekly", "daily"]
+    total_hours: float | None = Field(default=None, gt=0, le=80)
+    daily_entries: list[DailyHoursInput] = Field(default_factory=list, max_length=7)
+    notes: str = Field(default="", max_length=500)
+
+    @model_validator(mode="after")
+    def validate_hours(self) -> "HoursEntryInput":
+        if self.week_start.weekday() != 0:
+            raise ValueError("Week start must be a Monday")
+        week_end = self.week_start + timedelta(days=6)
+        if self.entry_mode == "weekly":
+            if self.total_hours is None:
+                raise ValueError("Enter the total hours for the week")
+            self.daily_entries = []
+        else:
+            if not self.daily_entries:
+                raise ValueError("Enter hours for at least one day")
+            dates = [entry.work_date for entry in self.daily_entries]
+            if len(set(dates)) != len(dates):
+                raise ValueError("Each work date can appear only once")
+            if any(value < self.week_start or value > week_end for value in dates):
+                raise ValueError("Daily hours must fall inside the selected payroll week")
+            if sum(entry.hours for entry in self.daily_entries) > 80:
+                raise ValueError("Weekly hours cannot exceed 80")
+            self.total_hours = None
+        self.notes = self.notes.strip()
+        return self
+
+
 class ApproveTimesheetInput(BaseModel):
     entry_id: int
+
+
+class QualificationDocumentInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    staff_id: int | None = Field(default=None, ge=1)
+    qualification_type: str = Field(min_length=2, max_length=100)
+    expiry_date: date
+    original_filename: str = Field(min_length=1, max_length=180)
+    document_media_type: Literal["application/pdf", "image/png", "image/jpeg", "image/webp"]
+    document_base64: str = Field(min_length=20, max_length=7_000_000)
+    reminder_days: int = Field(default=60, ge=7, le=120)
+
+    @model_validator(mode="after")
+    def clean_qualification(self) -> "QualificationDocumentInput":
+        self.qualification_type = self.qualification_type.strip()
+        self.original_filename = Path(self.original_filename).name.strip()
+        if not self.original_filename:
+            raise ValueError("A document filename is required")
+        return self
+
+
+class IncidentReportInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    swimmer_id: int = Field(ge=1)
+    location_slug: str
+    incident_at: datetime
+    incident_type: Literal["injury", "illness", "behaviour", "near_miss", "safeguarding", "other"]
+    what_happened: str = Field(min_length=10, max_length=3000)
+    injury_observed: str = Field(default="", max_length=2000)
+    first_aid_applied: str = Field(default="", max_length=2000)
+    further_action: str = Field(default="", max_length=2000)
+    witnesses: str = Field(default="", max_length=500)
+    parent_notified: bool = False
+
+    @model_validator(mode="after")
+    def clean_incident(self) -> "IncidentReportInput":
+        for field_name in ("what_happened", "injury_observed", "first_aid_applied", "further_action", "witnesses"):
+            setattr(self, field_name, getattr(self, field_name).strip())
+        return self
+
+
+class IncidentStatusInput(BaseModel):
+    status: Literal["open", "follow_up", "closed"]
 
 
 class AdminUserInput(BaseModel):
@@ -516,8 +618,35 @@ class AdminPasswordResetInput(BaseModel):
 
 
 class XeroStaffMappingInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     employee_id: str = Field(default="", max_length=80)
     payroll_calendar_id: str = Field(default="", max_length=80)
+    shopify_customer_gid: str = Field(default="", max_length=160)
+
+    @model_validator(mode="after")
+    def validate_staff_mapping(self) -> "XeroStaffMappingInput":
+        self.employee_id = self.employee_id.strip()
+        self.payroll_calendar_id = self.payroll_calendar_id.strip()
+        self.shopify_customer_gid = self.shopify_customer_gid.strip()
+        if self.shopify_customer_gid and not self.shopify_customer_gid.startswith("gid://shopify/Customer/"):
+            raise ValueError("Use the full Shopify Customer GID")
+        return self
+
+
+class CustomerIntegrationMappingInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    xero_contact_id: str = Field(default="", max_length=100)
+    shopify_customer_gid: str = Field(default="", max_length=160)
+
+    @model_validator(mode="after")
+    def validate_customer_mapping(self) -> "CustomerIntegrationMappingInput":
+        self.xero_contact_id = self.xero_contact_id.strip()
+        self.shopify_customer_gid = self.shopify_customer_gid.strip()
+        if self.shopify_customer_gid and not self.shopify_customer_gid.startswith("gid://shopify/Customer/"):
+            raise ValueError("Use the full Shopify Customer GID")
+        return self
 
 
 class ClassInput(BaseModel):
@@ -555,6 +684,19 @@ class NotificationInput(BaseModel):
     message: str = Field(min_length=3, max_length=800)
     kind: str = Field(default="info", max_length=30)
     channels: list[Literal["in_app", "email", "sms", "push"]] = Field(default_factory=lambda: ["in_app"])
+
+
+class ReminderPreferencesInput(BaseModel):
+    enabled: bool = True
+    hours_before: int = Field(default=24, ge=2, le=72)
+    channels: list[Literal["in_app", "email", "sms", "push"]] = Field(default_factory=lambda: ["in_app"])
+
+    @model_validator(mode="after")
+    def keep_in_app_delivery(self):
+        if "in_app" not in self.channels:
+            raise ValueError("In-app lesson reminders must remain enabled")
+        self.channels = list(dict.fromkeys(self.channels))
+        return self
 
 
 class EnquiryInput(BaseModel):
@@ -659,19 +801,20 @@ def issue_session(
     audit_detail: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     session_id, csrf = new_token(32), new_token(24)
+    stored_session_id = token_digest(session_id)
     db.execute("DELETE FROM sessions WHERE expires_at<=?", (now_iso(),))
     db.execute(
         "INSERT INTO sessions(id,user_id,csrf_token,created_at,expires_at) VALUES(?,?,?,?,?)",
-        (session_id, user["id"], csrf, now_iso(), expires_iso()),
+        (stored_session_id, user["id"], csrf, now_iso(), expires_iso()),
     )
-    audit(db, user["id"], action, "session", session_id[-8:], audit_detail, ip_address)
+    audit(db, user["id"], action, "session", stored_session_id[-12:], audit_detail, ip_address)
     response.set_cookie(
         SESSION_COOKIE,
         session_id,
         max_age=14 * 24 * 60 * 60,
         httponly=True,
         secure=settings.production,
-        samesite="lax",
+        samesite="strict",
         path="/",
     )
     return {"user": public_user(user), "csrf_token": csrf}
@@ -691,7 +834,7 @@ def session_user(request: Request) -> dict[str, Any]:
         row = db.execute(
             """SELECT s.id session_id,s.csrf_token,s.expires_at,u.* FROM sessions s
                JOIN users u ON u.id=s.user_id WHERE s.id=? AND s.expires_at>? AND u.active=1""",
-            (session_id, now_iso()),
+            (token_digest(session_id), now_iso()),
         ).fetchone()
         if not row:
             raise HTTPException(status_code=401, detail="Session expired")
@@ -767,6 +910,139 @@ def next_class_occurrence(weekday: int, start: date, term_end: date) -> date | N
     return candidate if candidate <= term_end else None
 
 
+def reminder_preferences(db: sqlite3.Connection, user_id: int) -> dict[str, Any]:
+    row = db.execute("SELECT * FROM reminder_preferences WHERE user_id=?", (user_id,)).fetchone()
+    if not row:
+        return {"user_id": user_id, "enabled": True, "hours_before": 24, "channels": ["in_app"]}
+    item = dict(row)
+    item["enabled"] = bool(item["enabled"])
+    item["channels"] = json.loads(item["channels"] or '["in_app"]')
+    return item
+
+
+def materialise_due_lesson_reminders(db: sqlite3.Connection, user_id: int) -> int:
+    preferences = reminder_preferences(db, user_id)
+    if not preferences["enabled"]:
+        return 0
+    term = active_term(db)
+    if not term:
+        return 0
+    local_now = datetime.now(MELBOURNE_TZ)
+    window_end = local_now + timedelta(hours=preferences["hours_before"])
+    created = 0
+    bookings = db.execute(
+        """SELECT b.id booking_id,s.first_name swimmer_first,c.title,c.weekday,c.start_time,l.name location_name
+           FROM bookings b JOIN swimmers s ON s.id=b.swimmer_id JOIN classes c ON c.id=b.class_id
+           JOIN locations l ON l.id=c.location_id
+           WHERE s.customer_id=? AND b.status='confirmed' AND c.active=1""",
+        (user_id,),
+    )
+    term_start = date.fromisoformat(term["start_date"])
+    term_end = date.fromisoformat(term["end_date"])
+    for booking in bookings:
+        occurrence = next_class_occurrence(booking["weekday"], max(local_now.date(), term_start), term_end)
+        if not occurrence:
+            continue
+        lesson_time = datetime.strptime(booking["start_time"], "%H:%M").time()
+        lesson_at = datetime.combine(occurrence, lesson_time, tzinfo=MELBOURNE_TZ)
+        if lesson_at <= local_now:
+            occurrence += timedelta(days=7)
+            lesson_at += timedelta(days=7)
+        if occurrence > term_end or lesson_at > window_end:
+            continue
+        existing = db.execute(
+            "SELECT 1 FROM lesson_reminder_dispatches WHERE booking_id=? AND occurrence_date=? AND user_id=?",
+            (booking["booking_id"], occurrence.isoformat(), user_id),
+        ).fetchone()
+        if existing:
+            continue
+        notification_id = db.execute(
+            """INSERT INTO notifications(user_id,title,message,kind,delivery_channels,created_at)
+               VALUES(?,?,?,?,?,?)""",
+            (
+                user_id,
+                f"Lesson reminder · {booking['swimmer_first']}",
+                f"{booking['title']} is at {booking['start_time']} on {occurrence.strftime('%A')} at {booking['location_name']}.",
+                "lesson_reminder",
+                json.dumps(preferences["channels"]),
+                now_iso(),
+            ),
+        ).lastrowid
+        db.execute(
+            """INSERT INTO lesson_reminder_dispatches
+               (booking_id,user_id,occurrence_date,notification_id,status,created_at)
+               VALUES(?,?,?,?,?,?)""",
+            (booking["booking_id"], user_id, occurrence.isoformat(), notification_id, "delivered_in_app", now_iso()),
+        )
+        created += 1
+    return created
+
+
+def create_xero_lesson_charge(
+    db: sqlite3.Connection,
+    *,
+    booking_id: int,
+    customer_id: int,
+    term: sqlite3.Row,
+    swim_class: sqlite3.Row,
+) -> dict[str, Any]:
+    existing = db.execute("SELECT * FROM lesson_charges WHERE booking_id=?", (booking_id,)).fetchone()
+    if existing:
+        return dict(existing)
+    first = next_class_occurrence(swim_class["weekday"], date.fromisoformat(term["start_date"]), date.fromisoformat(term["end_date"]))
+    if not first:
+        raise HTTPException(status_code=409, detail="This class has no lesson dates in the active term")
+    lesson_count = ((date.fromisoformat(term["end_date"]) - first).days // 7) + 1
+    # Guarantee the permanent identifiers inside the enrolment transaction. New family
+    # and swimmer records receive them earlier, while this closes the gap for migrated or
+    # legacy records before an invoice reference is created.
+    db.execute(
+        """UPDATE users SET customer_number=printf('HVS-%06d',id)
+           WHERE id=? AND role='customer' AND (customer_number IS NULL OR customer_number='')""",
+        (customer_id,),
+    )
+    db.execute(
+        """UPDATE swimmers SET swimmer_number=printf('HVS-S-%06d',id)
+           WHERE id=(SELECT swimmer_id FROM bookings WHERE id=?)
+             AND (swimmer_number IS NULL OR swimmer_number='')""",
+        (booking_id,),
+    )
+    identity = db.execute(
+        """SELECT u.customer_number,u.xero_contact_id,s.swimmer_number,s.first_name,s.last_name
+           FROM bookings b JOIN swimmers s ON s.id=b.swimmer_id
+           JOIN users u ON u.id=s.customer_id
+           WHERE b.id=? AND u.id=?""",
+        (booking_id, customer_id),
+    ).fetchone()
+    if not identity or not identity["customer_number"] or not identity["swimmer_number"]:
+        raise HTTPException(status_code=409, detail="Family and swimmer numbers could not be issued for this enrolment")
+    for _ in range(10):
+        fragment = new_token(5).replace("-", "").replace("_", "").upper()[:6]
+        reference = (
+            f"{identity['customer_number']}-{identity['swimmer_number'].replace('HVS-S-', 'S')}-"
+            f"{business_today().year}-{fragment}"
+        )
+        if not db.execute("SELECT 1 FROM lesson_charges WHERE reference=?", (reference,)).fetchone():
+            break
+    else:
+        raise HTTPException(status_code=503, detail="A secure Xero billing reference could not be created")
+    charge_id = db.execute(
+        """INSERT INTO lesson_charges
+           (reference,booking_id,customer_id,term_id,provider,per_lesson_cents,lesson_count,amount_cents,
+            family_customer_number,swimmer_number,xero_contact_id,invoice_description,status,created_at)
+           VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+        (
+            reference, booking_id, customer_id, term["id"], "xero", swim_class["price_cents"], lesson_count,
+            swim_class["price_cents"] * lesson_count, identity["customer_number"], identity["swimmer_number"],
+            identity["xero_contact_id"],
+            f"{term['name']} · {swim_class['title']} · {identity['first_name']} {identity['last_name']} "
+            f"({identity['swimmer_number']}) · {lesson_count} lessons at $22.50",
+            "pending_xero_invoice", now_iso(),
+        ),
+    ).lastrowid
+    return dict(db.execute("SELECT * FROM lesson_charges WHERE id=?", (charge_id,)).fetchone())
+
+
 def validate_class_occurrence(db: sqlite3.Connection, class_row: sqlite3.Row, occurrence: date) -> sqlite3.Row:
     term = term_for_date(db, occurrence)
     if not term:
@@ -788,6 +1064,26 @@ def certificate_reference(db: sqlite3.Connection) -> str:
         ).fetchone():
             return reference
     raise HTTPException(status_code=503, detail="A certificate reference could not be created; try again")
+
+
+def incident_reference(db: sqlite3.Connection) -> str:
+    for _ in range(10):
+        fragment = "".join(character for character in new_token(8).upper() if character.isalnum())[:8]
+        reference = f"HVS-INC-{business_today().year}-{fragment}"
+        if len(fragment) == 8 and not db.execute(
+            "SELECT 1 FROM incident_reports WHERE reference=?", (reference,)
+        ).fetchone():
+            return reference
+    raise HTTPException(status_code=503, detail="An incident reference could not be created; try again")
+
+
+def incident_payloads(cursor: sqlite3.Cursor) -> list[dict[str, Any]]:
+    payload = rows(cursor)
+    for record in payload:
+        for field_name in INCIDENT_SENSITIVE_FIELDS:
+            record[field_name] = decrypt_sensitive(record.get(field_name)) or ""
+        record["parent_notified"] = bool(record["parent_notified"])
+    return payload
 
 
 def achievement_template_rows(db: sqlite3.Connection) -> list[dict[str, Any]]:
@@ -817,6 +1113,18 @@ def eligible_achievement_swimmers(db: sqlite3.Connection, user: dict[str, Any]) 
                 WHERE s.active=1
                 ORDER BY s.first_name,s.last_name,c.title"""
     return rows(db.execute(query, (user["id"],)))
+
+
+def reveal_swimmer_record(record: dict[str, Any]) -> dict[str, Any]:
+    """Decrypt only after the caller's family/staff/management authorisation has passed."""
+    for field in SWIMMER_SENSITIVE_FIELDS:
+        if field in record:
+            record[field] = decrypt_sensitive(record.get(field))
+    return record
+
+
+def protect_swimmer_fields(values: dict[str, str]) -> dict[str, str | None]:
+    return {field: encrypt_sensitive(values.get(field, "").strip()) for field in SWIMMER_SENSITIVE_FIELDS}
 
 
 def staff_achievement_rows(db: sqlite3.Connection, user: dict[str, Any]) -> list[dict[str, Any]]:
@@ -866,7 +1174,7 @@ def optional_customer_session(db: sqlite3.Connection, request: Request) -> sqlit
     return db.execute(
         """SELECT u.* FROM sessions s JOIN users u ON u.id=s.user_id
            WHERE s.id=? AND s.expires_at>? AND u.active=1 AND u.role='customer'""",
-        (session_id, now_iso()),
+        (token_digest(session_id), now_iso()),
     ).fetchone()
 
 
@@ -1076,6 +1384,86 @@ def site_settings_payload(db: sqlite3.Connection) -> dict[str, Any]:
 
 ASSOCIATION_BADGE_DIR = DATA_DIR / "association-badges"
 ASSOCIATION_BADGE_KEYS = {"swim_schools_australia", "austswim", "autism_swim"}
+QUALIFICATION_DOCUMENT_DIR = DATA_DIR / "staff-qualification-documents"
+QUALIFICATION_DOCUMENT_TYPES = {
+    "application/pdf": (".pdf", b"%PDF-"),
+    "image/png": (".png", b"\x89PNG\r\n\x1a\n"),
+    "image/jpeg": (".jpg", b"\xff\xd8\xff"),
+    "image/webp": (".webp", b"RIFF"),
+}
+
+
+def validate_qualification_document(encoded: str, media_type: str) -> tuple[bytes, str, str]:
+    try:
+        document = base64.b64decode(encoded, validate=True)
+    except (ValueError, binascii.Error) as exc:
+        raise HTTPException(status_code=422, detail="Certificate document is not valid base64 data") from exc
+    if not (32 <= len(document) <= 5_000_000):
+        raise HTTPException(status_code=413, detail="Certificate document must be between 32 bytes and 5 MB")
+    extension, signature = QUALIFICATION_DOCUMENT_TYPES[media_type]
+    if not document.startswith(signature):
+        raise HTTPException(status_code=422, detail="Certificate file content does not match its selected type")
+    if media_type == "application/pdf" and b"%%EOF" not in document[-4096:]:
+        raise HTTPException(status_code=422, detail="Certificate PDF appears incomplete")
+    if media_type == "image/jpeg" and not document.endswith(b"\xff\xd9"):
+        raise HTTPException(status_code=422, detail="Certificate JPEG appears incomplete")
+    if media_type == "image/webp" and (len(document) < 12 or document[8:12] != b"WEBP"):
+        raise HTTPException(status_code=422, detail="Certificate WebP appears invalid")
+    return document, extension, hashlib.sha256(document).hexdigest()
+
+
+def qualification_document_path(filename: str | None) -> Path | None:
+    if not filename or Path(filename).name != filename:
+        return None
+    return QUALIFICATION_DOCUMENT_DIR / filename
+
+
+def qualification_records(db: sqlite3.Connection, user: dict[str, Any]) -> list[dict[str, Any]]:
+    where, params = ("q.staff_id=?", (user["id"],)) if user["role"] == "staff" else ("1=1", ())
+    records = rows(db.execute(
+        f"""SELECT q.*,u.first_name,u.last_name FROM qualifications q
+            JOIN users u ON u.id=q.staff_id WHERE {where}
+            ORDER BY q.expiry_date,q.qualification_type""",
+        params,
+    ))
+    today = business_today()
+    for record in records:
+        expiry = date.fromisoformat(record["expiry_date"])
+        remaining = (expiry - today).days
+        status_value = "expired" if remaining < 0 else "expiring" if remaining <= int(record["reminder_days"] or 60) else "current"
+        if record["status"] != status_value:
+            db.execute("UPDATE qualifications SET status=? WHERE id=?", (status_value, record["id"]))
+        record["status"] = status_value
+        record["days_remaining"] = remaining
+        document_path = qualification_document_path(record.get("document_filename"))
+        document_available = bool(
+            document_path
+            and document_path.is_file()
+            and record.get("document_sha256")
+            and hashlib.sha256(document_path.read_bytes()).hexdigest() == record["document_sha256"]
+        )
+        record["document_available"] = document_available
+        record["document_url"] = f"/api/staff/qualifications/{record['id']}/document" if document_available else None
+        if remaining <= int(record["reminder_days"] or 60):
+            dispatched = db.execute(
+                """INSERT OR IGNORE INTO qualification_reminder_dispatches
+                   (qualification_id,expiry_date,created_at) VALUES(?,?,?)""",
+                (record["id"], record["expiry_date"], now_iso()),
+            )
+            if dispatched.rowcount:
+                when = f"expired {abs(remaining)} days ago" if remaining < 0 else f"expires in {remaining} days"
+                message = f"{record['qualification_type']} {when} on {record['expiry_date']}. Upload the renewed certificate or licence as soon as it is issued."
+                db.execute(
+                    """INSERT INTO notifications(user_id,title,message,kind,delivery_channels,created_at)
+                       VALUES(?,?,?,?,?,?)""",
+                    (record["staff_id"], "Certificate renewal required", message, "compliance", '["in_app"]', now_iso()),
+                )
+                db.execute(
+                    """INSERT INTO notifications(audience_role,title,message,kind,delivery_channels,created_at)
+                       VALUES(?,?,?,?,?,?)""",
+                    ("admin", f"{record['first_name']} · certificate renewal", message, "compliance", '["in_app"]', now_iso()),
+                )
+    return records
 
 
 def validate_association_png(encoded: str) -> tuple[bytes, int, int, str]:
@@ -1245,7 +1633,7 @@ def renumber_waitlist(db: sqlite3.Connection, class_id: int) -> None:
 
 @app.get("/api/health")
 def health() -> dict[str, Any]:
-    return {"ok": True, "service": "HV Swim Bendigo", "version": "5.9.0", "environment": settings.app_env, "time": now_iso()}
+    return {"ok": True, "service": "HV Swim Bendigo", "version": "5.10.0", "environment": settings.app_env, "time": now_iso()}
 
 
 @app.get("/api/public/site-settings")
@@ -1379,6 +1767,10 @@ async def complete_oauth_login(
                            email,password_hash,role,first_name,last_name,must_change_password,created_at
                        ) VALUES(?,?,'customer',?,?,0,?)""",
                     (email, password_hash(new_token(48)), first_name, last_name, signed_in_at),
+                )
+                db.execute(
+                    "UPDATE users SET customer_number=printf('HVS-%06d',id) WHERE id=?",
+                    (cursor.lastrowid,),
                 )
                 user = db.execute("SELECT * FROM users WHERE id=?", (cursor.lastrowid,)).fetchone()
                 created = True
@@ -1659,7 +2051,7 @@ def customer_swimmers(user: dict[str, Any] = Depends(require_roles("customer", "
             result = rows(db.execute("SELECT * FROM swimmers WHERE customer_id=? AND active=1 ORDER BY first_name", (user["id"],)))
         else:
             result = rows(db.execute("SELECT s.*,u.first_name parent_first,u.last_name parent_last FROM swimmers s JOIN users u ON u.id=s.customer_id WHERE s.active=1 ORDER BY s.first_name"))
-        return {"swimmers": result}
+        return {"swimmers": [reveal_swimmer_record(record) for record in result]}
 
 
 @app.patch("/api/customer/swimmers/{swimmer_id}")
@@ -1678,13 +2070,13 @@ def update_family_swimmer_profile(
         ).fetchone()
         if not swimmer:
             raise HTTPException(status_code=404, detail="Active swimmer profile not found")
-        fields = {
+        fields = protect_swimmer_fields({
             "emergency_contact": payload.emergency_contact.strip(),
             "medical_notes": payload.medical_notes.strip(),
             "allergies": payload.allergies.strip(),
             "medications": payload.medications.strip(),
             "support_notes": payload.support_notes.strip(),
-        }
+        })
         db.execute(
             """UPDATE swimmers
                SET emergency_contact=?,medical_notes=?,allergies=?,medications=?,support_notes=?
@@ -2210,14 +2602,14 @@ def update_staff_support_ticket(
 def customer_bookings(user: dict[str, Any] = Depends(require_roles("customer", "admin"))) -> dict[str, Any]:
     with db_session() as db:
         where, params = ("s.customer_id=?", (user["id"],)) if user["role"] == "customer" else ("1=1", ())
-        query = f"""SELECT b.id,b.status,b.created_at,s.id swimmer_id,s.first_name swimmer_first,s.last_name swimmer_last,
+        query = f"""SELECT b.id,b.status,b.created_at,s.id swimmer_id,s.swimmer_number,s.first_name swimmer_first,s.last_name swimmer_last,
                     c.id class_id,c.title,c.level,c.weekday,c.start_time,c.duration_minutes,l.name location_name,
                     u.first_name instructor_first,u.last_name instructor_last
                     FROM bookings b JOIN swimmers s ON s.id=b.swimmer_id JOIN classes c ON c.id=b.class_id
                     JOIN locations l ON l.id=c.location_id LEFT JOIN users u ON u.id=c.instructor_id
                     WHERE {where} ORDER BY c.weekday,c.start_time"""
         bookings = rows(db.execute(query, params))
-        waitlist_query = f"""SELECT w.id,w.position,w.status,w.created_at,s.id swimmer_id,s.first_name swimmer_first,s.last_name swimmer_last,
+        waitlist_query = f"""SELECT w.id,w.position,w.status,w.created_at,s.id swimmer_id,s.swimmer_number,s.first_name swimmer_first,s.last_name swimmer_last,
                               c.id class_id,c.title,c.level,c.weekday,c.start_time,c.duration_minutes,l.name location_name
                               FROM waitlist w JOIN swimmers s ON s.id=w.swimmer_id JOIN classes c ON c.id=w.class_id
                               JOIN locations l ON l.id=c.location_id WHERE {where} AND w.status='waiting'
@@ -2372,9 +2764,15 @@ def create_booking(payload: BookingInput, request: Request, user: dict[str, Any]
             audit(db, user["id"], "join_waitlist", "class", payload.class_id, {"swimmer_id": payload.swimmer_id, "position": position}, client_ip(request))
             return {"status": "waitlisted", "waitlist_id": cursor.lastrowid, "position": position}
         cursor = db.execute("INSERT INTO bookings(class_id,swimmer_id,status,created_at) VALUES(?,?,?,?)", (payload.class_id, payload.swimmer_id, "confirmed", now_iso()))
+        charge = create_xero_lesson_charge(
+            db, booking_id=cursor.lastrowid, customer_id=swimmer["customer_id"], term=term, swim_class=swim_class
+        )
         db.execute("INSERT INTO notifications(user_id,title,message,kind,delivery_channels,created_at) VALUES(?,?,?,?,?,?)", (swimmer["customer_id"], "Lesson booking confirmed", f"{swimmer['first_name']} is confirmed for {swim_class['title']}.", "booking", '["in_app","email"]', now_iso()))
-        audit(db, user["id"], "create_booking", "booking", cursor.lastrowid, {"class_id": payload.class_id, "swimmer_id": payload.swimmer_id}, client_ip(request))
-        return {"status": "confirmed", "booking_id": cursor.lastrowid}
+        audit(db, user["id"], "create_booking", "booking", cursor.lastrowid, {"class_id": payload.class_id, "swimmer_id": payload.swimmer_id, "lesson_charge_reference": charge["reference"], "payment_provider": "xero"}, client_ip(request))
+        return {
+            "status": "confirmed", "booking_id": cursor.lastrowid,
+            "payment": {"provider": "Xero", "route": "xero_invoice_workflow", "reference": charge["reference"], "amount_cents": charge["amount_cents"], "status": charge["status"], "family_customer_number": charge["family_customer_number"], "swimmer_number": charge["swimmer_number"], "xero_contact_mapped": bool(charge["xero_contact_id"])},
+        }
 
 
 @app.delete("/api/customer/bookings/{booking_id}")
@@ -2385,6 +2783,7 @@ def cancel_booking(booking_id: int, request: Request, user: dict[str, Any] = Dep
         if not booking or (user["role"] == "customer" and booking["customer_id"] != user["id"]):
             raise HTTPException(status_code=404, detail="Booking not found")
         db.execute("UPDATE bookings SET status='cancelled' WHERE id=?", (booking_id,))
+        db.execute("UPDATE lesson_charges SET status='cancelled_no_refund' WHERE booking_id=? AND status='pending_xero_invoice'", (booking_id,))
         audit(db, user["id"], "cancel_booking", "booking", booking_id, ip_address=client_ip(request))
         return {"ok": True}
 
@@ -2436,6 +2835,7 @@ def staff_lesson_register(occurrence_date: date | None = None, user: dict[str, A
                 (selected.isoformat(), selected.isoformat(), class_item["id"]),
             ))
             for record in register:
+                reveal_swimmer_record(record)
                 record["photo_consent"] = bool(record["photo_consent"])
                 record["parent_onsite_confirmed"] = None if record["parent_onsite_confirmed"] is None else bool(record["parent_onsite_confirmed"])
                 record["reported_absence"] = bool(record["absence_report_id"])
@@ -2545,10 +2945,68 @@ def save_lesson_attendance(payload: LessonAttendanceInput, request: Request, use
 @app.post("/api/staff/clock")
 def staff_clock(payload: ClockInput, request: Request, user: dict[str, Any] = Depends(require_roles("staff", "admin")), x_csrf_token: str | None = Header(default=None)) -> dict[str, Any]:
     csrf_guard(request, user, x_csrf_token)
-    raise HTTPException(
-        status_code=410,
-        detail="HV Swim does not use clock-in tracking. Use the roster and reviewed timesheet workflow.",
-    )
+    recorded_at = datetime.now(timezone.utc)
+    recorded_iso = recorded_at.isoformat()
+    with db_session() as db:
+        db.execute("BEGIN IMMEDIATE")
+        active = db.execute(
+            "SELECT * FROM time_entries WHERE staff_id=? AND clock_out IS NULL ORDER BY clock_in DESC LIMIT 1",
+            (user["id"],),
+        ).fetchone()
+        if payload.action == "in":
+            if active:
+                raise HTTPException(status_code=409, detail="You are already clocked on")
+            location = location_by_slug(db, payload.location_slug)
+            local_day = recorded_at.astimezone(MELBOURNE_TZ).date()
+            week_start = local_day - timedelta(days=local_day.weekday())
+            entry_id = db.execute(
+                """INSERT INTO time_entries(
+                       staff_id,location_id,clock_in,status,work_date,week_start,entry_scope,break_minutes
+                   ) VALUES(?,?,?,'draft',?,?,'daily',0)""",
+                (user["id"], location["id"], recorded_iso, local_day.isoformat(), week_start.isoformat()),
+            ).lastrowid
+            audit(db, user["id"], "clock_on", "time_entry", entry_id, {"location": payload.location_slug}, client_ip(request))
+            return {"state": "working", "entry_id": entry_id, "clock_in": recorded_iso, "break_minutes": 0}
+        if not active:
+            raise HTTPException(status_code=409, detail="Clock on before recording work or a break")
+        if payload.action == "break_start":
+            if active["break_started_at"]:
+                raise HTTPException(status_code=409, detail="A break is already running")
+            db.execute("UPDATE time_entries SET break_started_at=? WHERE id=?", (recorded_iso, active["id"]))
+            audit(db, user["id"], "start_break", "time_entry", active["id"], ip_address=client_ip(request))
+            return {"state": "on_break", "entry_id": active["id"], "break_started_at": recorded_iso, "break_minutes": int(active["break_minutes"] or 0)}
+        break_minutes = int(active["break_minutes"] or 0)
+        if payload.action == "break_end":
+            if not active["break_started_at"]:
+                raise HTTPException(status_code=409, detail="No break is currently running")
+            break_started = datetime.fromisoformat(active["break_started_at"])
+            added_minutes = max(1, round((recorded_at - break_started).total_seconds() / 60))
+            break_minutes += added_minutes
+            db.execute(
+                "UPDATE time_entries SET break_started_at=NULL,break_minutes=? WHERE id=?",
+                (break_minutes, active["id"]),
+            )
+            audit(db, user["id"], "end_break", "time_entry", active["id"], {"break_minutes": break_minutes}, client_ip(request))
+            return {"state": "working", "entry_id": active["id"], "break_minutes": break_minutes}
+        if active["break_started_at"]:
+            break_started = datetime.fromisoformat(active["break_started_at"])
+            break_minutes += max(1, round((recorded_at - break_started).total_seconds() / 60))
+        clocked_on = datetime.fromisoformat(active["clock_in"])
+        paid_seconds = max(0, (recorded_at - clocked_on).total_seconds() - break_minutes * 60)
+        paid_hours = round(paid_seconds / 3600, 2)
+        db.execute(
+            """UPDATE time_entries
+               SET clock_out=?,hours=?,break_started_at=NULL,break_minutes=? WHERE id=?""",
+            (recorded_iso, paid_hours, break_minutes, active["id"]),
+        )
+        audit(
+            db, user["id"], "clock_off", "time_entry", active["id"],
+            {"paid_hours": paid_hours, "break_minutes": break_minutes}, client_ip(request),
+        )
+        return {
+            "state": "clocked_off", "entry_id": active["id"], "clock_out": recorded_iso,
+            "hours": paid_hours, "break_minutes": break_minutes,
+        }
 
 
 @app.get("/api/staff/time-entries")
@@ -2559,6 +3017,69 @@ def staff_time_entries(user: dict[str, Any] = Depends(require_roles("staff", "ad
                     JOIN locations l ON l.id=t.location_id JOIN users u ON u.id=t.staff_id WHERE {where}
                     ORDER BY t.clock_in DESC LIMIT 100"""
         return {"time_entries": rows(db.execute(query, params))}
+
+
+@app.post("/api/staff/time-entries")
+def create_manual_hours(
+    payload: HoursEntryInput,
+    request: Request,
+    user: dict[str, Any] = Depends(require_roles("staff", "admin")),
+    x_csrf_token: str | None = Header(default=None),
+) -> dict[str, Any]:
+    csrf_guard(request, user, x_csrf_token)
+    with db_session() as db:
+        db.execute("BEGIN IMMEDIATE")
+        location = location_by_slug(db, payload.location_slug)
+        existing = rows(db.execute(
+            """SELECT id,work_date,entry_scope,status FROM time_entries
+               WHERE staff_id=? AND week_start=? AND status<>'exported'""",
+            (user["id"], payload.week_start.isoformat()),
+        ))
+        if payload.entry_mode == "weekly" and existing:
+            raise HTTPException(status_code=409, detail="This payroll week already has hours. Edit the daily records or choose another week.")
+        if payload.entry_mode == "daily" and any(item["entry_scope"] == "weekly" for item in existing):
+            raise HTTPException(status_code=409, detail="This week already has a weekly-total entry")
+
+        values = (
+            [(payload.week_start, float(payload.total_hours or 0))]
+            if payload.entry_mode == "weekly"
+            else [(entry.work_date, float(entry.hours)) for entry in payload.daily_entries]
+        )
+        saved_ids: list[int] = []
+        for work_day, hours in values:
+            start = datetime.combine(work_day, datetime.min.time(), tzinfo=MELBOURNE_TZ)
+            finish = start + timedelta(hours=hours)
+            current = db.execute(
+                """SELECT id,status FROM time_entries
+                   WHERE staff_id=? AND week_start=? AND work_date=? AND entry_scope='daily'""",
+                (user["id"], payload.week_start.isoformat(), work_day.isoformat()),
+            ).fetchone()
+            if current and current["status"] != "draft":
+                raise HTTPException(status_code=409, detail=f"Hours for {work_day.isoformat()} have already been submitted")
+            if current:
+                db.execute(
+                    """UPDATE time_entries SET location_id=?,clock_in=?,clock_out=?,hours=?,notes=?
+                       WHERE id=?""",
+                    (location["id"], start.isoformat(), finish.isoformat(), hours, payload.notes or None, current["id"]),
+                )
+                saved_ids.append(current["id"])
+            else:
+                entry_id = db.execute(
+                    """INSERT INTO time_entries(
+                           staff_id,location_id,clock_in,clock_out,hours,status,work_date,week_start,entry_scope,notes
+                       ) VALUES(?,?,?,?,?,'draft',?,?,?,?)""",
+                    (
+                        user["id"], location["id"], start.isoformat(), finish.isoformat(), hours,
+                        work_day.isoformat(), payload.week_start.isoformat(), payload.entry_mode, payload.notes or None,
+                    ),
+                ).lastrowid
+                saved_ids.append(entry_id)
+        audit(
+            db, user["id"], "record_manual_hours", "time_entry",
+            detail={"entry_ids": saved_ids, "week_start": payload.week_start.isoformat(), "entry_mode": payload.entry_mode, "total_hours": sum(hours for _, hours in values)},
+            ip_address=client_ip(request),
+        )
+        return {"saved": True, "entry_ids": saved_ids, "week_start": payload.week_start.isoformat(), "entry_mode": payload.entry_mode}
 
 
 @app.post("/api/staff/time-entries/submit")
@@ -2576,6 +3097,136 @@ def submit_timesheet(payload: SubmitTimesheetInput, request: Request, user: dict
         cursor = db.execute(f"UPDATE time_entries SET status='submitted' WHERE id IN ({placeholders}) AND clock_out IS NOT NULL AND status='draft'{where_owner}", params)
         audit(db, user["id"], "submit_timesheet", "time_entry", detail={"entry_ids": payload.entry_ids, "updated": cursor.rowcount}, ip_address=client_ip(request))
         return {"updated": cursor.rowcount}
+
+
+@app.get("/api/staff/incidents")
+def staff_incidents(user: dict[str, Any] = Depends(require_roles("staff", "admin"))) -> dict[str, Any]:
+    with db_session() as db:
+        where, params = ("ir.reported_by=?", (user["id"],)) if user["role"] == "staff" else ("1=1", ())
+        reports = incident_payloads(db.execute(
+            f"""SELECT ir.*,s.first_name swimmer_first,s.last_name swimmer_last,s.swimmer_number,
+                       family.customer_number,family.first_name family_first,family.last_name family_last,
+                       reporter.staff_number,reporter.first_name reporter_first,reporter.last_name reporter_last,
+                       l.name location_name
+                FROM incident_reports ir JOIN swimmers s ON s.id=ir.swimmer_id
+                JOIN users family ON family.id=ir.family_user_id
+                JOIN users reporter ON reporter.id=ir.reported_by
+                JOIN locations l ON l.id=ir.location_id
+                WHERE {where} ORDER BY ir.incident_at DESC,ir.id DESC LIMIT 250""",
+            params,
+        ))
+        swimmers = rows(db.execute(
+            """SELECT s.id,s.first_name,s.last_name,s.swimmer_number,u.customer_number,
+                      u.first_name family_first,u.last_name family_last
+               FROM swimmers s JOIN users u ON u.id=s.customer_id
+               WHERE s.active=1 AND u.active=1 ORDER BY s.first_name,s.last_name"""
+        ))
+        locations = rows(db.execute("SELECT slug,name FROM locations ORDER BY CASE slug WHEN 'wood-street' THEN 0 ELSE 1 END,name"))
+        return {"reports": reports, "swimmers": swimmers, "locations": locations, "reporter": {"staff_number": user.get("staff_number")}}
+
+
+@app.post("/api/staff/incidents")
+def create_incident_report(
+    payload: IncidentReportInput,
+    request: Request,
+    user: dict[str, Any] = Depends(require_roles("staff", "admin")),
+    x_csrf_token: str | None = Header(default=None),
+) -> dict[str, Any]:
+    csrf_guard(request, user, x_csrf_token)
+    incident_at = payload.incident_at.replace(tzinfo=MELBOURNE_TZ) if payload.incident_at.tzinfo is None else payload.incident_at
+    incident_utc = incident_at.astimezone(timezone.utc)
+    now = datetime.now(timezone.utc)
+    if incident_utc > now + timedelta(minutes=5):
+        raise HTTPException(status_code=422, detail="Incident time cannot be in the future")
+    if incident_utc < now - timedelta(days=31):
+        raise HTTPException(status_code=422, detail="Incidents older than 31 days require management review before entry")
+    with db_session() as db:
+        db.execute("BEGIN IMMEDIATE")
+        swimmer = db.execute(
+            """SELECT s.id,s.customer_id,s.first_name,s.last_name,s.swimmer_number,u.customer_number
+               FROM swimmers s JOIN users u ON u.id=s.customer_id
+               WHERE s.id=? AND s.active=1 AND u.active=1""",
+            (payload.swimmer_id,),
+        ).fetchone()
+        if not swimmer:
+            raise HTTPException(status_code=404, detail="Active swimmer and family account not found")
+        location = location_by_slug(db, payload.location_slug)
+        reference = incident_reference(db)
+        encrypted = {field_name: encrypt_sensitive(getattr(payload, field_name)) for field_name in INCIDENT_SENSITIVE_FIELDS}
+        incident_id = db.execute(
+            """INSERT INTO incident_reports(
+                   reference,swimmer_id,family_user_id,reported_by,location_id,incident_at,incident_type,
+                   what_happened,injury_observed,first_aid_applied,further_action,witnesses,
+                   parent_notified,status,created_at
+               ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,'open',?)""",
+            (
+                reference, swimmer["id"], swimmer["customer_id"], user["id"], location["id"],
+                incident_utc.isoformat(), payload.incident_type, encrypted["what_happened"],
+                encrypted["injury_observed"], encrypted["first_aid_applied"], encrypted["further_action"],
+                encrypted["witnesses"], int(payload.parent_notified), now_iso(),
+            ),
+        ).lastrowid
+        db.execute(
+            """INSERT INTO notifications(user_id,title,message,kind,delivery_channels,created_at)
+               VALUES(?,?,?,?,?,?)""",
+            (
+                swimmer["customer_id"], "Incident report recorded",
+                f"A private incident report for {swimmer['first_name']} has been recorded under {reference}. Sign in to review it and contact HV Swim if you have questions.",
+                "incident", '["in_app"]', now_iso(),
+            ),
+        )
+        audit(
+            db, user["id"], "create_incident_report", "incident_report", incident_id,
+            {
+                "reference": reference, "swimmer_number": swimmer["swimmer_number"],
+                "family_customer_number": swimmer["customer_number"], "location": payload.location_slug,
+                "incident_type": payload.incident_type, "parent_notified": payload.parent_notified,
+            },
+            client_ip(request),
+        )
+        return {
+            "id": incident_id, "reference": reference, "status": "open",
+            "swimmer_number": swimmer["swimmer_number"], "family_customer_number": swimmer["customer_number"],
+            "staff_number": user.get("staff_number"), "family_notification": "delivered_in_app",
+        }
+
+
+@app.patch("/api/admin/incidents/{incident_id}")
+def update_incident_status(
+    incident_id: int,
+    payload: IncidentStatusInput,
+    request: Request,
+    user: dict[str, Any] = Depends(require_roles("admin")),
+    x_csrf_token: str | None = Header(default=None),
+) -> dict[str, Any]:
+    csrf_guard(request, user, x_csrf_token)
+    with db_session() as db:
+        incident = db.execute("SELECT id,reference,status FROM incident_reports WHERE id=?", (incident_id,)).fetchone()
+        if not incident:
+            raise HTTPException(status_code=404, detail="Incident report not found")
+        db.execute("UPDATE incident_reports SET status=? WHERE id=?", (payload.status, incident_id))
+        audit(db, user["id"], "update_incident_status", "incident_report", incident_id, {"reference": incident["reference"], "from": incident["status"], "to": payload.status}, client_ip(request))
+        return {"saved": True, "id": incident_id, "status": payload.status}
+
+
+@app.get("/api/customer/incidents")
+def customer_incidents(user: dict[str, Any] = Depends(require_roles("customer"))) -> dict[str, Any]:
+    with db_session() as db:
+        reports = incident_payloads(db.execute(
+            """SELECT ir.id,ir.reference,ir.incident_at,ir.incident_type,ir.what_happened,
+                      ir.injury_observed,ir.first_aid_applied,ir.further_action,ir.witnesses,
+                      ir.parent_notified,ir.status,ir.created_at,
+                      s.first_name swimmer_first,s.last_name swimmer_last,s.swimmer_number,
+                      family.customer_number,reporter.staff_number,
+                      reporter.first_name reporter_first,reporter.last_name reporter_last,l.name location_name
+               FROM incident_reports ir JOIN swimmers s ON s.id=ir.swimmer_id
+               JOIN users family ON family.id=ir.family_user_id
+               JOIN users reporter ON reporter.id=ir.reported_by
+               JOIN locations l ON l.id=ir.location_id
+               WHERE ir.family_user_id=? ORDER BY ir.incident_at DESC,ir.id DESC""",
+            (user["id"],),
+        ))
+        return {"reports": reports}
 
 
 @app.post("/api/staff/pool-readings")
@@ -2621,22 +3272,135 @@ def create_checklist(payload: ChecklistInput, request: Request, user: dict[str, 
 @app.get("/api/staff/qualifications")
 def qualifications(user: dict[str, Any] = Depends(require_roles("staff", "admin"))) -> dict[str, Any]:
     with db_session() as db:
-        where, params = ("q.staff_id=?", (user["id"],)) if user["role"] == "staff" else ("1=1", ())
-        query = f"""SELECT q.*,u.first_name,u.last_name FROM qualifications q JOIN users u ON u.id=q.staff_id
-                    WHERE {where} ORDER BY q.expiry_date"""
-        return {"qualifications": rows(db.execute(query, params))}
+        return {"qualifications": qualification_records(db, user), "reminders": {"in_app": "live", "email": "setup_required", "sms": "setup_required"}}
+
+
+@app.post("/api/staff/qualifications")
+def create_qualification_document(
+    payload: QualificationDocumentInput,
+    request: Request,
+    user: dict[str, Any] = Depends(require_roles("staff", "admin")),
+    x_csrf_token: str | None = Header(default=None),
+) -> dict[str, Any]:
+    csrf_guard(request, user, x_csrf_token)
+    staff_id = payload.staff_id if user["role"] == "admin" and payload.staff_id else user["id"]
+    if user["role"] == "staff" and payload.staff_id not in (None, user["id"]):
+        raise HTTPException(status_code=403, detail="Staff can upload only their own certificate documents")
+    document, extension, digest = validate_qualification_document(payload.document_base64, payload.document_media_type)
+    filename = f"{new_token(24)}{extension}"
+    QUALIFICATION_DOCUMENT_DIR.mkdir(parents=True, exist_ok=True)
+    final_path = QUALIFICATION_DOCUMENT_DIR / filename
+    temporary_path = QUALIFICATION_DOCUMENT_DIR / f".{filename}.tmp"
+    temporary_path.write_bytes(document)
+    temporary_path.replace(final_path)
+    try:
+        with db_session() as db:
+            staff = db.execute(
+                "SELECT id FROM users WHERE id=? AND role IN ('staff','admin') AND active=1",
+                (staff_id,),
+            ).fetchone()
+            if not staff:
+                raise HTTPException(status_code=404, detail="Active staff account not found")
+            today = business_today()
+            remaining = (payload.expiry_date - today).days
+            qualification_status = "expired" if remaining < 0 else "expiring" if remaining <= payload.reminder_days else "current"
+            qualification_id = db.execute(
+                """INSERT INTO qualifications(
+                       staff_id,qualification_type,expiry_date,status,verified_at,document_filename,
+                       original_filename,document_media_type,document_sha256,uploaded_at,reminder_days
+                   ) VALUES(?,?,?,?,?,?,?,?,?,?,?)""",
+                (
+                    staff_id, payload.qualification_type, payload.expiry_date.isoformat(), qualification_status,
+                    now_iso(), filename, payload.original_filename, payload.document_media_type, digest, now_iso(),
+                    payload.reminder_days,
+                ),
+            ).lastrowid
+            audit(
+                db, user["id"], "upload_staff_qualification", "qualification", qualification_id,
+                {"staff_id": staff_id, "qualification_type": payload.qualification_type, "expiry_date": payload.expiry_date.isoformat(), "media_type": payload.document_media_type, "sha256": digest},
+                client_ip(request),
+            )
+            return {"id": qualification_id, "saved": True, "status": qualification_status, "document_url": f"/api/staff/qualifications/{qualification_id}/document"}
+    except Exception:
+        final_path.unlink(missing_ok=True)
+        raise
+
+
+@app.get("/api/staff/qualifications/{qualification_id}/document")
+def qualification_document(
+    qualification_id: int,
+    user: dict[str, Any] = Depends(require_roles("staff", "admin")),
+) -> FileResponse:
+    with db_session() as db:
+        record = db.execute("SELECT * FROM qualifications WHERE id=?", (qualification_id,)).fetchone()
+        if not record or (user["role"] == "staff" and record["staff_id"] != user["id"]):
+            raise HTTPException(status_code=404, detail="Certificate document not found")
+        document_path = qualification_document_path(record["document_filename"])
+        if not document_path or not document_path.is_file():
+            raise HTTPException(status_code=404, detail="Certificate document not found")
+        if hashlib.sha256(document_path.read_bytes()).hexdigest() != record["document_sha256"]:
+            raise HTTPException(status_code=409, detail="Certificate document failed its integrity check")
+        return FileResponse(
+            document_path,
+            media_type=record["document_media_type"],
+            filename=record["original_filename"],
+            content_disposition_type="inline",
+            headers={"Cache-Control": "private, no-store"},
+        )
 
 
 @app.get("/api/notifications")
 def notifications(user: dict[str, Any] = Depends(session_user)) -> dict[str, Any]:
     with db_session() as db:
+        reminders_created = materialise_due_lesson_reminders(db, user["id"]) if user["role"] == "customer" else 0
         query = """SELECT n.id,n.user_id,n.audience_role,n.title,n.message,n.kind,n.delivery_channels,n.created_at,
                           COALESCE(r.read_at,CASE WHEN n.user_id=? THEN n.read_at END) read_at
                    FROM notifications n
                    LEFT JOIN notification_receipts r ON r.notification_id=n.id AND r.user_id=?
                    WHERE n.user_id=? OR n.audience_role=?
                    ORDER BY n.created_at DESC LIMIT 100"""
-        return {"notifications": rows(db.execute(query, (user["id"], user["id"], user["id"], user["role"])))}
+        return {
+            "notifications": rows(db.execute(query, (user["id"], user["id"], user["id"], user["role"]))),
+            "lesson_reminders_created": reminders_created,
+        }
+
+
+@app.get("/api/customer/reminder-preferences")
+def get_customer_reminder_preferences(user: dict[str, Any] = Depends(require_roles("customer"))) -> dict[str, Any]:
+    with db_session() as db:
+        return {
+            "preferences": reminder_preferences(db, user["id"]),
+            "delivery": {
+                "in_app": "live",
+                "email": "credentials_and_adapter_required",
+                "sms": "credentials_and_adapter_required",
+                "push": "paused_with_mobile_app",
+            },
+        }
+
+
+@app.patch("/api/customer/reminder-preferences")
+def save_customer_reminder_preferences(
+    payload: ReminderPreferencesInput,
+    request: Request,
+    user: dict[str, Any] = Depends(require_roles("customer")),
+    x_csrf_token: str | None = Header(default=None),
+) -> dict[str, Any]:
+    csrf_guard(request, user, x_csrf_token)
+    with db_session() as db:
+        db.execute(
+            """INSERT INTO reminder_preferences(user_id,enabled,hours_before,channels,updated_at)
+               VALUES(?,?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET
+               enabled=excluded.enabled,hours_before=excluded.hours_before,
+               channels=excluded.channels,updated_at=excluded.updated_at""",
+            (user["id"], int(payload.enabled), payload.hours_before, json.dumps(payload.channels), now_iso()),
+        )
+        audit(
+            db, user["id"], "update_lesson_reminders", "user", user["id"],
+            {"enabled": payload.enabled, "hours_before": payload.hours_before, "channels": payload.channels},
+            client_ip(request),
+        )
+        return {"saved": True, "preferences": reminder_preferences(db, user["id"])}
 
 
 @app.post("/api/notifications/{notification_id}/read")
@@ -3082,7 +3846,8 @@ def update_enquiry(enquiry_id: int, payload: EnquiryStatusInput, request: Reques
 @app.get("/api/admin/staff")
 def admin_staff(user: dict[str, Any] = Depends(require_roles("admin"))) -> dict[str, Any]:
     with db_session() as db:
-        query = """SELECT u.id,u.email,u.first_name,u.last_name,u.phone,u.role,u.active,u.xero_employee_id,u.xero_payroll_calendar_id,
+        query = """SELECT u.id,u.email,u.first_name,u.last_name,u.phone,u.role,u.active,u.staff_number,
+                          u.shopify_customer_gid,u.xero_employee_id,u.xero_payroll_calendar_id,
                    (SELECT COUNT(*) FROM qualifications q WHERE q.staff_id=u.id AND (q.status='expiring' OR q.expiry_date<=?)) expiring_qualifications
                    FROM users u WHERE u.role IN ('staff','admin') ORDER BY u.first_name,u.last_name"""
         cutoff = (business_today() + timedelta(days=60)).isoformat()
@@ -3093,10 +3858,56 @@ def admin_staff(user: dict[str, Any] = Depends(require_roles("admin"))) -> dict[
 def admin_accounts(user: dict[str, Any] = Depends(require_roles("admin"))) -> dict[str, Any]:
     with db_session() as db:
         query = """SELECT u.id,u.email,u.role,u.first_name,u.last_name,u.phone,u.active,u.created_at,
+                          u.customer_number,u.staff_number,u.xero_contact_id,u.shopify_customer_gid,
                           u.xero_employee_id,u.xero_payroll_calendar_id,
                           (SELECT COUNT(*) FROM swimmers s WHERE s.customer_id=u.id AND s.active=1) swimmer_count
                    FROM users u ORDER BY u.active DESC,u.role,u.first_name,u.last_name"""
         return {"accounts": rows(db.execute(query))}
+
+
+@app.patch("/api/admin/customers/{customer_id}/integration-mapping")
+def update_customer_integration_mapping(
+    customer_id: int,
+    payload: CustomerIntegrationMappingInput,
+    request: Request,
+    user: dict[str, Any] = Depends(require_roles("admin")),
+    x_csrf_token: str | None = Header(default=None),
+) -> dict[str, Any]:
+    csrf_guard(request, user, x_csrf_token)
+    with db_session() as db:
+        customer = db.execute(
+            "SELECT id,customer_number FROM users WHERE id=? AND role='customer' AND active=1",
+            (customer_id,),
+        ).fetchone()
+        if not customer:
+            raise HTTPException(status_code=404, detail="Active family account not found")
+        try:
+            db.execute(
+                "UPDATE users SET xero_contact_id=?,shopify_customer_gid=? WHERE id=?",
+                (payload.xero_contact_id or None, payload.shopify_customer_gid or None, customer_id),
+            )
+        except sqlite3.IntegrityError as exc:
+            raise HTTPException(status_code=409, detail="That Xero or Shopify customer record is already linked to another family") from exc
+        audit(
+            db,
+            user["id"],
+            "update_customer_integration_mapping",
+            "user",
+            customer_id,
+            {
+                "customer_number": customer["customer_number"],
+                "xero_contact_mapped": bool(payload.xero_contact_id),
+                "shopify_customer_mapped": bool(payload.shopify_customer_gid),
+            },
+            client_ip(request),
+        )
+        return {
+            "saved": True,
+            "customer_number": customer["customer_number"],
+            "xero_contact_mapped": bool(payload.xero_contact_id),
+            "shopify_customer_mapped": bool(payload.shopify_customer_gid),
+            "transmission": "none",
+        }
 
 
 @app.post("/api/admin/accounts")
@@ -3112,6 +3923,16 @@ def create_admin_account(payload: AdminUserInput, request: Request, user: dict[s
                    VALUES(?,?,?,?,?,?,1,?)""",
                 (email, password_hash(payload.temporary_password), payload.role, payload.first_name.strip(), payload.last_name.strip(), payload.phone.strip(), now_iso()),
             )
+            if payload.role == "customer":
+                db.execute(
+                    "UPDATE users SET customer_number=printf('HVS-%06d',id) WHERE id=?",
+                    (cursor.lastrowid,),
+                )
+            else:
+                db.execute(
+                    "UPDATE users SET staff_number=printf('HVS-W-%06d',id) WHERE id=?",
+                    (cursor.lastrowid,),
+                )
         except sqlite3.IntegrityError:
             raise HTTPException(status_code=409, detail="An account with this email already exists")
         audit(db, user["id"], "create_account", "user", cursor.lastrowid, {"email": email, "role": payload.role}, client_ip(request))
@@ -3181,10 +4002,14 @@ def create_admin_swimmer(payload: AdminSwimmerInput, request: Request, user: dic
             (
                 payload.customer_id, payload.first_name.strip(), payload.last_name.strip(),
                 payload.date_of_birth.isoformat() if payload.date_of_birth else None,
-                payload.level, payload.emergency_contact, payload.medical_notes,
-                payload.allergies, payload.medications, payload.support_notes,
+                payload.level, encrypt_sensitive(payload.emergency_contact.strip()), encrypt_sensitive(payload.medical_notes.strip()),
+                encrypt_sensitive(payload.allergies.strip()), encrypt_sensitive(payload.medications.strip()), encrypt_sensitive(payload.support_notes.strip()),
                 int(payload.photo_consent), now_iso(),
             ),
+        )
+        db.execute(
+            "UPDATE swimmers SET swimmer_number=printf('HVS-S-%06d',id) WHERE id=?",
+            (cursor.lastrowid,),
         )
         audit(db, user["id"], "create_swimmer", "swimmer", cursor.lastrowid, {"customer_id": payload.customer_id}, client_ip(request))
         return {"id": cursor.lastrowid, "created": True}
@@ -3197,12 +4022,23 @@ def update_xero_staff_mapping(staff_id: int, payload: XeroStaffMappingInput, req
         staff = db.execute("SELECT id FROM users WHERE id=? AND role IN ('staff','admin') AND active=1", (staff_id,)).fetchone()
         if not staff:
             raise HTTPException(status_code=404, detail="Active staff account not found")
-        db.execute(
-            "UPDATE users SET xero_employee_id=?,xero_payroll_calendar_id=? WHERE id=?",
-            (payload.employee_id.strip() or None, payload.payroll_calendar_id.strip() or None, staff_id),
+        try:
+            db.execute(
+                "UPDATE users SET xero_employee_id=?,xero_payroll_calendar_id=?,shopify_customer_gid=? WHERE id=?",
+                (payload.employee_id or None, payload.payroll_calendar_id or None, payload.shopify_customer_gid or None, staff_id),
+            )
+        except sqlite3.IntegrityError as exc:
+            raise HTTPException(status_code=409, detail="That Shopify customer record is already linked to another person") from exc
+        audit(
+            db, user["id"], "update_xero_staff_mapping", "user", staff_id,
+            {"employee_mapped": bool(payload.employee_id), "calendar_mapped": bool(payload.payroll_calendar_id), "shopify_staff_customer_mapped": bool(payload.shopify_customer_gid)},
+            client_ip(request),
         )
-        audit(db, user["id"], "update_xero_staff_mapping", "user", staff_id, {"employee_mapped": bool(payload.employee_id), "calendar_mapped": bool(payload.payroll_calendar_id)}, client_ip(request))
-        return {"saved": True, "staff_id": staff_id, "employee_mapped": bool(payload.employee_id), "calendar_mapped": bool(payload.payroll_calendar_id)}
+        return {
+            "saved": True, "staff_id": staff_id, "employee_mapped": bool(payload.employee_id),
+            "calendar_mapped": bool(payload.payroll_calendar_id), "shopify_staff_customer_mapped": bool(payload.shopify_customer_gid),
+            "transmission": "none",
+        }
 
 
 @app.get("/api/admin/enrolments")
@@ -3345,7 +4181,7 @@ def admin_waitlist_action(waitlist_id: int, payload: WaitlistActionInput, reques
         # Same read-then-write gap as create_booking: lock before checking capacity.
         db.execute("BEGIN IMMEDIATE")
         entry = db.execute(
-            """SELECT w.*,c.title,c.capacity,s.first_name swimmer_first,s.customer_id
+            """SELECT w.*,c.title,c.capacity,c.weekday,c.price_cents,s.first_name swimmer_first,s.customer_id
                FROM waitlist w JOIN classes c ON c.id=w.class_id JOIN swimmers s ON s.id=w.swimmer_id
                WHERE w.id=? AND w.status='waiting'""",
             (waitlist_id,),
@@ -3367,10 +4203,16 @@ def admin_waitlist_action(waitlist_id: int, payload: WaitlistActionInput, reques
         else:
             booking_id = db.execute("INSERT INTO bookings(class_id,swimmer_id,status,created_at) VALUES(?,?,?,?)", (entry["class_id"], entry["swimmer_id"], "confirmed", now_iso())).lastrowid
             db.execute("UPDATE waitlist SET status='converted' WHERE id=?", (waitlist_id,))
+        term = active_term(db)
+        if not term:
+            raise HTTPException(status_code=409, detail="Management must publish an active school term before confirming a lesson place")
+        charge = create_xero_lesson_charge(
+            db, booking_id=booking_id, customer_id=entry["customer_id"], term=term, swim_class=entry
+        )
         renumber_waitlist(db, entry["class_id"])
         db.execute("INSERT INTO notifications(user_id,title,message,kind,delivery_channels,created_at) VALUES(?,?,?,?,?,?)", (entry["customer_id"], "A lesson place is confirmed", f"{entry['swimmer_first']} now has a confirmed place in {entry['title']}.", "booking", '["in_app","email"]', now_iso()))
-        audit(db, user["id"], "promote_waitlist_entry", "waitlist", waitlist_id, {"booking_id": booking_id, "class_id": entry["class_id"], "swimmer_id": entry["swimmer_id"]}, client_ip(request))
-        return {"status": "confirmed", "waitlist_id": waitlist_id, "booking_id": booking_id}
+        audit(db, user["id"], "promote_waitlist_entry", "waitlist", waitlist_id, {"booking_id": booking_id, "class_id": entry["class_id"], "swimmer_id": entry["swimmer_id"], "lesson_charge_reference": charge["reference"], "payment_provider": "xero"}, client_ip(request))
+        return {"status": "confirmed", "waitlist_id": waitlist_id, "booking_id": booking_id, "payment": {"provider": "Xero", "reference": charge["reference"], "amount_cents": charge["amount_cents"], "status": charge["status"], "family_customer_number": charge["family_customer_number"], "swimmer_number": charge["swimmer_number"], "xero_contact_mapped": bool(charge["xero_contact_id"])}}
 
 
 @app.get("/api/admin/timesheets")
@@ -3479,6 +4321,28 @@ def integrations(user: dict[str, Any] = Depends(require_roles("admin"))) -> dict
         }
 
 
+@app.get("/api/admin/lesson-charges")
+def admin_lesson_charges(user: dict[str, Any] = Depends(require_roles("admin"))) -> dict[str, Any]:
+    with db_session() as db:
+        charges = rows(db.execute(
+            """SELECT lc.id,lc.reference,lc.provider,lc.per_lesson_cents,lc.lesson_count,lc.amount_cents,
+                      lc.family_customer_number,lc.swimmer_number,lc.xero_contact_id,lc.invoice_description,
+                      lc.status,lc.xero_invoice_id,lc.created_at,b.id booking_id,
+                      s.first_name swimmer_first,s.last_name swimmer_last,c.title class_title,
+                      u.first_name customer_first,u.last_name customer_last,u.email customer_email,t.name term_name
+               FROM lesson_charges lc JOIN bookings b ON b.id=lc.booking_id
+               JOIN swimmers s ON s.id=b.swimmer_id JOIN classes c ON c.id=b.class_id
+               JOIN users u ON u.id=lc.customer_id JOIN school_terms t ON t.id=lc.term_id
+               ORDER BY lc.created_at DESC"""
+        ))
+        return {
+            "charges": charges,
+            "provider": "Xero",
+            "transmission": "locked_until_authorised_xero_connection_and_reviewed_test_invoice",
+            "card_data_stored": False,
+        }
+
+
 @app.get("/api/integrations/xero/connect")
 def connect_xero(user: dict[str, Any] = Depends(require_roles("admin"))):
     if not xero_ready():
@@ -3525,8 +4389,8 @@ async def sync_xero_timesheets(request: Request, user: dict[str, Any] = Depends(
             raise HTTPException(status_code=409, detail="Connect the existing Xero organisation first")
         approved = rows(
             db.execute(
-                """SELECT t.id,t.staff_id,t.clock_in,t.clock_out,t.hours,
-                          u.first_name,u.last_name,u.xero_employee_id,u.xero_payroll_calendar_id
+                """SELECT t.id,t.staff_id,t.clock_in,t.clock_out,t.hours,t.break_minutes,
+                          u.first_name,u.last_name,u.staff_number,u.xero_employee_id,u.xero_payroll_calendar_id
                    FROM time_entries t JOIN users u ON u.id=t.staff_id
                    WHERE t.status='approved' AND t.xero_timesheet_id IS NULL
                    ORDER BY t.clock_in,t.id"""
@@ -3536,9 +4400,11 @@ async def sync_xero_timesheets(request: Request, user: dict[str, Any] = Depends(
             {
                 "entry_id": entry["id"],
                 "staff_id": entry["staff_id"],
+                "staff_number": entry["staff_number"],
                 "staff_name": f"{entry['first_name']} {entry['last_name']}".strip(),
                 "business_date": business_date_from_timestamp(entry["clock_in"]).isoformat(),
                 "hours": entry["hours"],
+                "break_minutes": entry["break_minutes"],
                 "employee_mapped": bool(entry["xero_employee_id"]),
                 "payroll_calendar_mapped": bool(entry["xero_payroll_calendar_id"]),
             }
@@ -3957,14 +4823,12 @@ PUBLIC_ROOT_FILES = frozenset(
         "START_HERE.html",
         "about.html",
         "admin.html",
-        "app.html",
         "customer.html",
         "enquire.html",
         "index.html",
         "locations.html",
         "login.html",
         "manifest.webmanifest",
-        "mobile-shell.html",
         "offline.html",
         "photo-consent.html",
         "platform.html",

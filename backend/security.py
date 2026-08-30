@@ -8,11 +8,17 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 from zoneinfo import ZoneInfo
 
+from nacl.exceptions import CryptoError
+from nacl.secret import SecretBox
+
+from .config import settings
+
 # OWASP's current PBKDF2-HMAC-SHA256 work factor. Existing lower-cost hashes are upgraded
 # transparently after the next successful sign-in by password_needs_rehash().
 PBKDF2_ITERATIONS = 600_000
 SESSION_DAYS = 14
 MELBOURNE_TZ = ZoneInfo("Australia/Melbourne")
+SENSITIVE_VALUE_PREFIX = "enc:v1:"
 
 
 def now_iso() -> str:
@@ -74,8 +80,40 @@ def new_token(bytes_count: int = 32) -> str:
     return secrets.token_urlsafe(bytes_count)
 
 
+def token_digest(token: str) -> str:
+    """Store bearer-style session identifiers as one-way digests, never reusable tokens."""
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def _data_secret_box() -> SecretBox:
+    # Development uses the stable preview secret so the demo remains self-contained.
+    # Production validation requires a separate, deployment-only encryption key.
+    material = settings.data_encryption_key or settings.session_secret
+    key = hashlib.sha256(f"hv-swim-sensitive-data-v1:{material}".encode("utf-8")).digest()
+    return SecretBox(key)
+
+
+def encrypt_sensitive(value: str | None) -> str | None:
+    """Authenticated field encryption for medical, allergy and emergency-contact text."""
+    if value is None or value == "" or value.startswith(SENSITIVE_VALUE_PREFIX):
+        return value
+    encrypted = bytes(_data_secret_box().encrypt(value.encode("utf-8")))
+    return SENSITIVE_VALUE_PREFIX + base64.urlsafe_b64encode(encrypted).decode("ascii")
+
+
+def decrypt_sensitive(value: str | None) -> str | None:
+    """Read encrypted values while allowing a controlled migration from legacy plaintext."""
+    if value is None or value == "" or not value.startswith(SENSITIVE_VALUE_PREFIX):
+        return value
+    try:
+        raw = base64.urlsafe_b64decode(value[len(SENSITIVE_VALUE_PREFIX):].encode("ascii"))
+        return _data_secret_box().decrypt(raw).decode("utf-8")
+    except (ValueError, UnicodeDecodeError, CryptoError) as exc:
+        raise RuntimeError("Sensitive customer data could not be decrypted") from exc
+
+
 def public_user(row: Any) -> dict[str, Any]:
-    return {
+    payload = {
         "id": row["id"],
         "email": row["email"],
         "role": row["role"],
@@ -84,3 +122,8 @@ def public_user(row: Any) -> dict[str, Any]:
         "display_name": f"{row['first_name']} {row['last_name']}".strip(),
         "must_change_password": bool(row["must_change_password"]),
     }
+    if "customer_number" in row.keys() and row["role"] == "customer":
+        payload["customer_number"] = row["customer_number"]
+    if "staff_number" in row.keys() and row["role"] in ("staff", "admin"):
+        payload["staff_number"] = row["staff_number"]
+    return payload

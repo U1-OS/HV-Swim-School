@@ -513,6 +513,93 @@ def test_wrong_password_is_rejected(client):
     assert "password" not in response.json()["detail"].lower().replace("email or password is incorrect", "")
 
 
+def test_database_never_stores_the_reusable_session_cookie(client):
+    from backend.database import db_session
+
+    client.cookies.clear()
+    response = client.post("/api/auth/login", json={"email": FAMILY[0], "password": FAMILY[1]})
+    assert response.status_code == 200
+    raw_cookie = client.cookies.get("hv_session")
+    assert raw_cookie
+    with db_session() as db:
+        stored = db.execute("SELECT id FROM sessions ORDER BY created_at DESC LIMIT 1").fetchone()["id"]
+    assert raw_cookie != stored
+    assert len(stored) == 64
+
+
+def test_child_safety_details_are_encrypted_at_rest_but_available_to_family(client):
+    from backend.database import db_session
+    from backend.security import SENSITIVE_VALUE_PREFIX
+
+    client.cookies.clear()
+    csrf = sign_in(client, FAMILY)
+    swimmer = client.get("/api/customer/swimmers").json()["swimmers"][0]
+    payload = {
+        "emergency_contact": "Private Contact · 0400 111 222",
+        "medical_notes": "Private medical lesson note",
+        "allergies": "Private allergy detail",
+        "medications": "Private medication detail",
+        "support_notes": "Private learning support detail",
+    }
+    response = client.patch(
+        f"/api/customer/swimmers/{swimmer['id']}", json=payload, headers={"X-CSRF-Token": csrf}
+    )
+    assert response.status_code == 200
+    returned = next(item for item in client.get("/api/customer/swimmers").json()["swimmers"] if item["id"] == swimmer["id"])
+    assert returned["allergies"] == payload["allergies"]
+    with db_session() as db:
+        stored = db.execute("SELECT emergency_contact,medical_notes,allergies,medications,support_notes FROM swimmers WHERE id=?", (swimmer["id"],)).fetchone()
+    assert all(stored[field].startswith(SENSITIVE_VALUE_PREFIX) for field in stored.keys())
+    assert not any(value in " ".join(stored) for value in payload.values())
+
+
+def test_family_can_control_in_app_lesson_reminders(client):
+    client.cookies.clear()
+    csrf = sign_in(client, FAMILY)
+    response = client.patch(
+        "/api/customer/reminder-preferences",
+        json={"enabled": True, "hours_before": 48, "channels": ["in_app"]},
+        headers={"X-CSRF-Token": csrf},
+    )
+    assert response.status_code == 200
+    assert response.json()["preferences"]["hours_before"] == 48
+    status = client.get("/api/customer/reminder-preferences")
+    assert status.status_code == 200
+    assert status.json()["delivery"]["in_app"] == "live"
+    assert status.json()["delivery"]["email"] == "credentials_and_adapter_required"
+
+
+def test_confirmed_lesson_creates_xero_only_billing_record(client):
+    from backend.database import db_session
+
+    client.cookies.clear()
+    csrf = sign_in(client, FAMILY)
+    swimmers = client.get("/api/customer/swimmers").json()["swimmers"]
+    classes = client.get("/api/classes").json()["classes"]
+    with db_session() as db:
+        existing = {(row["class_id"], row["swimmer_id"]) for row in db.execute("SELECT class_id,swimmer_id FROM bookings WHERE status='confirmed'")}
+    pair = next((item, swimmer) for item in classes for swimmer in swimmers if item["available"] and (item["id"], swimmer["id"]) not in existing)
+    with db_session() as db:
+        db.execute("UPDATE users SET customer_number=NULL WHERE id=?", (pair[1]["customer_id"],))
+        db.execute("UPDATE swimmers SET swimmer_number=NULL WHERE id=?", (pair[1]["id"],))
+    response = client.post(
+        "/api/customer/bookings",
+        json={"class_id": pair[0]["id"], "swimmer_id": pair[1]["id"]},
+        headers={"X-CSRF-Token": csrf},
+    )
+    assert response.status_code == 200
+    assert response.json()["payment"]["provider"] == "Xero"
+    assert response.json()["payment"]["family_customer_number"].startswith("HVS-")
+    assert response.json()["payment"]["swimmer_number"].startswith("HVS-S-")
+    with db_session() as db:
+        charge = db.execute("SELECT provider,status,amount_cents,family_customer_number,swimmer_number FROM lesson_charges WHERE booking_id=?", (response.json()["booking_id"],)).fetchone()
+    assert dict(charge)["provider"] == "xero"
+    assert dict(charge)["status"] == "pending_xero_invoice"
+    assert dict(charge)["amount_cents"] > 0
+    assert dict(charge)["family_customer_number"] == response.json()["payment"]["family_customer_number"]
+    assert dict(charge)["swimmer_number"] == response.json()["payment"]["swimmer_number"]
+
+
 def test_unknown_and_known_emails_give_the_same_error(client):
     """A different message for a real account would let anyone enumerate customers."""
     client.cookies.clear()
@@ -936,12 +1023,22 @@ def test_xero_timesheet_action_is_audited_readiness_only_and_uses_melbourne_date
 
     mapped = client.patch(
         f"/api/admin/staff/{staff['id']}/xero-mapping",
-        json={"employee_id": "xero-employee-test", "payroll_calendar_id": "xero-calendar-test"},
+        json={
+            "employee_id": "xero-employee-test",
+            "payroll_calendar_id": "xero-calendar-test",
+            "shopify_customer_gid": "gid://shopify/Customer/900001",
+        },
         headers={"X-CSRF-Token": admin_csrf},
     )
     assert mapped.status_code == 200, mapped.text
     assert mapped.json()["employee_mapped"] is True
+    assert mapped.json()["shopify_staff_customer_mapped"] is True
     with db_session() as db:
+        identity = db.execute(
+            "SELECT staff_number,shopify_customer_gid FROM users WHERE id=?", (staff["id"],)
+        ).fetchone()
+        assert identity["staff_number"].startswith("HVS-W-")
+        assert identity["shopify_customer_gid"] == "gid://shopify/Customer/900001"
         assert db.execute(
             "SELECT COUNT(*) FROM audit_log WHERE action='preview_xero_timesheets'"
         ).fetchone()[0] >= 1
@@ -955,6 +1052,71 @@ def test_family_sees_only_its_own_swimmers(client):
     mine = client.get("/api/customer/swimmers").json()["swimmers"]
     me = client.get("/api/auth/me").json()["user"]["id"]
     assert all(swimmer["customer_id"] == me for swimmer in mine)
+
+
+def test_incident_report_links_family_swimmer_and_worker_numbers_with_encrypted_details(client):
+    from backend.database import db_session
+
+    client.cookies.clear()
+    sign_in(client, FAMILY)
+    family_swimmer_id = client.get("/api/customer/swimmers").json()["swimmers"][0]["id"]
+    client.cookies.clear()
+    staff_csrf = sign_in(client, STAFF)
+    setup = client.get("/api/staff/incidents")
+    assert setup.status_code == 200, setup.text
+    swimmer = next(item for item in setup.json()["swimmers"] if item["id"] == family_swimmer_id)
+    happened = "Swimmer slipped while walking beside the pool and sat down immediately."
+    first_aid = "Instructor checked the child, applied a wrapped cold pack and monitored them."
+    created = client.post(
+        "/api/staff/incidents",
+        json={
+            "swimmer_id": swimmer["id"],
+            "location_slug": "wood-street",
+            "incident_at": datetime.now(timezone.utc).isoformat(),
+            "incident_type": "injury",
+            "what_happened": happened,
+            "injury_observed": "Small red area on the left knee; child remained alert.",
+            "first_aid_applied": first_aid,
+            "further_action": "Parent handover completed and monitoring advised.",
+            "witnesses": "Alex Lee, Instructor",
+            "parent_notified": True,
+        },
+        headers={"X-CSRF-Token": staff_csrf},
+    )
+    assert created.status_code == 200, created.text
+    body = created.json()
+    assert body["reference"].startswith("HVS-INC-")
+    assert body["swimmer_number"].startswith("HVS-S-")
+    assert body["family_customer_number"].startswith("HVS-")
+    assert body["staff_number"].startswith("HVS-W-")
+    with db_session() as db:
+        raw = db.execute("SELECT what_happened,first_aid_applied FROM incident_reports WHERE id=?", (body["id"],)).fetchone()
+        assert raw["what_happened"].startswith("enc:v1:") and happened not in raw["what_happened"]
+        assert raw["first_aid_applied"].startswith("enc:v1:") and first_aid not in raw["first_aid_applied"]
+        audit_detail = db.execute(
+            "SELECT detail FROM audit_log WHERE action='create_incident_report' ORDER BY id DESC LIMIT 1"
+        ).fetchone()["detail"]
+        assert happened not in audit_detail and first_aid not in audit_detail
+    staff_report = next(item for item in client.get("/api/staff/incidents").json()["reports"] if item["id"] == body["id"])
+    assert staff_report["what_happened"] == happened
+    assert staff_report["first_aid_applied"] == first_aid
+
+    client.cookies.clear()
+    sign_in(client, FAMILY)
+    family_report = next(item for item in client.get("/api/customer/incidents").json()["reports"] if item["id"] == body["id"])
+    assert family_report["reference"] == body["reference"]
+    assert family_report["parent_notified"] is True
+    assert client.get("/api/staff/incidents").status_code == 403
+
+    client.cookies.clear()
+    admin_csrf = sign_in(client, ADMIN)
+    updated = client.patch(
+        f"/api/admin/incidents/{body['id']}",
+        json={"status": "follow_up"},
+        headers={"X-CSRF-Token": admin_csrf},
+    )
+    assert updated.status_code == 200, updated.text
+    assert updated.json()["status"] == "follow_up"
 
 
 def test_family_can_update_owned_child_safety_profile_without_auditing_health_text(client):
@@ -1824,13 +1986,31 @@ def test_a_family_can_cancel_rebook_and_cancel_the_same_class(client):
     assert client.delete(f"/api/customer/bookings/{second.json()['booking_id']}", headers=headers).status_code == 200
 
 
-def test_clock_in_tracking_is_disabled_by_business_policy(client):
+def test_staff_clock_records_breaks_and_paid_hours_without_location_tracking(client):
     client.cookies.clear()
     csrf = sign_in(client, STAFF)
     headers = {"X-CSRF-Token": csrf}
-    response = client.post("/api/staff/clock", json={"action": "in", "location_slug": "wood-street"}, headers=headers)
-    assert response.status_code == 410
-    assert "does not use clock-in tracking" in response.json()["detail"]
+    profile = client.get("/api/auth/me").json()["user"]
+    assert profile["staff_number"].startswith("HVS-W-")
+    clock_on = client.post("/api/staff/clock", json={"action": "in", "location_slug": "wood-street"}, headers=headers)
+    assert clock_on.status_code == 200, clock_on.text
+    assert clock_on.json()["state"] == "working"
+    duplicate = client.post("/api/staff/clock", json={"action": "in", "location_slug": "wood-street"}, headers=headers)
+    assert duplicate.status_code == 409
+    break_start = client.post("/api/staff/clock", json={"action": "break_start", "location_slug": "wood-street"}, headers=headers)
+    assert break_start.status_code == 200, break_start.text
+    assert break_start.json()["state"] == "on_break"
+    break_end = client.post("/api/staff/clock", json={"action": "break_end", "location_slug": "wood-street"}, headers=headers)
+    assert break_end.status_code == 200, break_end.text
+    assert break_end.json()["break_minutes"] >= 1
+    clock_off = client.post("/api/staff/clock", json={"action": "out", "location_slug": "wood-street"}, headers=headers)
+    assert clock_off.status_code == 200, clock_off.text
+    assert clock_off.json()["state"] == "clocked_off"
+    records = client.get("/api/staff/time-entries").json()["time_entries"]
+    recorded = next(item for item in records if item["id"] == clock_on.json()["entry_id"])
+    assert recorded["clock_out"]
+    assert recorded["break_minutes"] >= 1
+    assert recorded["latitude"] is None and recorded["longitude"] is None
 
 
 def test_family_absence_credit_limit_and_financial_boundary(client):
@@ -1970,7 +2150,7 @@ def test_a_shift_cannot_finish_before_it_starts(client):
     assert response.status_code == 422
 
 
-def test_clock_in_rejects_impossible_coordinates(client):
+def test_staff_clock_rejects_location_coordinates_in_payload(client):
     client.cookies.clear()
     csrf = sign_in(client, STAFF)
     response = client.post(

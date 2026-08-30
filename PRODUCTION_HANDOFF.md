@@ -7,13 +7,16 @@ This build is a production foundation, not a substitute for the final deployment
 - Deploy the FastAPI service behind HTTPS on an Australian-region host.
 - Use Python 3.12 or newer and keep the GitHub quality workflow green.
 - Replace SQLite with managed PostgreSQL before real customer use.
-- Set a long random `HV_SESSION_SECRET` and `HV_APP_ENV=production`.
+- Set a long random `HV_SESSION_SECRET`, a separate long random
+  `HV_DATA_ENCRYPTION_KEY` and `HV_APP_ENV=production`. Keep both keys in the hosting
+  secret store and outside the database, backups and repository.
 - On the first start of an empty production database only, set
   `HV_BOOTSTRAP_ADMIN_EMAIL` and a unique `HV_BOOTSTRAP_ADMIN_PASSWORD` (12+ characters),
   then remove both values after the management account has been created.
 - Configure the real public origin in `HV_PUBLIC_URL` and restrict allowed hosts.
 - Add automated encrypted backups, uptime checks, error monitoring and a restore drill.
 - Run an independent penetration test before collecting customer or staff information.
+  The included automated and local security audits are a baseline, not an “unhackable” claim.
 
 ## 2. Accounts, privacy and safeguarding
 
@@ -53,12 +56,15 @@ This build is a production foundation, not a substitute for the final deployment
 - Assign the asynchronous support-ticket queue to a staffed role, publish a response target and retention period, and train staff that it is not monitored as live chat or an emergency service. The current build creates an internal queue item and reference only; it does not send an external support email.
 - Approve who may issue or revoke swimmer achievements. Families see the achievement and evidence note, while the staff note remains private; issue and revocation events are audited. Treat printable HTML certificates as HV Swim progress records, never as qualifications, licences or industry accreditation.
 - Confirm enrolment authority, waitlist priority rules, payment collection and signed-terms requirements before managers promote real families into classes.
+- Every family and swimmer receives a permanent HV number when the account/record is created. The lesson-purchase workflow rechecks and backfills both identifiers before creating the Xero charge record. Preserve those identifiers during migration, map the family number to the Xero contact and Shopify customer metafield, and never recycle a retired number.
 - Decide whether a released class place should notify the next family automatically or remain a manager-approved action; the current build defaults to audited manager approval.
 - Train managers to use Website content only for approved public wording and to verify every published change on mobile.
-- HV Swim does not use clock-ins. The former clock endpoint is disabled and the platform
-  uses published rosters plus reviewed timesheets with shift start/finish records. Do not
-  re-enable background location or clock tracking without a new approved business,
-  privacy and employment process.
+- HV Swim now requires staff clock-on, break and clock-off records as well as optional
+  manual weekly/daily hour entry. Completed entries remain subject to management approval
+  before the Xero payroll workflow. The clock records timestamps and a selected workplace;
+  it does not request GPS, background location or continuous device tracking. Confirm the
+  employment/privacy notice and break-rounding policy before production use.
+- Configure an incident-retention, correction and escalation procedure before real use. Sensitive incident narratives are encrypted and routed by family, student and worker number; authorised management still needs an approved safeguarding workflow, breach-response plan and restricted backup/export process.
 
 Confirmed legal identity in this release: **HVS BENDIGO PTY LTD**, ABN
 **46 687 937 962**, 76 Wood Street, California Gully VIC 3556; postal address PO Box
@@ -75,6 +81,7 @@ with HV Swim before production deployment.
   service configuration, idempotency, reconciliation and credit-note handling before the
   management readiness matrix can be treated as live. The current term/absence workflow
   records eligibility only and never changes an invoice automatically.
+- Use the permanent HV family number as the external contact reference and include the relevant student number on the lesson invoice/charge line. The current build snapshots those values locally but does not yet create or reconcile a live Xero contact or invoice.
 - Map HV Swim staff to Xero employee and payroll-calendar IDs in the management workspace and confirm the earnings rate.
 - Use the audited readiness preview to identify incomplete mappings. It never transmits payroll data.
 - Import Xero pay-period boundaries and implement idempotent export tracking against the current AU Payroll API before any live transmission is enabled. `XERO_SYNC_ENABLED` is intentionally not sufficient to bypass this lock.
@@ -84,6 +91,7 @@ with HV Swim before production deployment.
 
 - Treat all 24 premium catalogue records as planned until each product passes the release gates below; a public concept card or saved-list entry is not inventory or an offer to supply.
 - Use Shopify as the customer-facing source of truth for products, variants, stock, checkout, GST and refunds.
+- Store the permanent HV family number in an approved Shopify customer metafield when the live customer sync is implemented. Shopify customer IDs must remain mapping identifiers, not the authoritative HV family number.
 - Keep public Shopify Checkout scoped to approved family merchandise. Staff uniforms must
   remain in the role-protected Staff and Management workspaces and must not be published in
   public Shopify collections or the public product API. Lesson and term payments stay in the
@@ -100,16 +108,19 @@ with HV Swim before production deployment.
 - Test stock, variants, shipping, GST, checkout, refunds and mobile purchases end-to-end.
 - Follow `MERCH_PRODUCTION_PLAN.md` for the initial supplier map and release gates.
 
-## 5. Notifications and app distribution
+## 5. Notifications and website delivery
 
 - Choose email, SMS and push providers and add sender-domain verification.
 - Approve message templates, quiet hours, emergency escalation and opt-out handling.
-- Active website and connected-app pages poll for urgent closure and changed-condition alerts and clear stale notices if the feed fails. This is not guaranteed off-device delivery and must not replace venue/emergency procedures.
-- To reach a closed/backgrounded PWA or native app, implement and test Web Push plus APNs/FCM registration, consent, device-token lifecycle, provider credentials, delivery receipts and unsubscribe/removal. Browser notification permission by itself is not that service.
-- Use the existing PWA immediately; its offline mode never queues sensitive changes without confirmation.
-- Confirm the production HTTPS app origin and permanent bundle ID, then run `prepare-mobile-app.command` to create and synchronise the Capacitor iOS/Android projects.
-- Follow `MOBILE_APP_README.md` and `mobile/STORE_HANDOFF.md` for Xcode 26, Android API 36, signing, beta testing, privacy disclosures and store assets.
-- Treat native push notification setup as a separate consented production integration; the included web and native shells do not pretend that provider credentials are active.
+- Active website pages poll for urgent closure and changed-condition alerts and clear stale
+  notices if the feed fails. Signed-in family accounts can choose a 12, 24 or 48-hour
+  in-portal lesson reminder. These are not guaranteed off-device delivery and must not
+  replace venue or emergency procedures.
+- Implement and test the email/SMS adapters, verified sender, consent, quiet hours,
+  idempotency, delivery receipts and opt-out handling before enabling external reminders.
+- The mobile-app phase is paused. `app.html` and `mobile-shell.html` are retained as source
+  but are not publicly served, linked or included in the website sitemap. Do not start
+  store submission or APNs/FCM work until HV Swim approves a new mobile scope.
 
 ## 6. Pool temperatures and conditions
 

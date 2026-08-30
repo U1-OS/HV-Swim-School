@@ -44,7 +44,7 @@ for (const entry of shell) {
     fail('precache', `${entry} does not exist — cache.addAll will reject and the PWA will never install`);
   }
   if (query) {
-    const versionPattern = new RegExp(path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\?(v=[\\d.]+)', 'g');
+    const versionPattern = new RegExp(path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\?(v=[\\w.-]+)', 'g');
     const pageVersions = new Set([...allHtml.matchAll(versionPattern)].map((match) => match[1]));
     for (const pageVersion of pageVersions) {
       if (pageVersion !== query) {
@@ -57,7 +57,7 @@ for (const entry of shell) {
 // A shared asset must never have two cache-busting versions across pages. The worker can
 // otherwise install successfully while one page keeps loading an older script or stylesheet.
 const requestedVersions = new Map();
-for (const [, asset, version] of allHtml.matchAll(/(?:src|href)="(assets\/[^"]+?)\?(v=[\d.]+)"/g)) {
+for (const [, asset, version] of allHtml.matchAll(/(?:src|href)="(assets\/[^"]+?)\?(v=[\w.-]+)"/g)) {
   if (!requestedVersions.has(asset)) requestedVersions.set(asset, new Set());
   requestedVersions.get(asset).add(version);
 }
@@ -139,10 +139,16 @@ if (read('index.html').includes('Badge-ready') && !/data-public-feature="associa
 }
 if (allHtml.includes('sloanswimschool@hotmail.com')) fail('business identity', 'an obsolete contact email remains in public markup');
 if (!read('programs.html').includes('$22.50 per lesson')) fail('business terms', 'the confirmed lesson fee is missing from programs.html');
-if (/data-route-jump="clock"|data-action="clock"/.test(read('assets/platform.js'))) fail('business workflow', 'clock-in controls remain in the staff interface');
+if (!/data-action="staff-clock"/.test(read('assets/platform.js'))) fail('business workflow', 'staff clock-on/off controls are missing');
+if (/navigator\.geolocation|accuracy_metres/.test(read('assets/platform.js'))) fail('business workflow', 'staff clock controls must not collect continuous device location data');
+if (!/\/api\/staff\/incidents/.test(read('assets/platform.js'))) fail('business workflow', 'staff incident reporting route is missing');
+if (!/swimmer_number/.test(read('backend/server.py')) || !/customer_number/.test(read('backend/server.py'))) fail('business workflow', 'family/student number linkage is missing from the service');
 const shopPage = read('shop.html');
 if (!/id="production-routes"/.test(shopPage) || !/not a claim of available stock/i.test(shopPage)) {
   fail('production copy', 'public supplier routes are missing their stock/connection boundary in shop.html');
+}
+if (/Save this kit|choices save on this device|persistent preview cart/i.test(shopPage)) {
+  fail('production copy', 'shop.html still presents a simulated saved-cart workflow');
 }
 
 if (problems.length) {

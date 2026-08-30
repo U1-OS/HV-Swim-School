@@ -14,6 +14,7 @@ def production_settings(**changes):
     values = {
         "app_env": "production",
         "session_secret": "a-unique-production-secret-with-32-plus-characters",
+        "data_encryption_key": "a-separate-production-data-key-with-32-plus-characters",
         "public_url": "https://swim.example.test",
         "xero_client_id": "",
         "xero_client_secret": "",
@@ -49,6 +50,15 @@ def test_conflicting_legacy_environment_names_fail_closed(monkeypatch):
 def test_production_rejects_placeholder_or_short_session_secrets(secret):
     with pytest.raises(RuntimeError, match="HV_SESSION_SECRET"):
         server.validate_production_config(production_settings(session_secret=secret))
+
+
+def test_production_requires_a_separate_customer_data_encryption_key():
+    with pytest.raises(RuntimeError, match="HV_DATA_ENCRYPTION_KEY"):
+        server.validate_production_config(production_settings(data_encryption_key="too-short"))
+    with pytest.raises(RuntimeError, match="HV_DATA_ENCRYPTION_KEY"):
+        server.validate_production_config(
+            production_settings(data_encryption_key="a-unique-production-secret-with-32-plus-characters")
+        )
 
 
 def test_production_requires_https_for_public_and_xero_urls():

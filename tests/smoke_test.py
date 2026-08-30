@@ -37,7 +37,7 @@ def expect(label, condition):
 def main():
     public = urllib.request.build_opener()
     status, health = request(public, "/api/health")
-    expect("health endpoint", status == 200 and health.get("version") == "5.9.0")
+    expect("health endpoint", status == 200 and health.get("version") == "5.10.0")
     status, account_providers = request(public, "/api/auth/oauth/providers")
     expect(
         "family Google and Apple account boundary",
@@ -58,10 +58,15 @@ def main():
     expect("guided merchandise kit builder", "First Splash Kit" in shop_page and "Lesson Day Kit" in shop_page and "data-kit-add" in shop_page and "Size it, care for it" in shop_page)
     enquire_page = public.open(BASE + "/enquire.html", timeout=30).read().decode("utf-8")
     expect("guided enrolment concierge", "Four clear steps" in enquire_page and "wizard-class-grid" in enquire_page and "enrolment-success" in enquire_page)
-    mobile_shell = public.open(BASE + "/mobile-shell.html", timeout=30).read().decode("utf-8")
-    expect("native mobile launch shell", "Open connected app" in mobile_shell and "V5.9.0" in mobile_shell)
+    for paused_path in ("/app.html", "/mobile-shell.html"):
+        try:
+            public.open(BASE + paused_path, timeout=30)
+            paused_status = 200
+        except urllib.error.HTTPError as exc:
+            paused_status = exc.code
+        expect(f"paused mobile route {paused_path}", paused_status == 404)
     manifest = json.loads(public.open(BASE + "/manifest.webmanifest", timeout=30).read().decode("utf-8"))
-    expect("installable app manifest", manifest.get("display") == "standalone" and len(manifest.get("icons", [])) >= 3)
+    expect("website identity manifest", len(manifest.get("icons", [])) >= 3)
     for path, key in (("/api/public/locations", "locations"), ("/api/classes", "classes")):
         status, payload = request(public, path)
         expect(path, status == 200 and isinstance(payload.get(key), list) and payload.get("term_calendar", {}).get("configured") is True)

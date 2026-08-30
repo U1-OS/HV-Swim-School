@@ -1,16 +1,11 @@
 {
   "name": "HV Swim Bendigo",
   "short_name": "HV Swim",
-  "description": "HV Swim Bendigo lessons, bookings, pool updates, family messages, achievements, rosters and management operations.",
+  "description": "HV Swim Bendigo programs, locations, pool updates and secure family, staff and management website access.",
   "id": "./",
-  "start_url": "app.html?source=pwa",
+  "start_url": "index.html",
   "scope": "./",
-  "display": "standalone",
-  "display_override": [
-    "window-controls-overlay",
-    "standalone",
-    "minimal-ui"
-  ],
+  "display": "browser",
   "background_color": "#061a3b",
   "theme_color": "#061a3b",
   "orientation": "portrait-primary",
@@ -70,7 +65,7 @@
       ]
     },
     {
-      "name": "Staff app",
+      "name": "Staff portal",
       "short_name": "Staff",
       "url": "login.html?role=staff",
       "icons": [

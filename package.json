@@ -1,9 +1,9 @@
 {
-  "name": "hv-swim-bendigo-mobile",
-  "version": "5.9.0",
+  "name": "hv-swim-bendigo-website",
+  "version": "5.10.0",
   "private": true,
   "packageManager": "pnpm@11.19.0",
-  "description": "Capacitor foundation for the HV Swim Bendigo iOS and Android apps.",
+  "description": "HV Swim Bendigo website quality tooling; paused mobile source is retained for a later phase.",
   "scripts": {
     "quality": "node scripts/check-site.mjs",
     "test": "node scripts/check-site.mjs",

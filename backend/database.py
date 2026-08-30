@@ -7,7 +7,7 @@ from datetime import date, datetime, timedelta, timezone
 from typing import Generator, Iterable
 
 from .config import DB_PATH, settings
-from .security import business_today, now_iso, password_hash
+from .security import SENSITIVE_VALUE_PREFIX, business_today, encrypt_sensitive, now_iso, password_hash
 
 
 SCHEMA = """
@@ -22,6 +22,10 @@ CREATE TABLE IF NOT EXISTS users (
   first_name TEXT NOT NULL,
   last_name TEXT NOT NULL DEFAULT '',
   phone TEXT,
+  customer_number TEXT,
+  staff_number TEXT,
+  xero_contact_id TEXT,
+  shopify_customer_gid TEXT,
   xero_employee_id TEXT,
   xero_payroll_calendar_id TEXT,
   must_change_password INTEGER NOT NULL DEFAULT 0,
@@ -65,6 +69,7 @@ CREATE TABLE IF NOT EXISTS oauth_identities (
 CREATE TABLE IF NOT EXISTS swimmers (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   customer_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  swimmer_number TEXT,
   first_name TEXT NOT NULL,
   last_name TEXT NOT NULL,
   date_of_birth TEXT,
@@ -202,7 +207,13 @@ CREATE TABLE IF NOT EXISTS time_entries (
   status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','submitted','approved','exported')),
   approved_by INTEGER REFERENCES users(id),
   approved_at TEXT,
-  xero_timesheet_id TEXT
+  xero_timesheet_id TEXT,
+  work_date TEXT,
+  week_start TEXT,
+  entry_scope TEXT NOT NULL DEFAULT 'daily' CHECK (entry_scope IN ('daily','weekly')),
+  notes TEXT,
+  break_started_at TEXT,
+  break_minutes INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS qualifications (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -211,8 +222,41 @@ CREATE TABLE IF NOT EXISTS qualifications (
   reference_number TEXT,
   expiry_date TEXT,
   status TEXT NOT NULL DEFAULT 'current',
-  verified_at TEXT
+  verified_at TEXT,
+  document_filename TEXT,
+  original_filename TEXT,
+  document_media_type TEXT,
+  document_sha256 TEXT,
+  uploaded_at TEXT,
+  reminder_days INTEGER NOT NULL DEFAULT 60
 );
+CREATE TABLE IF NOT EXISTS qualification_reminder_dispatches (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  qualification_id INTEGER NOT NULL REFERENCES qualifications(id) ON DELETE CASCADE,
+  expiry_date TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  UNIQUE(qualification_id, expiry_date)
+);
+CREATE TABLE IF NOT EXISTS incident_reports (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  reference TEXT UNIQUE NOT NULL,
+  swimmer_id INTEGER NOT NULL REFERENCES swimmers(id),
+  family_user_id INTEGER NOT NULL REFERENCES users(id),
+  reported_by INTEGER NOT NULL REFERENCES users(id),
+  location_id INTEGER NOT NULL REFERENCES locations(id),
+  incident_at TEXT NOT NULL,
+  incident_type TEXT NOT NULL,
+  what_happened TEXT NOT NULL,
+  injury_observed TEXT,
+  first_aid_applied TEXT,
+  further_action TEXT,
+  witnesses TEXT,
+  parent_notified INTEGER NOT NULL DEFAULT 0,
+  status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open','follow_up','closed')),
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_incidents_family ON incident_reports(family_user_id,incident_at);
+CREATE INDEX IF NOT EXISTS idx_incidents_reporter ON incident_reports(reported_by,incident_at);
 CREATE TABLE IF NOT EXISTS association_credentials (
   key TEXT PRIMARY KEY,
   display_name TEXT NOT NULL,
@@ -238,6 +282,41 @@ CREATE TABLE IF NOT EXISTS notifications (
   kind TEXT NOT NULL DEFAULT 'info',
   delivery_channels TEXT NOT NULL DEFAULT '["in_app"]',
   read_at TEXT,
+  created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS reminder_preferences (
+  user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  enabled INTEGER NOT NULL DEFAULT 1,
+  hours_before INTEGER NOT NULL DEFAULT 24 CHECK (hours_before BETWEEN 2 AND 72),
+  channels TEXT NOT NULL DEFAULT '["in_app"]',
+  updated_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS lesson_reminder_dispatches (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  booking_id INTEGER NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  occurrence_date TEXT NOT NULL,
+  notification_id INTEGER REFERENCES notifications(id) ON DELETE SET NULL,
+  status TEXT NOT NULL DEFAULT 'delivered_in_app' CHECK (status IN ('delivered_in_app','external_pending','cancelled')),
+  created_at TEXT NOT NULL,
+  UNIQUE(booking_id, occurrence_date, user_id)
+);
+CREATE TABLE IF NOT EXISTS lesson_charges (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  reference TEXT UNIQUE NOT NULL,
+  booking_id INTEGER UNIQUE NOT NULL REFERENCES bookings(id),
+  customer_id INTEGER NOT NULL REFERENCES users(id),
+  term_id INTEGER NOT NULL REFERENCES school_terms(id),
+  provider TEXT NOT NULL DEFAULT 'xero' CHECK (provider='xero'),
+  per_lesson_cents INTEGER NOT NULL CHECK (per_lesson_cents>=0),
+  lesson_count INTEGER NOT NULL CHECK (lesson_count>=1),
+  amount_cents INTEGER NOT NULL CHECK (amount_cents>=0),
+  family_customer_number TEXT,
+  swimmer_number TEXT,
+  xero_contact_id TEXT,
+  invoice_description TEXT,
+  status TEXT NOT NULL DEFAULT 'pending_xero_invoice' CHECK (status IN ('pending_xero_invoice','invoiced','paid','cancelled_no_refund')),
+  xero_invoice_id TEXT,
   created_at TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS notification_receipts (
@@ -399,6 +478,8 @@ CREATE INDEX IF NOT EXISTS idx_absence_reports_term ON absence_reports(term_id,c
 CREATE INDEX IF NOT EXISTS idx_lesson_attendance_date ON lesson_attendance(occurrence_date,booking_id);
 CREATE INDEX IF NOT EXISTS idx_pool_readings_location ON pool_readings(location_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_lesson_reminders_user ON lesson_reminder_dispatches(user_id, occurrence_date DESC);
+CREATE INDEX IF NOT EXISTS idx_lesson_charges_status ON lesson_charges(status, created_at);
 CREATE INDEX IF NOT EXISTS idx_notification_receipts_user ON notification_receipts(user_id, read_at DESC);
 CREATE INDEX IF NOT EXISTS idx_swimmer_achievements_swimmer ON swimmer_achievements(swimmer_id, status, awarded_at DESC);
 CREATE INDEX IF NOT EXISTS idx_swimmer_achievements_awarded_by ON swimmer_achievements(awarded_by, awarded_at DESC);
@@ -409,6 +490,7 @@ CREATE INDEX IF NOT EXISTS idx_support_messages_ticket ON support_messages(ticke
 CREATE INDEX IF NOT EXISTS idx_public_alerts_active ON public_alerts(status, severity, published_at DESC);
 CREATE INDEX IF NOT EXISTS idx_public_alerts_location ON public_alerts(location_id, status, source);
 CREATE INDEX IF NOT EXISTS idx_time_entries_status ON time_entries(status, staff_id);
+CREATE INDEX IF NOT EXISTS idx_qualifications_expiry ON qualifications(expiry_date, staff_id);
 -- Both rate limits below scan on every sign-in and every public enquiry, and both tables
 -- grow with traffic, so they need covering indexes.
 CREATE INDEX IF NOT EXISTS idx_audit_action_ip ON audit_log(action, ip_address, created_at);
@@ -547,24 +629,97 @@ def initialise_database() -> None:
                 db.execute(f"ALTER TABLE products ADD COLUMN {column} {definition}")
         user_columns = {row[1] for row in db.execute("PRAGMA table_info(users)")}
         for column, definition in {
+            "customer_number": "TEXT",
+            "staff_number": "TEXT",
+            "xero_contact_id": "TEXT",
+            "shopify_customer_gid": "TEXT",
             "xero_employee_id": "TEXT",
             "xero_payroll_calendar_id": "TEXT",
             "must_change_password": "INTEGER NOT NULL DEFAULT 0",
         }.items():
             if column not in user_columns:
                 db.execute(f"ALTER TABLE users ADD COLUMN {column} {definition}")
+        db.execute("CREATE UNIQUE INDEX IF NOT EXISTS uniq_customer_number ON users(customer_number) WHERE customer_number IS NOT NULL")
+        db.execute("CREATE UNIQUE INDEX IF NOT EXISTS uniq_staff_number ON users(staff_number) WHERE staff_number IS NOT NULL")
+        db.execute("CREATE UNIQUE INDEX IF NOT EXISTS uniq_xero_contact_id ON users(xero_contact_id) WHERE xero_contact_id IS NOT NULL")
+        db.execute("CREATE UNIQUE INDEX IF NOT EXISTS uniq_shopify_customer_gid ON users(shopify_customer_gid) WHERE shopify_customer_gid IS NOT NULL")
+        db.execute(
+            """UPDATE users SET customer_number=printf('HVS-%06d',id)
+               WHERE role='customer' AND (customer_number IS NULL OR customer_number='')"""
+        )
+        db.execute(
+            """UPDATE users SET staff_number=printf('HVS-W-%06d',id)
+               WHERE role IN ('staff','admin') AND (staff_number IS NULL OR staff_number='')"""
+        )
+        time_entry_columns = {row[1] for row in db.execute("PRAGMA table_info(time_entries)")}
+        for column, definition in {
+            "work_date": "TEXT",
+            "week_start": "TEXT",
+            "entry_scope": "TEXT NOT NULL DEFAULT 'daily'",
+            "notes": "TEXT",
+            "break_started_at": "TEXT",
+            "break_minutes": "INTEGER NOT NULL DEFAULT 0",
+        }.items():
+            if column not in time_entry_columns:
+                db.execute(f"ALTER TABLE time_entries ADD COLUMN {column} {definition}")
+        db.execute(
+            """UPDATE time_entries
+               SET work_date=COALESCE(work_date,substr(clock_in,1,10)),
+                   week_start=COALESCE(week_start,date(substr(clock_in,1,10),printf('-%d days',(CAST(strftime('%w',substr(clock_in,1,10)) AS INTEGER)+6)%7))),
+                   entry_scope=COALESCE(NULLIF(entry_scope,''),'daily')"""
+        )
+        db.execute("CREATE INDEX IF NOT EXISTS idx_time_entries_week ON time_entries(staff_id,week_start,status)")
+        qualification_columns = {row[1] for row in db.execute("PRAGMA table_info(qualifications)")}
+        for column, definition in {
+            "document_filename": "TEXT",
+            "original_filename": "TEXT",
+            "document_media_type": "TEXT",
+            "document_sha256": "TEXT",
+            "uploaded_at": "TEXT",
+            "reminder_days": "INTEGER NOT NULL DEFAULT 60",
+        }.items():
+            if column not in qualification_columns:
+                db.execute(f"ALTER TABLE qualifications ADD COLUMN {column} {definition}")
+        lesson_charge_columns = {row[1] for row in db.execute("PRAGMA table_info(lesson_charges)")}
+        for column, definition in {
+            "family_customer_number": "TEXT",
+            "swimmer_number": "TEXT",
+            "xero_contact_id": "TEXT",
+            "invoice_description": "TEXT",
+        }.items():
+            if column not in lesson_charge_columns:
+                db.execute(f"ALTER TABLE lesson_charges ADD COLUMN {column} {definition}")
         oauth_attempt_columns = {row[1] for row in db.execute("PRAGMA table_info(oauth_login_attempts)")}
         if "ip_address" not in oauth_attempt_columns:
             db.execute("ALTER TABLE oauth_login_attempts ADD COLUMN ip_address TEXT NOT NULL DEFAULT 'legacy'")
         db.execute("CREATE INDEX IF NOT EXISTS idx_oauth_attempts_ip ON oauth_login_attempts(ip_address, created_at)")
         swimmer_columns = {row[1] for row in db.execute("PRAGMA table_info(swimmers)")}
         for column, definition in {
+            "swimmer_number": "TEXT",
             "allergies": "TEXT",
             "medications": "TEXT",
             "support_notes": "TEXT",
         }.items():
             if column not in swimmer_columns:
                 db.execute(f"ALTER TABLE swimmers ADD COLUMN {column} {definition}")
+        db.execute("CREATE UNIQUE INDEX IF NOT EXISTS uniq_swimmer_number ON swimmers(swimmer_number) WHERE swimmer_number IS NOT NULL")
+        db.execute(
+            """UPDATE swimmers SET swimmer_number=printf('HVS-S-%06d',id)
+               WHERE swimmer_number IS NULL OR swimmer_number=''"""
+        )
+        # Safety-critical child details are authenticated-encrypted at field level. Older
+        # preview databases migrate in place; the prefix makes the migration idempotent.
+        sensitive_fields = ("emergency_contact", "medical_notes", "allergies", "medications", "support_notes")
+        for swimmer in db.execute(
+            "SELECT id,emergency_contact,medical_notes,allergies,medications,support_notes FROM swimmers"
+        ).fetchall():
+            values = [swimmer[field] for field in sensitive_fields]
+            if any(value and not value.startswith(SENSITIVE_VALUE_PREFIX) for value in values):
+                db.execute(
+                    """UPDATE swimmers SET emergency_contact=?,medical_notes=?,allergies=?,medications=?,support_notes=?
+                       WHERE id=?""",
+                    (*(encrypt_sensitive(value) for value in values), swimmer["id"]),
+                )
         attendance_columns = {row[1] for row in db.execute("PRAGMA table_info(lesson_attendance)")}
         if "term_id" not in attendance_columns:
             # V5.7 preview databases created during development may have register rows
@@ -785,7 +940,7 @@ def initialise_database() -> None:
                     "HV_BOOTSTRAP_ADMIN_PASSWORD of at least 12 characters for its first start"
                 )
             first_name, _, last_name = settings.bootstrap_admin_name.partition(" ")
-            db.execute(
+            bootstrap_id = db.execute(
                 "INSERT INTO users(email,password_hash,role,first_name,last_name,created_at) VALUES(?,?,?,?,?,?)",
                 (
                     settings.bootstrap_admin_email,
@@ -795,8 +950,9 @@ def initialise_database() -> None:
                     last_name or "Swim Admin",
                     created,
                 ),
-            )
-            audit(db, None, "bootstrap_admin", "user", db.execute("SELECT last_insert_rowid()").fetchone()[0])
+            ).lastrowid
+            db.execute("UPDATE users SET staff_number=printf('HVS-W-%06d',id) WHERE id=?", (bootstrap_id,))
+            audit(db, None, "bootstrap_admin", "user", bootstrap_id)
             return
         demo_users = [
             ("parent@hvswim.demo", "FamilyDemo!26", "customer", "Jordan", "Smith", "0413 000 101"),
@@ -809,15 +965,31 @@ def initialise_database() -> None:
                 "INSERT INTO users(email,password_hash,role,first_name,last_name,phone,created_at) VALUES(?,?,?,?,?,?,?)",
                 (email, password_hash(password), role, first, last, phone, created),
             )
+        db.execute(
+            """UPDATE users SET customer_number=printf('HVS-%06d',id)
+               WHERE role='customer' AND (customer_number IS NULL OR customer_number='')"""
+        )
+        db.execute(
+            """UPDATE users SET staff_number=printf('HVS-W-%06d',id)
+               WHERE role IN ('staff','admin') AND (staff_number IS NULL OR staff_number='')"""
+        )
         user_ids = {row["email"]: row["id"] for row in db.execute("SELECT id,email FROM users")}
         location_ids = {row["slug"]: row["id"] for row in db.execute("SELECT id,slug FROM locations")}
         db.execute(
             "INSERT INTO swimmers(customer_id,first_name,last_name,date_of_birth,level,emergency_contact,medical_notes,allergies,medications,support_notes,photo_consent,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
-            (user_ids["parent@hvswim.demo"], "Mia", "Smith", "2018-05-14", "Learn to Swim 3", "Jordan Smith · 0413 000 101", "No medical conditions recorded in this demo profile", "No known allergies", "No medications recorded", "Responds well to calm, step-by-step instructions", 1, created),
+            (user_ids["parent@hvswim.demo"], "Mia", "Smith", "2018-05-14", "Learn to Swim 3", encrypt_sensitive("Jordan Smith · 0413 000 101"), encrypt_sensitive("No medical conditions recorded in this demo profile"), encrypt_sensitive("No known allergies"), encrypt_sensitive("No medications recorded"), encrypt_sensitive("Responds well to calm, step-by-step instructions"), 1, created),
+        )
+        db.execute(
+            """UPDATE swimmers SET swimmer_number=printf('HVS-S-%06d',id)
+               WHERE swimmer_number IS NULL OR swimmer_number=''"""
         )
         db.execute(
             "INSERT INTO swimmers(customer_id,first_name,last_name,date_of_birth,level,emergency_contact,medical_notes,allergies,medications,support_notes,photo_consent,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
-            (user_ids["parent@hvswim.demo"], "Noah", "Smith", "2024-01-22", "Infant Aquatics", "Jordan Smith · 0413 000 101", "No medical conditions recorded in this demo profile", "No known allergies", "No medications recorded", "Parent participates in every infant lesson", 0, created),
+            (user_ids["parent@hvswim.demo"], "Noah", "Smith", "2024-01-22", "Infant Aquatics", encrypt_sensitive("Jordan Smith · 0413 000 101"), encrypt_sensitive("No medical conditions recorded in this demo profile"), encrypt_sensitive("No known allergies"), encrypt_sensitive("No medications recorded"), encrypt_sensitive("Parent participates in every infant lesson"), 0, created),
+        )
+        db.execute(
+            """UPDATE swimmers SET swimmer_number=printf('HVS-S-%06d',id)
+               WHERE swimmer_number IS NULL OR swimmer_number=''"""
         )
         classes = [
             ("INF-A-MON", "Infant Aquatics", "Infant Aquatics", location_ids["wood-street"], user_ids["staff@hvswim.demo"], 0, "09:00", 30, 5, 2250),

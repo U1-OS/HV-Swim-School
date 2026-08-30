@@ -202,7 +202,7 @@
     else footer.append(strip);
   }
 
-  // Urgent website/app alerts. Open pages receive a new closure or changed-condition
+  // Urgent website alerts. Open pages receive a new closure or changed-condition
   // notice within the server-provided refresh window. Native/web push while the app is
   // closed remains a separate production provider boundary.
   const ALERT_STORAGE_KEY = 'hv-swim-last-device-alert';

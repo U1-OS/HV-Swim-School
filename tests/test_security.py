@@ -17,12 +17,16 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from backend.security import (  # noqa: E402
     PBKDF2_ITERATIONS,
+    SENSITIVE_VALUE_PREFIX,
     business_date_from_timestamp,
     business_today,
+    decrypt_sensitive,
+    encrypt_sensitive,
     new_token,
     password_hash,
     password_needs_rehash,
     password_verify,
+    token_digest,
 )
 
 PASSWORD = "FamilyDemo!26"
@@ -76,6 +80,23 @@ def test_session_tokens_are_unique_and_long_enough():
     tokens = {new_token() for _ in range(500)}
     assert len(tokens) == 500
     assert min(len(token) for token in tokens) >= 32
+
+
+def test_session_tokens_are_one_way_digested_for_database_storage():
+    token = new_token(32)
+    digest = token_digest(token)
+    assert token not in digest
+    assert len(digest) == 64
+    assert token_digest(token) == digest
+
+
+def test_sensitive_customer_text_is_authenticated_encrypted_and_round_trips():
+    value = "Severe allergy · private lesson safety note"
+    encrypted = encrypt_sensitive(value)
+    assert encrypted.startswith(SENSITIVE_VALUE_PREFIX)
+    assert value not in encrypted
+    assert decrypt_sensitive(encrypted) == value
+    assert decrypt_sensitive("legacy preview text") == "legacy preview text"
 
 
 def test_business_date_uses_melbourne_not_the_server_timezone():

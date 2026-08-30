@@ -6,10 +6,47 @@ customer, swimmer, health, payroll or credential data in a public issue.
 ## Supported deployment
 
 - Python 3.12 or newer on a maintained POSIX/Linux host behind HTTPS.
-- A strong deployment-only `HV_SESSION_SECRET` and production host allowlist.
+- A strong deployment-only `HV_SESSION_SECRET`, a separate strong
+  `HV_DATA_ENCRYPTION_KEY` and a production host allowlist.
 - Managed production persistence, encrypted backups and error monitoring before real data.
 - No direct exposure of the source checkout: the server publishes only explicit root files
   and the fixed `assets/` directory.
+
+## Application security controls
+
+- Browser sessions use `HttpOnly`, `Secure` in production and `SameSite=Strict` cookies.
+  Only a SHA-256 digest of each session token is stored in the database, so a database read
+  does not disclose reusable browser credentials.
+- Emergency contacts, allergies, medications, medical notes and support notes are encrypted
+  with authenticated encryption before persistence and are revealed only after an authorised
+  family, staff or management request. The data-encryption key must be stored outside the
+  database and must never be reused as the session secret.
+- Incident and injury narratives, observed symptoms, first-aid details, follow-up and witness
+  notes use the same authenticated-encryption boundary. Audit entries contain only the report
+  reference, linked non-secret identifiers and workflow state—not the sensitive narrative.
+- Family, student and worker numbers are permanent internal identifiers. They are not secrets
+  or authentication credentials and never grant access by themselves; every API read and write
+  still applies session, role and record-ownership checks.
+- The public server uses a fixed file allowlist, request-target validation, trusted hosts,
+  security headers, CSRF checks and API request-size limits. Role checks remain server-side;
+  hiding a menu item is never treated as authorisation.
+- Lesson charges are recorded only for the Xero invoicing workflow. Merchandise checkout is
+  delegated only to Shopify. This application deliberately stores no card number, CVV or raw
+  payment credential.
+- Clock-on/off records accept only an approved action and staff-selected workplace. The API
+  does not accept GPS coordinates, and the browser does not request geolocation or background
+  location permission.
+- In-portal reminders are available now. Email, SMS, Web Push and external payment transmission
+  fail closed until their provider credentials, adapters, consent flows, webhook verification
+  and idempotency controls have been implemented and tested.
+
+## Verification scope
+
+The automated suite and local security audit cover common access-control, session, CSRF,
+request-smuggling/path, sensitive-file, injection and security-header failures. They reduce
+risk but do not make the service “unhackable” and are not a substitute for production threat
+modelling, infrastructure review and an independent penetration test before real child,
+health, payroll or payment-related data is accepted.
 
 ## 2026 Starlette advisory review
 

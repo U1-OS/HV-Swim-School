@@ -3,6 +3,9 @@
   const grid = document.getElementById('shop-grid');
   if (!grid) return;
 
+  document.querySelectorAll('[data-cart-open]').forEach(button=>button.hidden=true);
+  document.querySelectorAll('[data-kit-add]').forEach(button=>{button.disabled=true;button.textContent='Shopify setup required';});
+
   const CART_KEY = 'hv-swim-v48-preview-cart';
   let products = [];
   let activeFilter = 'all';
@@ -38,11 +41,6 @@
     'HV-INSTRUCTOR-CAP': {material:'Lightweight adjustable performance cap',care:'Hand wash and reshape while damp',personalisation:'Embroidered HV Swim identity; instructor label under review'},
     'HV-FAMILY-TEE': {material:'Premium soft-touch tee blank selected from an Australian-capable POD catalogue',care:'Cold wash inside-out; shade dry; do not iron decoration',personalisation:'HV Swim chest mark; optional family surname only after a sample is approved'},
     'HV-FAMILY-CREW': {material:'Mid-weight premium crew blank — composition and Australian fulfilment pending sample',care:'Cold wash inside-out; reshape and shade dry',personalisation:'Premium HV Swim chest decoration; no individual name by default'}
-  };
-  const KITS = {
-    'first-splash': ['HV-GOGGLES','HV-CAP','HV-HOODED-TOWEL','HV-BOTTLE'],
-    'lesson-day': ['HV-RASHIE','HV-SWIM-SHORTS','HV-GOGGLES','HV-CAP','HV-TRAINING-MITTS','HV-HOODED-TOWEL','HV-BAG','HV-BOTTLE'],
-    'family-club': ['HV-FAMILY-TEE','HV-FAMILY-CREW','HV-BOTTLE','HV-TOWEL']
   };
   const ROUTE_DETAILS = {
     printify:{short:'POD · Printify',label:'Print-on-demand candidate',copy:'Prepared for Printify-to-Shopify fulfilment after the exact blank, decoration, landed cost and physical sample are approved.'},
@@ -146,13 +144,14 @@
       const chooseVariant = catalogueSource === 'shopify';
       const available = product.status === 'available';
       const badge = available ? 'Available' : (chooseVariant ? 'Currently unavailable' : (product.sample_status === 'approved' ? 'Sample approved' : 'Collection concept'));
-      const addLabel = chooseVariant ? (available ? 'Choose option' : 'Unavailable') : 'Save';
+      const addLabel = chooseVariant ? (available ? 'Choose option' : 'Unavailable') : 'Shopify setup required';
       const route = routeFor(product);
-      return `<article class="shop-card reveal visible" data-audience="${slug(audienceFor(product))}" style="--reveal-delay:${Math.min(index*45,180)}ms"><button class="shop-product-visual" type="button" data-product-view="${esc(product.id)}" aria-label="View ${esc(product.title)}">${visual(product)}<span class="shop-product-badge">${badge}</span><span class="shop-quick-view">View details <span aria-hidden="true">→</span></span></button><div class="shop-card-copy"><div class="shop-card-heading"><span class="shop-category">${esc(product.category)}</span><span>${esc(audienceFor(product))}</span></div><span class="shop-route-chip route-${slug(product.supplier_route || 'review')}">${esc(route.short)}</span><h3>${esc(product.title)}</h3><p>${esc(product.description)}</p><div class="shop-sizes">${sizes.slice(0,4).map(size=>`<span>${esc(size)}</span>`).join('')||'<span>Final sizing pending</span>'}${sizes.length>4?`<span>+${sizes.length-4}</span>`:''}</div><div class="shop-card-foot"><div>${priceMarkup(product,chooseVariant)}</div><button type="button" class="shop-add-button" data-product-add="${esc(product.id)}" ${chooseVariant&&!available?'disabled':''}>${addLabel} <span aria-hidden="true">${chooseVariant?'→':'+'}</span></button></div></div></article>`;
+      return `<article class="shop-card reveal visible" data-audience="${slug(audienceFor(product))}" style="--reveal-delay:${Math.min(index*45,180)}ms"><button class="shop-product-visual" type="button" data-product-view="${esc(product.id)}" aria-label="View ${esc(product.title)}">${visual(product)}<span class="shop-product-badge">${badge}</span><span class="shop-quick-view">View details <span aria-hidden="true">→</span></span></button><div class="shop-card-copy"><div class="shop-card-heading"><span class="shop-category">${esc(product.category)}</span><span>${esc(audienceFor(product))}</span></div><span class="shop-route-chip route-${slug(product.supplier_route || 'review')}">${esc(route.short)}</span><h3>${esc(product.title)}</h3><p>${esc(product.description)}</p><div class="shop-sizes">${sizes.slice(0,4).map(size=>`<span>${esc(size)}</span>`).join('')||'<span>Final sizing pending</span>'}${sizes.length>4?`<span>+${sizes.length-4}</span>`:''}</div><div class="shop-card-foot"><div>${priceMarkup(product,chooseVariant)}</div><button type="button" class="shop-add-button" data-product-add="${esc(product.id)}" ${!chooseVariant||!available?'disabled':''}>${addLabel} <span aria-hidden="true">${chooseVariant?'→':'◇'}</span></button></div></div></article>`;
     }).join('') || '<div class="empty-state"><strong>Nothing matches that search.</strong><p>Try a different category, or clear the search to see the whole collection.</p><button type="button" class="btn btn-outline btn-small" data-clear-search>Show everything</button></div>';
   }
 
   function addToCart(product,selection,quantity=1,openDrawer=true) {
+    if (catalogueSource !== 'shopify') return false;
     let selectedSize = selection || sizeList(product)[0] || 'Standard';
     let variantId = null;
     let price = Number(product.price_cents || 0);
@@ -179,20 +178,8 @@
       document.getElementById('collection')?.scrollIntoView({behavior:'smooth',block:'start'});
       return;
     }
-    const fallbackSkus = {'HV-HOODED-TOWEL':'HV-TOWEL','HV-RASHIE':'HV-SWIMWEAR','HV-SWIM-SHORTS':'HV-SWIMWEAR'};
-    const kitProducts=(KITS[kitId]||[]).map(sku=>products.find(product=>product.sku===sku)||products.find(product=>product.sku===fallbackSkus[sku])).filter((product,index,list)=>product&&list.findIndex(item=>item.id===product.id)===index);
-    if (!kitProducts.length) return;
-    kitProducts.forEach(product=>{
-      const selectedSize=sizeList(product)[0]||'Standard';
-      const key=cartKey(product.id,selectedSize);
-      const existing=cart.find(item=>item.key===key);
-      if(existing) existing.quantity=Math.min(20,Number(existing.quantity)+1);
-      else cart.push({key,id:String(product.id),sku:product.sku,title:product.title,category:product.category,size:selectedSize,quantity:1,price_cents:Number(product.price_cents||0),variant_id:null});
-    });
-    saveCart();
     const status=document.getElementById('kit-builder-status');
-    if(status){status.classList.add('complete');status.innerHTML=`<span>✓</span><p><strong>${kitProducts.length} products saved.</strong> Review sizes and quantities in your saved collection before sending an enquiry.</p>`;}
-    openCart();
+    if(status){status.classList.remove('complete');status.innerHTML='<span>→</span><p><strong>Shopify setup is required.</strong> This kit is a product plan only and cannot be saved or purchased yet.</p>';}
   }
 
   function renderCart() {
@@ -253,13 +240,13 @@
     const dialog=document.getElementById('product-dialog');
     productOpener=opener instanceof HTMLElement?opener:null;
     const live=catalogueSource==='shopify';
-    const available=!live||(product.variants||[]).some(variant=>variant.availableForSale);
+    const available=live&&(product.variants||[]).some(variant=>variant.availableForSale);
     const options=live
       ? `<option value="">Choose an option</option>${(product.variants||[]).map(variant=>`<option value="${esc(variant.id)}" ${variant.availableForSale?'':'disabled'}>${esc(variant.title==='Default Title'?'Standard':variant.title)}${variant.availableForSale?'':' — unavailable'}</option>`).join('')}`
       : (sizes.length?sizes:['Standard']).map(size=>`<option value="${esc(size)}">${esc(size)}</option>`).join('');
     const dialogPrice=Number(product.price_cents)>0?money(product.price_cents):'Price pending';
     const route=routeFor(product);
-    document.getElementById('product-dialog-content').innerHTML=`<div class="dialog-product-visual">${visual(product)}<span class="dialog-concept-label">${live?'HV Swim approved range':'Concept image · sample pending'}</span></div><div class="dialog-product-copy"><div class="dialog-product-meta"><span class="shop-category">${esc(product.category)}</span><span>${esc(audienceFor(product))}</span></div><span class="shop-route-chip route-${slug(product.supplier_route || 'review')}">${esc(route.short)}</span><h2 id="product-dialog-title">${esc(product.title)}</h2><strong class="dialog-price">${dialogPrice}</strong><p>${esc(product.description)}</p><dl class="product-specs"><div><dt>Material direction</dt><dd>${esc(detail.material)}</dd></div><div><dt>Care</dt><dd>${esc(detail.care)}</dd></div><div><dt>Personalisation</dt><dd>${esc(product.personalisation || detail.personalisation)}</dd></div><div><dt>${esc(route.label)}</dt><dd>${esc(route.copy)}</dd></div></dl><div class="product-dialog-options"><div class="product-option"><label for="dialog-size">${live?'Select option':'Preferred option'}</label><select id="dialog-size" required>${options}</select></div><div class="product-option"><label for="dialog-quantity">Quantity</label><select id="dialog-quantity">${[1,2,3,4,5].map(value=>`<option value="${value}">${value}</option>`).join('')}</select></div></div><p class="wizard-error" id="dialog-option-error" role="alert" hidden>Please choose an available option.</p><div class="info-note"><strong>${live?'Live catalogue':'Collection availability'}:</strong> ${live?(available?'Availability and options come from the approved Shopify catalogue.':'This product is currently unavailable in Shopify. You can still review its details and check again later.'):'No stock is reserved and no payment is taken while final samples and suppliers are approved.'}</div><button class="btn btn-primary" type="button" data-dialog-add="${esc(product.id)}" ${available?'':'disabled'}>${live?(available?'Add selected option':'Currently unavailable'):'Save to collection list'}</button></div>`;
+    document.getElementById('product-dialog-content').innerHTML=`<div class="dialog-product-visual">${visual(product)}<span class="dialog-concept-label">${live?'HV Swim approved range':'Product plan · sample pending'}</span></div><div class="dialog-product-copy"><div class="dialog-product-meta"><span class="shop-category">${esc(product.category)}</span><span>${esc(audienceFor(product))}</span></div><span class="shop-route-chip route-${slug(product.supplier_route || 'review')}">${esc(route.short)}</span><h2 id="product-dialog-title">${esc(product.title)}</h2><strong class="dialog-price">${dialogPrice}</strong><p>${esc(product.description)}</p><dl class="product-specs"><div><dt>Material direction</dt><dd>${esc(detail.material)}</dd></div><div><dt>Care</dt><dd>${esc(detail.care)}</dd></div><div><dt>Personalisation</dt><dd>${esc(product.personalisation || detail.personalisation)}</dd></div><div><dt>${esc(route.label)}</dt><dd>${esc(route.copy)}</dd></div></dl>${live?`<div class="product-dialog-options"><div class="product-option"><label for="dialog-size">Select option</label><select id="dialog-size" required>${options}</select></div><div class="product-option"><label for="dialog-quantity">Quantity</label><select id="dialog-quantity">${[1,2,3,4,5].map(value=>`<option value="${value}">${value}</option>`).join('')}</select></div></div>`:''}<p class="wizard-error" id="dialog-option-error" role="alert" hidden>Please choose an available option.</p><div class="info-note"><strong>${live?'Live catalogue':'Shopify setup required'}:</strong> ${live?(available?'Availability and options come from the approved Shopify catalogue.':'This product is currently unavailable in Shopify. You can still review its details and check again later.'):'This specification is for production planning. It cannot be saved, ordered or paid for until samples are approved and Shopify is connected.'}</div><button class="btn btn-primary" type="button" data-dialog-add="${esc(product.id)}" ${available?'':'disabled'}>${live?(available?'Add selected option':'Currently unavailable'):'Shopify setup required'}</button></div>`;
     dialog.showModal();
   }
 
@@ -295,13 +282,13 @@
     if (add) {
       const product=products.find(item=>String(item.id)===String(add.dataset.productAdd));
       if(product){
-        if(catalogueSource==='shopify')openProduct(product.id,add);
-        else addToCart(product);
+        openProduct(product.id,add);
       }
     }
   });
   document.getElementById('product-dialog-content')?.addEventListener('click',event=>{
     const button=event.target.closest('[data-dialog-add]'); if(!button)return;
+    if(catalogueSource!=='shopify')return;
     const product=products.find(item=>String(item.id)===String(button.dataset.dialogAdd));
     if(!product)return;
     const select=document.getElementById('dialog-size');
@@ -361,11 +348,14 @@
     products=(payload.products||[]).map(product=>normalise(product,payload.source));
     const live=payload.source==='shopify';
     const catalogueCount=products.length;
-    const sourceLabel=live?'Live Shopify catalogue':`${catalogueCount}-product collection plan`;
+    const sourceLabel=live?'Live Shopify catalogue':`${catalogueCount}-product plan · ordering unavailable`;
     document.getElementById('shop-source').innerHTML=`<span class="status ${live?'open':'changed'}">${sourceLabel}</span>`;
     document.getElementById('cart-mode-status').className=`status ${live?'open':'changed'}`;
-    document.getElementById('cart-mode-status').textContent=live?'Shopify catalogue connected':'Collection in development';
-    document.getElementById('cart-mode-copy').textContent=live?'Only sampled and approved Shopify products are visible. Sign in to review saved items.':'Your choices save on this device. No stock is reserved and no payment is taken.';
+    document.getElementById('cart-mode-status').textContent=live?'Shopify catalogue connected':'Shopify setup required';
+    document.getElementById('cart-mode-copy').textContent=live?'Only sampled and approved Shopify products are visible. Sign in to review saved items.':'Product specifications are visible, but cart and checkout are unavailable.';
+    document.querySelectorAll('[data-cart-open]').forEach(button=>button.hidden=!live);
+    document.querySelectorAll('[data-kit-add]').forEach(button=>{button.disabled=!live;button.textContent=live?'Choose kit products':'Shopify setup required';});
+    if(!live){cart=[];saveCart();closeCart();}
     render(); renderCart();
   }).catch(()=>{
     grid.innerHTML='<div class="empty-state"><strong>The collection is not loading right now.</strong><p>This is a temporary problem on our side. The range is still there — get in touch and the team can talk you through it.</p><a class="btn btn-blue btn-small" href="enquire.html">Talk to the team <span aria-hidden="true">&rarr;</span></a></div>';

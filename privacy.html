@@ -22,14 +22,14 @@
   <link rel="icon" href="assets/app-icon-v3-64.png">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="assets/app-icon-v3-180.png">
-  <link rel="stylesheet" href="assets/styles.css?v=5.9.0">
-  <link rel="stylesheet" href="assets/support.css?v=5.9.0">
-  <script defer src="assets/app.js?v=5.9.0"></script>
-  <script defer src="assets/support.js?v=5.9.0"></script>
+  <link rel="stylesheet" href="assets/styles.css?v=5.10.0-ui4">
+  <link rel="stylesheet" href="assets/support.css?v=5.10.0-ui4">
+  <script defer src="assets/app.js?v=5.10.0-ui4"></script>
+  <script defer src="assets/support.js?v=5.10.0-ui4"></script>
 </head>
 <body data-page="privacy">
   <a class="skip-link" href="#main-content">Skip to main content</a>
-  <header class="site-header"><div class="container nav-wrap"><a class="brand" href="index.html" aria-label="HV Swim Bendigo home"><img src="assets/hv-swim-logo-v3.png" width="400" height="265" alt="HV Swim Bendigo"><span class="brand-copy"><strong>HV Swim Bendigo</strong><span>Confidence for life</span></span></a><nav class="nav-links" id="main-nav" aria-label="Main navigation"><a href="index.html">Home</a><a href="programs.html">Programs</a><a href="locations.html">Locations &amp; conditions</a><a href="about.html">Our approach</a><a href="shop.html">Shop</a><a href="app.html">App</a><a class="nav-mobile-login" href="login.html">Platform sign in</a></nav><div class="nav-actions"><a class="nav-login" href="login.html">Sign in</a><a class="btn btn-primary btn-small" href="enquire.html">Find a lesson <span aria-hidden="true">→</span></a><button class="menu-toggle" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="main-nav"><span></span></button></div></div></header>
+  <header class="site-header"><div class="container nav-wrap"><a class="brand" href="index.html" aria-label="HV Swim Bendigo home"><img src="assets/hv-swim-logo-v3.png" width="400" height="265" alt="HV Swim Bendigo"><span class="brand-copy"><strong>HV Swim Bendigo</strong><span>Confidence for life</span></span></a><nav class="nav-links" id="main-nav" aria-label="Main navigation"><a href="index.html">Home</a><a href="programs.html">Programs</a><a href="locations.html">Locations &amp; conditions</a><a href="about.html">Our approach</a><a href="shop.html">Shop</a><a class="nav-mobile-login" href="login.html">Platform sign in</a></nav><div class="nav-actions"><a class="nav-login" href="login.html">Sign in</a><a class="btn btn-primary btn-small" href="enquire.html">Find a lesson <span aria-hidden="true">→</span></a><button class="menu-toggle" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="main-nav"><span></span></button></div></div></header>
 
   <main id="main-content">
     <section class="legal-hero">
@@ -65,14 +65,15 @@
         <h3>Bookings and lesson history</h3>
         <p>We record class bookings, cancellations, completed lessons and waitlist positions so we can run classes, manage capacity fairly and show you your own history.</p>
         <p>When staff award a swimmer achievement, we record the achievement, family-visible evidence, certificate reference, issuing staff member and date. A separate operational note may be visible only to authorised staff. Families can see active achievements for their own swimmers; issue and revocation actions, including the reason for revocation, are retained in the audit record.</p>
+        <p>If an incident or injury is reported, we record the child and family numbers, reporting worker number, time, venue, objective account of what happened, observed injury or symptoms, first aid, follow-up, witnesses and whether a parent was notified. Incident details are encrypted in the database and are available only to authorised staff, management and the involved family. Audit records contain the reference and routing details, not the sensitive narrative.</p>
 
         <h3>If you work for us</h3>
-        <p>For staff we hold rosters, timesheets, approved hours and qualification records including reference numbers and expiry dates, so we can meet supervision, first-aid and child-safety obligations.</p>
-        <p>HV Swim does not use staff clock-in or clock-out tracking. Staff hours are entered and reviewed through roster and timesheet records; the platform does not require continuous device-location tracking.</p>
+        <p>For staff we hold a permanent HV worker number, rosters, clock-on and clock-off timestamps, break records, manually entered hours, approved timesheets and certificate/licence documents with expiry dates. These records support payroll, supervision, first-aid and child-safety obligations.</p>
+        <p>Workers select their work location when clocking on. The platform does not request GPS coordinates, background location or continuous device tracking. Authorised management may map a worker record to the matching Xero employee/payroll identifiers and, where needed for private uniform orders, a Shopify customer identifier.</p>
         <h3>Automatically collected information</h3>
         <p>When someone signs in with email and password, we log the email address used, the IP address it came from and whether the attempt succeeded. These records are automatically deleted after 30 days. A Google or Apple sign-in start temporarily stores a one-way digest of the security state, the IP address and replay-protection values for up to 10 minutes. This protects accounts against guessing, flooding and sign-in replay attacks.</p>
         <p>Our public pages do not use advertising or third-party analytics trackers. The homepage includes an optional Facebook timeline. It does not connect to Meta until you select “Load Facebook posts”. If you load it, Meta may receive technical information such as your IP address, browser and device details, and may use cookies under its own privacy terms.</p>
-        <p>Urgent pool and lesson alerts currently refresh while a website or connected-app page is open. True delivery to a closed or backgrounded device is not active. If HV Swim later enables Web Push, Apple Push Notification service or Firebase Cloud Messaging, the service will require consent and device/subscription identifiers; this policy and the provider list will be updated before those identifiers are collected.</p>
+        <p>Urgent pool alerts and optional lesson reminders currently refresh while the website or signed-in family portal is open. Email, SMS and delivery to a closed browser are not active. If HV Swim later enables an external reminder or push provider, the service will require consent and relevant delivery identifiers; this policy and the provider list will be updated before those identifiers are collected.</p>
 
         <h2>Why we collect it</h2>
         <ul>
@@ -99,7 +100,7 @@
         </ul>
         <p class="data-boundary"><strong>Integration boundary:</strong> Xero is used by the business, but the website-to-Xero connection is not active until production OAuth, staff mappings and export safeguards are configured. Shopify and Printify are not treated as live until their credentials, supplier approvals and checkout tests are complete. The production hosting provider and storage region must be documented before launch.</p>
         <h2>Storing and protecting information</h2>
-        <p>Passwords are stored as PBKDF2 hashes and never in readable form. Sign-in sessions use HttpOnly cookies with cross-site request protection, sign-in attempts are rate limited, and access to family, staff and management information is restricted by role. Google and Apple sign-in attempts use short-lived replay protection, and provider identity tokens are verified on the server. Integration credentials are encrypted and are never exposed to the browser.</p>
+        <p>Passwords are stored as PBKDF2 hashes and never in readable form. Sign-in sessions use HttpOnly, SameSite cookies and only a one-way digest of each session token is stored. Emergency contacts, allergies, medications, medical notes and support notes are encrypted before database storage and are revealed only after an authorised request. Cross-site request protection, sign-in rate limits and server-side role checks protect family, staff and management information. Google and Apple sign-in attempts use short-lived replay protection, and provider identity tokens are verified on the server. Integration credentials are never exposed to the browser.</p>
         <p>No system is perfectly secure. If a data breach occurs that is likely to cause serious harm, we will notify affected people and the Office of the Australian Information Commissioner as required by the Notifiable Data Breaches scheme.</p>
 
         <h2>How long we keep it</h2>

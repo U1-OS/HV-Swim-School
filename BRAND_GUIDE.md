@@ -1,6 +1,6 @@
 # HV Swim Bendigo brand guide
 
-V5.9.0 refines the existing HV Swim identity rather than replacing it. The rising sun,
+V5.10.0 refines the existing HV Swim identity rather than replacing it. The rising sun,
 freestyle swimmer, layered wave, navy/cyan/gold palette and `HV SWIM BENDIGO` name remain
 the recognisable core.
 
@@ -82,7 +82,7 @@ Swim identity, certificate reference and family-visible evidence without suggest
 qualification, licence, AUSTSWIM/SWIM accreditation or provider endorsement. Staff-private
 notes never appear on the certificate, and revoked records must no longer present as active.
 
-Use “urgent website/app alert” for the current active-page closure feed and “message HV Swim”
+Use “urgent website alert” for the current active-page closure feed and “message HV Swim”
 for the asynchronous support queue. Do not call either feature guaranteed push, emergency
 notification or live chat until the relevant provider-backed service is implemented and
 approved.

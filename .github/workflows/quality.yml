@@ -35,7 +35,7 @@ jobs:
           --ignore-vuln PYSEC-2026-2280
           --ignore-vuln PYSEC-2026-2281
 
-  site-and-mobile-shell:
+  website:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -48,6 +48,3 @@ jobs:
       - name: Check JavaScript syntax
         run: for file in assets/*.js scripts/*.mjs; do node --check "$file"; done
       - run: node scripts/check-site.mjs
-      - run: node scripts/build-mobile-web.mjs
-        env:
-          HV_MOBILE_APP_URL: https://app.example.test

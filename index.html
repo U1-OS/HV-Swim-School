@@ -21,11 +21,11 @@
   <link rel="icon" href="assets/app-icon-v3-64.png">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="assets/app-icon-v3-180.png">
-  <link rel="stylesheet" href="assets/styles.css?v=5.9.0">
-  <link rel="stylesheet" href="assets/support.css?v=5.9.0">
-  <script defer src="assets/app.js?v=5.9.0"></script>
-  <script defer src="assets/support.js?v=5.9.0"></script>
-  <script defer src="assets/public-api.js?v=5.9.0"></script>
+  <link rel="stylesheet" href="assets/styles.css?v=5.10.0-ui4">
+  <link rel="stylesheet" href="assets/support.css?v=5.10.0-ui4">
+  <script defer src="assets/app.js?v=5.10.0-ui4"></script>
+  <script defer src="assets/support.js?v=5.10.0-ui4"></script>
+  <script defer src="assets/public-api.js?v=5.10.0-ui4"></script>
   <script type="application/ld+json">{
   "@context": "https://schema.org",
   "@type": "SportsActivityLocation",
@@ -66,7 +66,7 @@
         <a href="locations.html">Locations &amp; conditions</a>
         <a href="about.html">Our approach</a>
         <a href="shop.html">Shop</a>
-        <a href="app.html">App</a>
+
         <a class="nav-mobile-login" href="login.html">Platform sign in</a>
       </nav>
       <div class="nav-actions">
@@ -95,6 +95,7 @@
             <span>Small-group lessons</span>
             <span>One-on-one options</span>
             <span>All ages &amp; abilities</span>
+            <span>$22.50 per lesson</span>
           </div>
         </div>
       </div>
@@ -124,9 +125,9 @@
       <div class="container today-panel reveal">
         <div class="today-panel-head"><div><div class="eyebrow">Your day at a glance</div><h2 id="today-title">Today at HV Swim.</h2></div><div class="today-live"><span class="live-pulse" aria-hidden="true"></span><strong>Current Bendigo view</strong><small id="today-updated" role="status" aria-live="polite">Connecting now…</small></div></div>
         <div class="today-grid" id="today-grid">
-          <article class="today-card"><div class="today-card-icon" aria-hidden="true">☀</div><div><span>Bendigo weather</span><strong id="today-weather-temp">—</strong><p id="today-weather-detail" aria-live="polite">Loading local conditions…</p></div><a href="locations.html">Full forecast →</a></article>
-          <article class="today-card"><div class="today-card-icon" aria-hidden="true">°C</div><div><span>Wood Street water</span><strong id="today-pool-temp">—</strong><p id="today-pool-detail" aria-live="polite">Checking the latest staff reading…</p></div><a href="locations.html#wood-street">Pool details →</a></article>
-          <article class="today-card lesson"><div class="today-card-icon" aria-hidden="true">→</div><div><span>Next available lesson</span><strong id="today-class-title">Connecting…</strong><p id="today-class-detail" aria-live="polite">Checking current places…</p></div><a id="today-class-link" href="enquire.html">Enquire →</a></article>
+          <article class="today-card today-weather"><div class="today-card-icon" aria-hidden="true">☀</div><div><span>Bendigo weather</span><strong id="today-weather-temp">—</strong><p id="today-weather-detail" aria-live="polite">Loading local conditions…</p></div><a href="locations.html">Full forecast →</a></article>
+          <article class="today-card today-water"><div class="today-card-icon" aria-hidden="true">°C</div><div><span>Wood Street water</span><strong id="today-pool-temp">—</strong><p id="today-pool-detail" aria-live="polite">Checking the latest staff reading…</p></div><a href="locations.html#wood-street">Pool details →</a></article>
+          <article class="today-card lesson today-lesson"><div class="today-card-icon" aria-hidden="true">→</div><div><span>Next available lesson</span><strong id="today-class-title">Connecting…</strong><p id="today-class-detail" aria-live="polite">Checking current places…</p></div><a id="today-class-link" href="enquire.html">Enquire →</a></article>
         </div>
         <div class="today-panel-foot"><p><span class="status closed" id="today-seasonal-status">Seasonal venue</span><strong>Bendigo East Swimming Pool:</strong> <span id="today-seasonal-copy">checking current public status…</span></p><a class="btn btn-soft btn-small" href="locations.html">All locations &amp; conditions</a></div>
         <p class="micro today-boundary" id="today-boundary">Outdoor weather updates from the connected weather service. Water temperature is checked and published by staff; class places and fees are confirmed before enrolment.</p>

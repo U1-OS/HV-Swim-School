@@ -1,4 +1,4 @@
-# Association badge activation — V5.9.0
+# Association badge activation — V5.10.0
 
 The public site reserves polished space for HV Swim's aquatic-industry listings, but it
 does not include copied, redrawn or generic organisation logos. That is intentional.
@@ -27,7 +27,7 @@ Do not scrape artwork from a website, social post or search result.
 
 ## Management workflow now available
 
-V5.9.0 implements the protected register under **Management → Staff compliance**. For
+V5.10.0 implements the protected register under **Management → Staff compliance**. For
 each organisation, management must enter the membership/certificate reference, valid-until
 date, an internal evidence note and an explicit confirmation that the exact supplied mark
 may currently be displayed. The register accepts PNG only (64–2400 pixels and no larger
