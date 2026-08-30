@@ -138,6 +138,70 @@
     if (sortOrder === 'price-high') return filtered.sort((a,b)=>Number(b.price_cents||0)-Number(a.price_cents||0));
     return filtered;
   }
+
+  // Kits are defined by SKU only. Titles, prices and item counts are resolved from the live
+  // catalogue at render time, so a kit card can never describe something the shop does not
+  // actually sell — the previous cards listed their contents in hand-written prose and had
+  // already drifted from the range.
+  const KITS = [
+    { id:'first-splash', group:'kids', audience:'New swimmers', title:'First Splash Kit',
+      blurb:'The four things a nervous first-timer actually needs, so lesson one is about the water and nothing else.',
+      skus:['HV-GOGGLES','HV-CAP','HV-MINI-HOODED-TOWEL','HV-BOTTLE'] },
+    { id:'lesson-day', group:'kids', audience:'Weekly swimmers', title:'Lesson Day Kit', featured:true,
+      blurb:'A full week-in, week-out setup: in the water, out of the water, and everything wet carried home.',
+      skus:['HV-RASHIE','HV-SWIM-SHORTS','HV-GOGGLES','HV-CAP','HV-TRAINING-MITTS','HV-HOODED-TOWEL','HV-BAG','HV-BOTTLE'] },
+    { id:'summer-season', group:'kids', audience:'Outdoor season', title:'Sun & Season Kit',
+      blurb:'For the seasonal outdoor pool — sun cover, quick changes and a drink that stays cold on the grass.',
+      skus:['HV-KIDS-SUN-HAT','HV-RASHIE','HV-TOWEL','HV-BOTTLE','HV-GOGGLES'] },
+    { id:'poolside-parent', group:'families', audience:'Parents on the deck', title:'Poolside Parent Kit',
+      blurb:'Bendigo decks are cold in winter. A warm layer, a hot drink that stays hot, and a towel that is not your child\u2019s.',
+      skus:['HV-FAMILY-CREW','HV-INSULATED-TUMBLER','HV-TOWEL'] },
+    { id:'family-club', group:'families', audience:'Families + supporters', title:'Family Club Kit',
+      blurb:'Matching casual pieces for lesson-day arrivals, holiday clinics and HV Swim community events.',
+      skus:['HV-FAMILY-TEE','HV-FAMILY-CREW','HV-BOTTLE','HV-TOWEL'] },
+    { id:'instructor-uniform', group:'staff', audience:'Every instructor', title:'Instructor Uniform',
+      blurb:'The standard on-deck set. One look across the team, sun-safe, and comfortable to teach in all session.',
+      skus:['HV-STAFF-POLO','HV-STAFF-TEE','HV-STAFF-SHORTS','HV-INSTRUCTOR-CAP','HV-BOTTLE'] },
+    { id:'winter-deck', group:'staff', audience:'Cold-weather shifts', title:'Winter Deck Uniform',
+      blurb:'Layers for early starts and unheated decks, without losing the uniform look in front of families.',
+      skus:['HV-STAFF-PUFFER-VEST','HV-STAFF-PUFFER-JACKET','HV-STAFF-TRACKPANTS','HV-TEAM-HOODIE','HV-INSULATED-TUMBLER'] },
+  ];
+  const KIT_GROUPS = [
+    ['kids','For the swimmer','Built around the lesson itself, from a first nervous visit to a full weekly routine.'],
+    ['families','For parents and families','Whoever is on the deck watching, and whoever is wearing it to the shops afterwards.'],
+    ['staff','Staff uniform','What the HV Swim team wears on deck, in every season.'],
+  ];
+
+  function renderKits() {
+    const wrap = document.getElementById('kit-grid');
+    if (!wrap) return;
+    const bySku = new Map(products.map(product => [String(product.sku).toUpperCase(), product]));
+    let index = 0;
+    wrap.innerHTML = KIT_GROUPS.map(([group, heading, intro]) => {
+      const cards = KITS.filter(kit => kit.group === group).map(kit => {
+        const items = kit.skus.map(sku => bySku.get(sku)).filter(Boolean);
+        // A kit is only shown once every product in it is in the catalogue.
+        if (items.length !== kit.skus.length) return '';
+        const total = items.reduce((sum, item) => sum + Number(item.price_cents || 0), 0);
+        index += 1;
+        return `<article class="kit-card${kit.featured ? ' featured' : ''}">
+          ${kit.featured ? '<span class="kit-flag">Most complete</span>' : ''}
+          <span class="kit-index">${String(index).padStart(2,'0')}</span>
+          <span class="kit-audience">${esc(kit.audience)}</span>
+          <h3>${esc(kit.title)}</h3>
+          <p class="kit-blurb">${esc(kit.blurb)}</p>
+          <ul class="kit-items">${items.map(item => `<li><span>${esc(item.title)}</span><em>${money(item.price_cents)}</em></li>`).join('')}</ul>
+          <div class="kit-foot">
+            <div><strong>${money(total)}</strong><small>${items.length} item${items.length === 1 ? '' : 's'} · components total</small></div>
+            <button type="button" class="btn btn-soft btn-small" data-kit-add="${esc(kit.id)}">Add kit</button>
+          </div>
+        </article>`;
+      }).join('');
+      if (!cards.trim()) return '';
+      return `<section class="kit-group"><div class="kit-group-head"><h3>${esc(heading)}</h3><p>${esc(intro)}</p></div><div class="kit-cards">${cards}</div></section>`;
+    }).join('');
+  }
+
   function render() {
     const visible = visibleProducts();
     const displayed=visible.slice(0,visibleLimit);
@@ -365,7 +429,7 @@
     document.querySelectorAll('[data-cart-open]').forEach(button=>button.hidden=!live);
     document.querySelectorAll('[data-kit-add]').forEach(button=>{button.disabled=!live;button.textContent=live?'Choose kit products':'Shopify setup required';});
     if(!live){cart=[];saveCart();closeCart();}
-    render(); renderCart();
+    render(); renderKits(); renderCart();
   }).catch(()=>{
     grid.innerHTML='<div class="empty-state"><strong>The collection is not loading right now.</strong><p>This is a temporary problem on our side. The range is still there — get in touch and the team can talk you through it.</p><a class="btn btn-blue btn-small" href="enquire.html">Talk to the team <span aria-hidden="true">&rarr;</span></a></div>';
     document.getElementById('shop-result-count').textContent='Catalogue temporarily unavailable';

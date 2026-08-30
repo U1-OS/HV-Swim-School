@@ -700,3 +700,24 @@ body[data-page="shop"] .dialog-product-copy .shop-production-route { margin-top:
   body[data-page="shop"] .production-route-card,
   body[data-page="shop"] .shop-add-button { transition:none; }
 }
+
+/* Kit plans — grouped by who they are for, rendered from the catalogue rather than
+   hand-written, so contents and totals always match the products actually offered. */
+.kit-group + .kit-group { margin-top:44px; }
+.kit-group-head h3 { font-size:1.35rem; color:#0d2f52; margin:0; }
+.kit-group-head p { margin:6px 0 20px; max-width:62ch; font-size:.82rem; line-height:1.6; color:#4f6477; }
+.kit-cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(290px,1fr)); gap:18px; align-items:start; }
+.kit-card { position:relative; display:flex; flex-direction:column; padding:26px 24px 22px; border:1px solid #dbe7f1; border-radius:18px; background:#fff; box-shadow:0 12px 34px rgba(4,47,105,.06); }
+.kit-card.featured { border-color:#1d6fb0; box-shadow:0 16px 40px rgba(8,120,220,.16); }
+.kit-flag { position:absolute; top:-11px; right:20px; padding:5px 11px; border-radius:999px; background:#ffd44d; color:#06214a; font-size:.6rem; font-weight:900; letter-spacing:.08em; text-transform:uppercase; }
+.kit-index { font-size:.62rem; font-weight:900; letter-spacing:.14em; color:#8aa3ba; }
+.kit-audience { display:block; margin-top:10px; font-size:.6rem; font-weight:900; letter-spacing:.12em; text-transform:uppercase; color:#0873a6; }
+.kit-card h3 { margin:8px 0 0; font-size:1.28rem; color:#0d2f52; }
+.kit-blurb { margin:10px 0 16px; font-size:.82rem; line-height:1.6; color:#4f6477; }
+.kit-items { list-style:none; margin:0 0 18px; padding:0; border-top:1px solid #e6eef6; }
+.kit-items li { display:flex; align-items:baseline; justify-content:space-between; gap:14px; padding:9px 0; border-bottom:1px solid #eef4f9; font-size:.8rem; color:#3f5a72; }
+.kit-items em { font-style:normal; font-weight:800; color:#0d2f52; white-space:nowrap; }
+.kit-foot { margin-top:auto; display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap; }
+.kit-foot strong { display:block; font-size:1.2rem; color:#0d2f52; }
+.kit-foot small { display:block; margin-top:2px; font-size:.66rem; color:#62798e; }
+@media (max-width:640px) { .kit-cards { grid-template-columns:1fr; } }
