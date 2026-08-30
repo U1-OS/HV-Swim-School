@@ -117,7 +117,7 @@
   };
   const routeFor = product => ROUTE_DETAILS[product.supplier_route] || ROUTE_DETAILS.manual_review;
   const visualClass = product => `product-${slug(product.sku || product.title)} ${['Uniforms','Lifestyle'].includes(product.category)?'uniform-studio-crop':''}`;
-  const visual = product => product.image ? `<img src="${esc(product.image)}" alt="${esc(product.image_alt||product.title)}" loading="lazy" decoding="async">` : `<div class="shop-product-crop ${visualClass(product)}" role="img" aria-label="${esc(product.title)} concept"><span class="shop-product-monogram" aria-hidden="true">${esc(product.emoji || 'HV')}</span></div>`;
+  const visual = product => product.image ? `<img src="${esc(product.image)}" alt="${esc(product.image_alt||product.title)}" loading="lazy" decoding="async" data-product-photo>` : `<div class="shop-product-crop ${visualClass(product)}" role="img" aria-label="${esc(product.title)} concept"><span class="shop-product-monogram" aria-hidden="true">${esc(product.emoji || 'HV')}</span></div>`;
   const priceMarkup = (product,live=false) => Number(product.price_cents) > 0 ? `<strong>${money(product.price_cents)}</strong><small>${live?'Current price':'Indicative price'}</small>` : '<strong>Price pending</strong><small>Supplier quote required</small>';
   const cartKey = (id,size) => `${id}::${size || 'Standard'}`;
 
@@ -171,6 +171,27 @@
     ['families','For parents and families','Whoever is on the deck watching, and whoever is wearing it to the shops afterwards.'],
     ['staff','Staff uniform','What the HV Swim team wears on deck, in every season.'],
   ];
+
+  // A product photo that fails to load leaves a broken-image icon in the middle of the
+  // card. Drop back to the monogram tile the product would have had with no photo at all.
+  document.addEventListener('error', event => {
+    const img = event.target;
+    if (!(img instanceof HTMLImageElement) || !img.hasAttribute('data-product-photo')) return;
+    const holder = img.parentElement;
+    if (!holder) return;
+    const label = img.getAttribute('alt') || 'Product';
+    img.remove();
+    const tile = document.createElement('div');
+    tile.className = 'shop-product-crop';
+    tile.setAttribute('role', 'img');
+    tile.setAttribute('aria-label', label);
+    const monogram = document.createElement('span');
+    monogram.className = 'shop-product-monogram';
+    monogram.setAttribute('aria-hidden', 'true');
+    monogram.textContent = 'HV';
+    tile.append(monogram);
+    holder.prepend(tile);
+  }, true);
 
   function renderKits(live = false) {
     const wrap = document.getElementById('kit-grid');

@@ -5271,7 +5271,8 @@ def public_product_view(product: dict[str, Any]) -> dict[str, Any]:
 async def products() -> dict[str, Any]:
     public_product_query = """SELECT id,sku,title,category,description,price_cents,sizes,status,emoji,
                                      sample_status,supplier_route,personalisation,audience,fulfilment_mode,
-                                     cost_cents,shopify_gid,printify_product_id,supplier_reference
+                                     cost_cents,shopify_gid,printify_product_id,supplier_reference,
+                                     image,image_alt
                               FROM products ORDER BY category,title"""
     if shopify_ready():
         try:

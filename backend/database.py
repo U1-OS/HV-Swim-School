@@ -688,6 +688,11 @@ def initialise_database() -> None:
             "fulfilment_mode": "TEXT NOT NULL DEFAULT 'manual'",
             "printify_product_id": "TEXT",
             "supplier_reference": "TEXT",
+            # Product photography. Left empty until a real render or photograph exists —
+            # the shop falls back to its monogram tile, which is honest, where a path
+            # pointing at a missing file would show every product as a broken image.
+            "image": "TEXT",
+            "image_alt": "TEXT",
         }.items():
             if column not in product_columns:
                 db.execute(f"ALTER TABLE products ADD COLUMN {column} {definition}")
