@@ -319,6 +319,60 @@ CREATE TABLE IF NOT EXISTS lesson_charges (
   xero_invoice_id TEXT,
   created_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS billing_invoices (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  invoice_number TEXT UNIQUE NOT NULL,
+  customer_id INTEGER NOT NULL REFERENCES users(id),
+  term_id INTEGER REFERENCES school_terms(id),
+  provider TEXT NOT NULL DEFAULT 'xero' CHECK (provider='xero'),
+  currency TEXT NOT NULL DEFAULT 'AUD' CHECK (currency='AUD'),
+  customer_number TEXT NOT NULL,
+  xero_contact_id TEXT,
+  status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','approved','sync_review','synced','sent','paid','voided')),
+  issue_date TEXT NOT NULL,
+  due_date TEXT NOT NULL,
+  subtotal_cents INTEGER NOT NULL CHECK (subtotal_cents>=0),
+  total_cents INTEGER NOT NULL CHECK (total_cents>=0),
+  amount_paid_cents INTEGER NOT NULL DEFAULT 0 CHECK (amount_paid_cents>=0),
+  amount_due_cents INTEGER NOT NULL CHECK (amount_due_cents>=0),
+  management_note TEXT NOT NULL DEFAULT '',
+  idempotency_key TEXT UNIQUE NOT NULL,
+  xero_invoice_id TEXT UNIQUE,
+  xero_invoice_number TEXT,
+  xero_status TEXT,
+  online_invoice_url TEXT,
+  last_sync_error TEXT,
+  approved_by INTEGER REFERENCES users(id),
+  approved_at TEXT,
+  synced_at TEXT,
+  created_by INTEGER NOT NULL REFERENCES users(id),
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  CHECK (due_date>=issue_date),
+  CHECK (amount_paid_cents<=total_cents),
+  CHECK (amount_due_cents<=total_cents)
+);
+CREATE TABLE IF NOT EXISTS billing_invoice_lines (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  invoice_id INTEGER NOT NULL REFERENCES billing_invoices(id) ON DELETE CASCADE,
+  lesson_charge_id INTEGER UNIQUE NOT NULL REFERENCES lesson_charges(id),
+  description TEXT NOT NULL,
+  quantity INTEGER NOT NULL CHECK (quantity>=1),
+  unit_amount_cents INTEGER NOT NULL CHECK (unit_amount_cents>=0),
+  line_amount_cents INTEGER NOT NULL CHECK (line_amount_cents>=0),
+  student_number TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS billing_invoice_events (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  invoice_id INTEGER NOT NULL REFERENCES billing_invoices(id) ON DELETE CASCADE,
+  event_type TEXT NOT NULL,
+  from_status TEXT,
+  to_status TEXT,
+  detail TEXT NOT NULL DEFAULT '{}',
+  created_by INTEGER REFERENCES users(id),
+  created_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS notification_receipts (
   notification_id INTEGER NOT NULL REFERENCES notifications(id) ON DELETE CASCADE,
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -480,6 +534,10 @@ CREATE INDEX IF NOT EXISTS idx_pool_readings_location ON pool_readings(location_
 CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_lesson_reminders_user ON lesson_reminder_dispatches(user_id, occurrence_date DESC);
 CREATE INDEX IF NOT EXISTS idx_lesson_charges_status ON lesson_charges(status, created_at);
+CREATE INDEX IF NOT EXISTS idx_billing_invoices_customer ON billing_invoices(customer_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_billing_invoices_status ON billing_invoices(status, due_date, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_billing_invoice_lines_invoice ON billing_invoice_lines(invoice_id, id);
+CREATE INDEX IF NOT EXISTS idx_billing_invoice_events_invoice ON billing_invoice_events(invoice_id, created_at, id);
 CREATE INDEX IF NOT EXISTS idx_notification_receipts_user ON notification_receipts(user_id, read_at DESC);
 CREATE INDEX IF NOT EXISTS idx_swimmer_achievements_swimmer ON swimmer_achievements(swimmer_id, status, awarded_at DESC);
 CREATE INDEX IF NOT EXISTS idx_swimmer_achievements_awarded_by ON swimmer_achievements(awarded_by, awarded_at DESC);

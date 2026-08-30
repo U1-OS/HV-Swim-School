@@ -77,11 +77,16 @@ with HV Swim before production deployment.
 - Use Xero as the financial route for lesson enrolments, term invoices and any approved
   absence-credit adjustment. Shopify is reserved for merchandise and uniforms; do not mix
   lesson fees into the Shopify cart.
-- Implement and review Xero contact matching, invoice creation, GST/tax settings, payment
-  service configuration, idempotency, reconciliation and credit-note handling before the
-  management readiness matrix can be treated as live. The current term/absence workflow
-  records eligibility only and never changes an invoice automatically.
-- Use the permanent HV family number as the external contact reference and include the relevant student number on the lesson invoice/charge line. The current build snapshots those values locally but does not yet create or reconcile a live Xero contact or invoice.
+- The current build implements reviewed local invoice drafting, management approval,
+  idempotent Xero DRAFT-invoice creation and status/payment reconciliation. Before enabling
+  transmission, verify the contact mapping, lesson account code, tax type and line-amount type
+  with the business accountant, then test the complete workflow in the intended Xero
+  organisation. Credit-note creation remains unimplemented and must not be inferred from the
+  absence-credit record.
+- Use the permanent HV family number as the external contact reference and include the relevant
+  student number on the lesson invoice line. The platform snapshots both values and can create
+  a draft against a verified, manually mapped Xero Contact ID; it does not create or merge Xero
+  contacts automatically.
 - Map HV Swim staff to Xero employee and payroll-calendar IDs in the management workspace and confirm the earnings rate.
 - Use the audited readiness preview to identify incomplete mappings. It never transmits payroll data.
 - Import Xero pay-period boundaries and implement idempotent export tracking against the current AU Payroll API before any live transmission is enabled. `XERO_SYNC_ENABLED` is intentionally not sufficient to bypass this lock.

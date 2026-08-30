@@ -1,4 +1,4 @@
-# HV Swim Bendigo V5.10.1 Premium Platform
+# HV Swim Bendigo V5.11.0 Premium Platform
 
 Premium public website and connected operations platform for HV Swim Bendigo. The build combines a polished responsive front end with a FastAPI service, role-based accounts and a SQLite preview database. SQLite is not approved for the final production deployment that will store customer, child or payroll data.
 
@@ -43,6 +43,7 @@ Demo credentials only work while `HV_APP_ENV=development`. Production mode disab
   deliberately excluded from storage; staff and management identities remain invitation-only
 - Family swimmers, editable emergency/allergy/medication/support profiles encrypted at rest, class availability, bookings, cancellations, waitlists and notices
 - Automatic permanent family (`HVS-…`) and student (`HVS-S-…`) numbers, guaranteed again at lesson purchase and snapshotted into the Xero lesson-charge record so website, family, student and accounting records can be reconciled
+- Management lesson-invoice ledger with grouped unbilled charges, local draft/approval controls, duplicate-charge protection, immutable event history and a deliberately gated Xero DRAFT-invoice handoff; families see only approved invoices and confirmed payment status
 - Family absence reporting against the active term calendar, with a visible two-credit
   allowance per swimmer and an explicit no-make-up/no-automatic-refund boundary
 - Filtered family class finder with live capacity meters and visible waitlist positions
@@ -99,8 +100,10 @@ Demo credentials only work while `HV_APP_ENV=development`. Production mode disab
 Google family access requires an HV Swim-owned Google Cloud OAuth web client. Apple/iCloud
 family access requires an Apple Developer Services ID and generated, rotated client secret. Until
 those values are present, both buttons remain visible but disabled as “Setup required”; the
-preview never fabricates a provider login. Connecting the existing Xero organisation requires
-an HV Swim-owned OAuth app and mappings. Shopify, Printify, VistaPrint ordering, commercial
+preview never fabricates a provider login. Connecting the existing Xero organisation and
+enabling the reviewed DRAFT-invoice handoff requires an HV Swim-owned OAuth app, verified
+family contact mappings, lesson account code, tax type, line-amount type and explicit outbound
+switch. Shopify, Printify, VistaPrint ordering, commercial
 weather, email, SMS, push, pool sensors, hosting and domain
 likewise require credentials or accounts owned by HV Swim. Those values belong in a private
 `.env` file created from `.env.example`; secrets must never be placed in HTML or committed to

@@ -29,6 +29,7 @@ from .config import DATA_DIR, ROOT, settings
 from .database import audit, db_session, initialise_database, rows
 from .integrations import (
     current_bendigo_weather,
+    decrypt_json,
     encrypt_json,
     pool_sensor_reading,
     printify_products,
@@ -38,8 +39,12 @@ from .integrations import (
     shopify_ready,
     weather_ready,
     xero_authorization_url,
+    xero_create_draft_invoice,
     xero_exchange_code,
+    xero_get_invoice,
+    xero_invoice_configuration_ready,
     xero_ready,
+    xero_token_valid,
 )
 from .oauth import (
     OAuthProviderError,
@@ -142,6 +147,17 @@ def validate_production_config(candidate=settings) -> None:
     xero_configured = bool(candidate.xero_client_id and candidate.xero_client_secret and candidate.xero_redirect_uri)
     if xero_configured and not candidate.xero_redirect_uri.startswith("https://"):
         raise RuntimeError("XERO_REDIRECT_URI must use HTTPS in production")
+    if candidate.xero_sync_enabled and not xero_configured:
+        raise RuntimeError("XERO_SYNC_ENABLED requires the complete Xero OAuth configuration")
+    if candidate.xero_sync_enabled and (
+        not candidate.xero_lesson_account_code
+        or not candidate.xero_lesson_tax_type
+        or candidate.xero_line_amount_type not in {"Exclusive", "Inclusive", "NoTax"}
+    ):
+        raise RuntimeError(
+            "XERO_SYNC_ENABLED requires XERO_LESSON_ACCOUNT_CODE, XERO_LESSON_TAX_TYPE "
+            "and a valid XERO_LINE_AMOUNT_TYPE"
+        )
     google_fields = (candidate.google_client_id, candidate.google_client_secret)
     if any(google_fields) and not all(google_fields):
         raise RuntimeError("GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET must be configured together")
@@ -165,7 +181,7 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(
     title="HV Swim Bendigo Platform API",
-    version="5.10.1",
+    version="5.11.0",
     docs_url="/api/docs" if not settings.production else None,
     openapi_url="/openapi.json" if not settings.production else None,
     redoc_url=None,
@@ -649,6 +665,26 @@ class CustomerIntegrationMappingInput(BaseModel):
         return self
 
 
+class InvoiceDraftInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    customer_id: int = Field(ge=1)
+    charge_ids: list[int] = Field(min_length=1, max_length=50)
+    due_date: date
+    management_note: str = Field(default="", max_length=500)
+
+    @model_validator(mode="after")
+    def validate_invoice_draft(self) -> "InvoiceDraftInput":
+        if len(set(self.charge_ids)) != len(self.charge_ids):
+            raise ValueError("Each lesson charge can appear only once")
+        if self.due_date < business_today():
+            raise ValueError("Invoice due date cannot be in the past")
+        if self.due_date > business_today() + timedelta(days=365):
+            raise ValueError("Invoice due date must be within the next year")
+        self.management_note = self.management_note.strip()
+        return self
+
+
 class ClassInput(BaseModel):
     code: str = Field(min_length=3, max_length=40)
     title: str = Field(min_length=3, max_length=80)
@@ -1041,6 +1077,99 @@ def create_xero_lesson_charge(
         ),
     ).lastrowid
     return dict(db.execute("SELECT * FROM lesson_charges WHERE id=?", (charge_id,)).fetchone())
+
+
+def billing_invoice_number(db: sqlite3.Connection) -> str:
+    for _ in range(12):
+        fragment = "".join(character for character in new_token(8).upper() if character.isalnum())[:8]
+        if len(fragment) < 6:
+            continue
+        number = f"HVS-INV-{business_today().year}-{fragment}"
+        if not db.execute("SELECT 1 FROM billing_invoices WHERE invoice_number=?", (number,)).fetchone():
+            return number
+    raise HTTPException(status_code=503, detail="A unique invoice number could not be created")
+
+
+def record_billing_event(
+    db: sqlite3.Connection,
+    invoice_id: int,
+    event_type: str,
+    *,
+    from_status: str | None,
+    to_status: str | None,
+    created_by: int | None,
+    detail: dict[str, Any] | None = None,
+) -> None:
+    db.execute(
+        """INSERT INTO billing_invoice_events
+           (invoice_id,event_type,from_status,to_status,detail,created_by,created_at)
+           VALUES(?,?,?,?,?,?,?)""",
+        (
+            invoice_id,
+            event_type,
+            from_status,
+            to_status,
+            json.dumps(detail or {}),
+            created_by,
+            now_iso(),
+        ),
+    )
+
+
+def billing_invoice_payload(db: sqlite3.Connection, invoice_id: int) -> dict[str, Any]:
+    invoice = db.execute(
+        """SELECT bi.*,u.first_name customer_first,u.last_name customer_last,u.email customer_email,
+                  t.name term_name,creator.first_name created_by_first,creator.last_name created_by_last,
+                  approver.first_name approved_by_first,approver.last_name approved_by_last
+           FROM billing_invoices bi JOIN users u ON u.id=bi.customer_id
+           LEFT JOIN school_terms t ON t.id=bi.term_id
+           JOIN users creator ON creator.id=bi.created_by
+           LEFT JOIN users approver ON approver.id=bi.approved_by
+           WHERE bi.id=?""",
+        (invoice_id,),
+    ).fetchone()
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+    result = dict(invoice)
+    result["management_note"] = decrypt_sensitive(result.get("management_note")) or ""
+    result["lines"] = rows(
+        db.execute(
+            """SELECT bil.id,bil.lesson_charge_id,bil.description,bil.quantity,bil.unit_amount_cents,
+                      bil.line_amount_cents,bil.student_number,lc.reference charge_reference
+               FROM billing_invoice_lines bil JOIN lesson_charges lc ON lc.id=bil.lesson_charge_id
+               WHERE bil.invoice_id=? ORDER BY bil.id""",
+            (invoice_id,),
+        )
+    )
+    result["events"] = rows(
+        db.execute(
+            """SELECT bie.event_type,bie.from_status,bie.to_status,bie.detail,bie.created_at,
+                      u.first_name actor_first,u.last_name actor_last
+               FROM billing_invoice_events bie LEFT JOIN users u ON u.id=bie.created_by
+               WHERE bie.invoice_id=? ORDER BY bie.created_at,bie.id""",
+            (invoice_id,),
+        )
+    )
+    return result
+
+
+def cents_from_xero(value: Any) -> int:
+    try:
+        return max(0, int(round(float(value or 0) * 100)))
+    except (TypeError, ValueError):
+        return 0
+
+
+async def refresh_and_store_xero_token(token: dict[str, Any]) -> dict[str, Any]:
+    """Persist a rotated Xero refresh token before the next accounting API call."""
+    current = await xero_token_valid(token)
+    if current != token:
+        with db_session() as db:
+            db.execute(
+                "UPDATE integration_connections SET encrypted_tokens=?,updated_at=? WHERE provider='xero'",
+                (encrypt_json(current), now_iso()),
+            )
+    return current
 
 
 def validate_class_occurrence(db: sqlite3.Connection, class_row: sqlite3.Row, occurrence: date) -> sqlite3.Row:
@@ -1633,7 +1762,7 @@ def renumber_waitlist(db: sqlite3.Connection, class_id: int) -> None:
 
 @app.get("/api/health")
 def health() -> dict[str, Any]:
-    return {"ok": True, "service": "HV Swim Bendigo", "version": "5.10.1", "environment": settings.app_env, "time": now_iso()}
+    return {"ok": True, "service": "HV Swim Bendigo", "version": "5.11.0", "environment": settings.app_env, "time": now_iso()}
 
 
 @app.get("/api/public/site-settings")
@@ -2615,6 +2744,63 @@ def customer_bookings(user: dict[str, Any] = Depends(require_roles("customer", "
                               JOIN locations l ON l.id=c.location_id WHERE {where} AND w.status='waiting'
                               ORDER BY c.weekday,c.start_time,w.position"""
         return {"bookings": bookings, "waitlist": rows(db.execute(waitlist_query, params))}
+
+
+@app.get("/api/customer/billing")
+def customer_billing(user: dict[str, Any] = Depends(require_roles("customer"))) -> dict[str, Any]:
+    with db_session() as db:
+        invoice_ids = [
+            row["id"]
+            for row in db.execute(
+                """SELECT id FROM billing_invoices
+                   WHERE customer_id=? AND status!='draft' ORDER BY created_at DESC""",
+                (user["id"],),
+            )
+        ]
+        invoices = []
+        for invoice_id in invoice_ids:
+            invoice = billing_invoice_payload(db, invoice_id)
+            invoices.append(
+                {
+                    key: invoice[key]
+                    for key in (
+                        "id",
+                        "invoice_number",
+                        "provider",
+                        "currency",
+                        "customer_number",
+                        "status",
+                        "issue_date",
+                        "due_date",
+                        "total_cents",
+                        "amount_paid_cents",
+                        "amount_due_cents",
+                        "xero_invoice_number",
+                        "xero_status",
+                        "online_invoice_url",
+                        "term_name",
+                        "created_at",
+                        "updated_at",
+                        "lines",
+                    )
+                }
+            )
+        outstanding = sum(
+            int(invoice["amount_due_cents"])
+            for invoice in invoices
+            if invoice["status"] not in {"paid", "voided"}
+        )
+        return {
+            "invoices": invoices,
+            "summary": {
+                "invoice_count": len(invoices),
+                "outstanding_cents": outstanding,
+                "paid_cents": sum(int(invoice["amount_paid_cents"]) for invoice in invoices),
+            },
+            "lesson_provider": "Xero",
+            "merchandise_provider": "Shopify",
+            "card_data_stored": False,
+        }
 
 
 @app.get("/api/customer/absences")
@@ -3860,7 +4046,16 @@ def admin_accounts(user: dict[str, Any] = Depends(require_roles("admin"))) -> di
         query = """SELECT u.id,u.email,u.role,u.first_name,u.last_name,u.phone,u.active,u.created_at,
                           u.customer_number,u.staff_number,u.xero_contact_id,u.shopify_customer_gid,
                           u.xero_employee_id,u.xero_payroll_calendar_id,
-                          (SELECT COUNT(*) FROM swimmers s WHERE s.customer_id=u.id AND s.active=1) swimmer_count
+                          (SELECT COUNT(*) FROM swimmers s WHERE s.customer_id=u.id AND s.active=1) swimmer_count,
+                          (SELECT COUNT(*) FROM bookings b JOIN swimmers s ON s.id=b.swimmer_id
+                           WHERE s.customer_id=u.id AND b.status='confirmed') active_booking_count,
+                          (SELECT COUNT(*) FROM billing_invoices bi WHERE bi.customer_id=u.id) invoice_count,
+                          (SELECT COALESCE(SUM(bi.amount_due_cents),0) FROM billing_invoices bi
+                           WHERE bi.customer_id=u.id AND bi.status NOT IN ('draft','paid','voided')) outstanding_cents,
+                          (SELECT COALESCE(SUM(lc.amount_cents),0) FROM lesson_charges lc
+                           LEFT JOIN billing_invoice_lines bil ON bil.lesson_charge_id=lc.id
+                           WHERE lc.customer_id=u.id AND lc.status='pending_xero_invoice' AND bil.id IS NULL) unbilled_cents,
+                          (SELECT MAX(ses.created_at) FROM sessions ses WHERE ses.user_id=u.id) last_session_at
                    FROM users u ORDER BY u.active DESC,u.role,u.first_name,u.last_name"""
         return {"accounts": rows(db.execute(query))}
 
@@ -4290,7 +4485,8 @@ def integrations(user: dict[str, Any] = Depends(require_roles("admin"))) -> dict
             "integrations": integration_summary(db),
             "safe_mode": {
                 "xero_sync_requested": settings.xero_sync_enabled,
-                "xero_transmission_locked": True,
+                "payroll_transmission_locked": True,
+                "invoice_transmission": "draft_only_with_management_approval_and_complete_configuration",
             },
             "payment_routing": [
                 {
@@ -4298,8 +4494,8 @@ def integrations(user: dict[str, Any] = Depends(require_roles("admin"))) -> dict
                     "provider": "Xero",
                     "route": "xero_invoice_workflow",
                     "connection_status": connection_status.get("xero", "not_connected"),
-                    "transaction_status": "locked",
-                    "boundary": "Invoice creation, contact matching, online-payment settings and credit-note handling require the authorised Xero organisation and a reviewed test invoice.",
+                    "transaction_status": "draft_sync_ready" if settings.xero_sync_enabled and xero_invoice_configuration_ready() else "configuration_required",
+                    "boundary": "Management creates and approves the local invoice first. The platform sends only a DRAFT invoice after contact, account-code and tax settings are complete; Xero remains the accounting source of truth.",
                 },
                 {
                     "category": "Absence credits",
@@ -4315,10 +4511,394 @@ def integrations(user: dict[str, Any] = Depends(require_roles("admin"))) -> dict
                     "route": "shopify_checkout",
                     "connection_status": connection_status.get("shopify", "not_connected"),
                     "transaction_status": "gated",
-                    "boundary": "Checkout is available only for sampled, approved and mapped products after Shopify credentials and a successful test order are confirmed.",
+                    "boundary": "Checkout is available only for sampled, approved and mapped products. Shopify owns merchandise payment, refunds and order history; lesson fees never enter this route.",
                 },
             ],
         }
+
+
+@app.get("/api/admin/billing")
+def admin_billing(user: dict[str, Any] = Depends(require_roles("admin"))) -> dict[str, Any]:
+    with db_session() as db:
+        invoice_ids = [
+            row["id"] for row in db.execute("SELECT id FROM billing_invoices ORDER BY created_at DESC")
+        ]
+        invoices = [billing_invoice_payload(db, invoice_id) for invoice_id in invoice_ids]
+        unbilled = rows(
+            db.execute(
+                """SELECT lc.id,lc.reference,lc.customer_id,lc.term_id,lc.per_lesson_cents,
+                          lc.lesson_count,lc.amount_cents,lc.family_customer_number,lc.swimmer_number,
+                          lc.invoice_description,lc.created_at,u.first_name customer_first,
+                          u.last_name customer_last,u.email customer_email,u.xero_contact_id,
+                          t.name term_name,s.first_name swimmer_first,s.last_name swimmer_last
+                   FROM lesson_charges lc JOIN users u ON u.id=lc.customer_id
+                   JOIN school_terms t ON t.id=lc.term_id JOIN bookings b ON b.id=lc.booking_id
+                   JOIN swimmers s ON s.id=b.swimmer_id
+                   LEFT JOIN billing_invoice_lines bil ON bil.lesson_charge_id=lc.id
+                   WHERE lc.status='pending_xero_invoice' AND bil.id IS NULL
+                   ORDER BY u.first_name,u.last_name,t.start_date,lc.created_at"""
+            )
+        )
+        connection = db.execute(
+            "SELECT status,metadata,updated_at FROM integration_connections WHERE provider='xero'"
+        ).fetchone()
+        outstanding = sum(
+            int(invoice["amount_due_cents"])
+            for invoice in invoices
+            if invoice["status"] not in {"draft", "paid", "voided"}
+        )
+        return {
+            "invoices": invoices,
+            "unbilled_charges": unbilled,
+            "summary": {
+                "draft_count": sum(invoice["status"] == "draft" for invoice in invoices),
+                "approval_count": sum(invoice["status"] == "approved" for invoice in invoices),
+                "sync_review_count": sum(invoice["status"] == "sync_review" for invoice in invoices),
+                "outstanding_cents": outstanding,
+                "paid_cents": sum(int(invoice["amount_paid_cents"]) for invoice in invoices),
+                "unbilled_cents": sum(int(charge["amount_cents"]) for charge in unbilled),
+            },
+            "xero": {
+                "oauth_configured": xero_ready(),
+                "connection_status": connection["status"] if connection else "not_connected",
+                "connection_metadata": json.loads(connection["metadata"] or "{}") if connection else {},
+                "invoice_configuration_ready": xero_invoice_configuration_ready(),
+                "outbound_enabled": settings.xero_sync_enabled,
+                "account_code_configured": bool(settings.xero_lesson_account_code),
+                "tax_type_configured": bool(settings.xero_lesson_tax_type),
+                "line_amount_type": settings.xero_line_amount_type or None,
+                "sync_mode": "draft_invoices_only",
+            },
+            "shopify": {
+                "storefront_configured": shopify_ready(),
+                "route": "merchandise_checkout_only",
+                "order_reconciliation": "requires_approved_shopify_customer_access_and_accounting_connector",
+            },
+        }
+
+
+@app.post("/api/admin/billing/invoices")
+def create_billing_invoice(
+    payload: InvoiceDraftInput,
+    request: Request,
+    user: dict[str, Any] = Depends(require_roles("admin")),
+    x_csrf_token: str | None = Header(default=None),
+) -> dict[str, Any]:
+    csrf_guard(request, user, x_csrf_token)
+    placeholders = ",".join("?" for _ in payload.charge_ids)
+    with db_session() as db:
+        customer = db.execute(
+            """SELECT id,customer_number,xero_contact_id,first_name,last_name,email
+               FROM users WHERE id=? AND role='customer' AND active=1""",
+            (payload.customer_id,),
+        ).fetchone()
+        if not customer:
+            raise HTTPException(status_code=404, detail="Active family account not found")
+        charges = rows(
+            db.execute(
+                f"""SELECT lc.* FROM lesson_charges lc
+                    LEFT JOIN billing_invoice_lines bil ON bil.lesson_charge_id=lc.id
+                    WHERE lc.id IN ({placeholders}) AND lc.customer_id=?
+                      AND lc.status='pending_xero_invoice' AND bil.id IS NULL
+                    ORDER BY lc.id""",
+                (*payload.charge_ids, payload.customer_id),
+            )
+        )
+        if len(charges) != len(payload.charge_ids):
+            raise HTTPException(
+                status_code=409,
+                detail="One or more lesson charges are unavailable, already invoiced or belong to another family",
+            )
+        term_ids = {int(charge["term_id"]) for charge in charges}
+        if len(term_ids) != 1:
+            raise HTTPException(status_code=409, detail="Create a separate invoice for each school term")
+        total = sum(int(charge["amount_cents"]) for charge in charges)
+        created_at = now_iso()
+        cursor = db.execute(
+            """INSERT INTO billing_invoices
+               (invoice_number,customer_id,term_id,provider,currency,customer_number,xero_contact_id,
+                status,issue_date,due_date,subtotal_cents,total_cents,amount_paid_cents,amount_due_cents,
+                management_note,idempotency_key,created_by,created_at,updated_at)
+               VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (
+                billing_invoice_number(db),
+                payload.customer_id,
+                next(iter(term_ids)),
+                "xero",
+                "AUD",
+                customer["customer_number"],
+                customer["xero_contact_id"],
+                "draft",
+                business_today().isoformat(),
+                payload.due_date.isoformat(),
+                total,
+                total,
+                0,
+                total,
+                encrypt_sensitive(payload.management_note),
+                f"hv-invoice-{new_token(48)}"[:128],
+                user["id"],
+                created_at,
+                created_at,
+            ),
+        )
+        invoice_id = int(cursor.lastrowid)
+        for charge in charges:
+            db.execute(
+                """INSERT INTO billing_invoice_lines
+                   (invoice_id,lesson_charge_id,description,quantity,unit_amount_cents,
+                    line_amount_cents,student_number,created_at)
+                   VALUES(?,?,?,?,?,?,?,?)""",
+                (
+                    invoice_id,
+                    charge["id"],
+                    charge["invoice_description"],
+                    charge["lesson_count"],
+                    charge["per_lesson_cents"],
+                    charge["amount_cents"],
+                    charge["swimmer_number"],
+                    created_at,
+                ),
+            )
+        record_billing_event(
+            db,
+            invoice_id,
+            "created",
+            from_status=None,
+            to_status="draft",
+            created_by=user["id"],
+            detail={"charge_count": len(charges), "total_cents": total},
+        )
+        audit(
+            db,
+            user["id"],
+            "create_billing_invoice",
+            "billing_invoice",
+            invoice_id,
+            {"customer_number": customer["customer_number"], "charge_count": len(charges), "total_cents": total},
+            client_ip(request),
+        )
+        return {"created": True, "invoice": billing_invoice_payload(db, invoice_id)}
+
+
+@app.post("/api/admin/billing/invoices/{invoice_id}/approve")
+def approve_billing_invoice(
+    invoice_id: int,
+    request: Request,
+    user: dict[str, Any] = Depends(require_roles("admin")),
+    x_csrf_token: str | None = Header(default=None),
+) -> dict[str, Any]:
+    csrf_guard(request, user, x_csrf_token)
+    with db_session() as db:
+        invoice = db.execute(
+            """SELECT bi.*,u.xero_contact_id current_xero_contact_id
+               FROM billing_invoices bi JOIN users u ON u.id=bi.customer_id WHERE bi.id=?""",
+            (invoice_id,),
+        ).fetchone()
+        if not invoice:
+            raise HTTPException(status_code=404, detail="Invoice not found")
+        if invoice["status"] != "draft":
+            raise HTTPException(status_code=409, detail="Only a draft invoice can be approved")
+        if not invoice["current_xero_contact_id"]:
+            raise HTTPException(status_code=409, detail="Map this family to its verified Xero contact before approval")
+        line_total = db.execute(
+            "SELECT COALESCE(SUM(line_amount_cents),0) FROM billing_invoice_lines WHERE invoice_id=?",
+            (invoice_id,),
+        ).fetchone()[0]
+        if not line_total or int(line_total) != int(invoice["total_cents"]):
+            raise HTTPException(status_code=409, detail="Invoice line totals do not match the invoice total")
+        changed_at = now_iso()
+        db.execute(
+            """UPDATE billing_invoices SET status='approved',xero_contact_id=?,approved_by=?,
+                      approved_at=?,last_sync_error=NULL,updated_at=? WHERE id=?""",
+            (invoice["current_xero_contact_id"], user["id"], changed_at, changed_at, invoice_id),
+        )
+        record_billing_event(
+            db,
+            invoice_id,
+            "approved",
+            from_status="draft",
+            to_status="approved",
+            created_by=user["id"],
+            detail={"xero_contact_mapped": True},
+        )
+        audit(db, user["id"], "approve_billing_invoice", "billing_invoice", invoice_id, {}, client_ip(request))
+        return {"approved": True, "invoice": billing_invoice_payload(db, invoice_id)}
+
+
+@app.post("/api/admin/billing/invoices/{invoice_id}/sync-xero")
+async def sync_billing_invoice_to_xero(
+    invoice_id: int,
+    request: Request,
+    user: dict[str, Any] = Depends(require_roles("admin")),
+    x_csrf_token: str | None = Header(default=None),
+) -> dict[str, Any]:
+    csrf_guard(request, user, x_csrf_token)
+    if not settings.xero_sync_enabled:
+        raise HTTPException(status_code=409, detail="Enable reviewed Xero invoice transmission in the server configuration first")
+    if not xero_ready() or not xero_invoice_configuration_ready():
+        raise HTTPException(status_code=409, detail="Complete the Xero OAuth, account-code, tax and line-amount configuration first")
+    with db_session() as db:
+        invoice = billing_invoice_payload(db, invoice_id)
+        if invoice["status"] != "approved":
+            raise HTTPException(status_code=409, detail="Only an approved invoice can be sent to Xero")
+        connection = db.execute(
+            "SELECT * FROM integration_connections WHERE provider='xero' AND status='connected'"
+        ).fetchone()
+        if not connection or not connection["encrypted_tokens"]:
+            raise HTTPException(status_code=409, detail="Connect the existing Xero organisation first")
+        token = decrypt_json(connection["encrypted_tokens"])
+        previous = invoice["status"]
+        changed_at = now_iso()
+        db.execute(
+            "UPDATE billing_invoices SET status='sync_review',last_sync_error=NULL,updated_at=? WHERE id=?",
+            (changed_at, invoice_id),
+        )
+        record_billing_event(
+            db,
+            invoice_id,
+            "xero_sync_started",
+            from_status=previous,
+            to_status="sync_review",
+            created_by=user["id"],
+            detail={"mode": "draft_only"},
+        )
+    try:
+        current_token = await refresh_and_store_xero_token(token)
+        refreshed_token, xero_invoice = await xero_create_draft_invoice(current_token, invoice=invoice, lines=invoice["lines"])
+    except Exception as exc:
+        safe_error = f"{type(exc).__name__}: {str(exc)}"[:500]
+        with db_session() as db:
+            db.execute(
+                "UPDATE billing_invoices SET last_sync_error=?,updated_at=? WHERE id=?",
+                (safe_error, now_iso(), invoice_id),
+            )
+            record_billing_event(
+                db,
+                invoice_id,
+                "xero_sync_requires_review",
+                from_status="sync_review",
+                to_status="sync_review",
+                created_by=user["id"],
+                detail={"error_type": type(exc).__name__},
+            )
+            audit(db, user["id"], "xero_invoice_sync_requires_review", "billing_invoice", invoice_id, {"error_type": type(exc).__name__}, client_ip(request))
+        raise HTTPException(
+            status_code=502,
+            detail="Xero did not confirm the draft invoice. Check Xero before attempting any further action.",
+        )
+    xero_status = str(xero_invoice.get("Status") or "DRAFT").upper()
+    local_status = "synced" if xero_status == "DRAFT" else "sent"
+    with db_session() as db:
+        db.execute(
+            "UPDATE integration_connections SET encrypted_tokens=?,updated_at=? WHERE provider='xero'",
+            (encrypt_json(refreshed_token), now_iso()),
+        )
+        db.execute(
+            """UPDATE billing_invoices SET status=?,xero_invoice_id=?,xero_invoice_number=?,
+                      xero_status=?,last_sync_error=NULL,synced_at=?,updated_at=? WHERE id=?""",
+            (
+                local_status,
+                xero_invoice.get("InvoiceID"),
+                xero_invoice.get("InvoiceNumber"),
+                xero_status,
+                now_iso(),
+                now_iso(),
+                invoice_id,
+            ),
+        )
+        db.execute(
+            """UPDATE lesson_charges SET status='invoiced',xero_invoice_id=?
+               WHERE id IN (SELECT lesson_charge_id FROM billing_invoice_lines WHERE invoice_id=?)""",
+            (xero_invoice.get("InvoiceID"), invoice_id),
+        )
+        record_billing_event(
+            db,
+            invoice_id,
+            "xero_draft_created",
+            from_status="sync_review",
+            to_status=local_status,
+            created_by=user["id"],
+            detail={"xero_status": xero_status},
+        )
+        audit(db, user["id"], "sync_billing_invoice_to_xero", "billing_invoice", invoice_id, {"xero_status": xero_status}, client_ip(request))
+        return {"synced": True, "invoice": billing_invoice_payload(db, invoice_id)}
+
+
+@app.post("/api/admin/billing/invoices/{invoice_id}/refresh-xero")
+async def refresh_billing_invoice_from_xero(
+    invoice_id: int,
+    request: Request,
+    user: dict[str, Any] = Depends(require_roles("admin")),
+    x_csrf_token: str | None = Header(default=None),
+) -> dict[str, Any]:
+    csrf_guard(request, user, x_csrf_token)
+    with db_session() as db:
+        invoice = db.execute("SELECT * FROM billing_invoices WHERE id=?", (invoice_id,)).fetchone()
+        if not invoice:
+            raise HTTPException(status_code=404, detail="Invoice not found")
+        if not invoice["xero_invoice_id"]:
+            raise HTTPException(status_code=409, detail="This invoice has no confirmed Xero invoice ID to refresh")
+        connection = db.execute(
+            "SELECT * FROM integration_connections WHERE provider='xero' AND status='connected'"
+        ).fetchone()
+        if not connection or not connection["encrypted_tokens"]:
+            raise HTTPException(status_code=409, detail="Reconnect the Xero organisation first")
+        token = decrypt_json(connection["encrypted_tokens"])
+        previous_status = invoice["status"]
+    try:
+        current_token = await refresh_and_store_xero_token(token)
+        refreshed_token, xero_invoice = await xero_get_invoice(current_token, str(invoice["xero_invoice_id"]))
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Xero status refresh failed: {type(exc).__name__}")
+    xero_status = str(xero_invoice.get("Status") or "").upper()
+    local_status = {
+        "DRAFT": "synced",
+        "SUBMITTED": "sent",
+        "AUTHORISED": "sent",
+        "PAID": "paid",
+        "VOIDED": "voided",
+        "DELETED": "voided",
+    }.get(xero_status, "sync_review")
+    amount_paid = cents_from_xero(xero_invoice.get("AmountPaid"))
+    amount_due = cents_from_xero(xero_invoice.get("AmountDue"))
+    with db_session() as db:
+        db.execute(
+            "UPDATE integration_connections SET encrypted_tokens=?,updated_at=? WHERE provider='xero'",
+            (encrypt_json(refreshed_token), now_iso()),
+        )
+        db.execute(
+            """UPDATE billing_invoices SET status=?,xero_status=?,xero_invoice_number=?,
+                      amount_paid_cents=?,amount_due_cents=?,online_invoice_url=?,last_sync_error=NULL,
+                      updated_at=? WHERE id=?""",
+            (
+                local_status,
+                xero_status,
+                xero_invoice.get("InvoiceNumber"),
+                amount_paid,
+                amount_due,
+                xero_invoice.get("OnlineInvoiceUrl"),
+                now_iso(),
+                invoice_id,
+            ),
+        )
+        charge_status = "paid" if local_status == "paid" else "invoiced"
+        db.execute(
+            f"""UPDATE lesson_charges SET status=?
+                WHERE id IN (SELECT lesson_charge_id FROM billing_invoice_lines WHERE invoice_id=?)""",
+            (charge_status, invoice_id),
+        )
+        record_billing_event(
+            db,
+            invoice_id,
+            "xero_status_refreshed",
+            from_status=previous_status,
+            to_status=local_status,
+            created_by=user["id"],
+            detail={"xero_status": xero_status, "amount_due_cents": amount_due},
+        )
+        audit(db, user["id"], "refresh_billing_invoice_from_xero", "billing_invoice", invoice_id, {"xero_status": xero_status}, client_ip(request))
+        return {"refreshed": True, "invoice": billing_invoice_payload(db, invoice_id)}
 
 
 @app.get("/api/admin/lesson-charges")

@@ -74,6 +74,20 @@ def test_production_requires_https_for_public_and_xero_urls():
         )
 
 
+def test_xero_invoice_transmission_cannot_start_with_partial_accounting_configuration():
+    with pytest.raises(RuntimeError, match="complete Xero OAuth"):
+        server.validate_production_config(production_settings(xero_sync_enabled=True))
+    with pytest.raises(RuntimeError, match="XERO_LESSON_ACCOUNT_CODE"):
+        server.validate_production_config(
+            production_settings(
+                xero_sync_enabled=True,
+                xero_client_id="client",
+                xero_client_secret="secret",
+                xero_redirect_uri="https://swim.example.test/api/integrations/xero/callback",
+            )
+        )
+
+
 def test_production_rejects_incomplete_or_insecure_social_signin_configuration():
     with pytest.raises(RuntimeError, match="GOOGLE_CLIENT_ID"):
         server.validate_production_config(production_settings(google_client_id="client"))

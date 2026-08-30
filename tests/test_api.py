@@ -1988,6 +1988,122 @@ def test_a_family_can_cancel_rebook_and_cancel_the_same_class(client):
     assert client.delete(f"/api/customer/bookings/{second.json()['booking_id']}", headers=headers).status_code == 200
 
 
+def test_lesson_invoice_requires_local_review_and_never_blindly_syncs_to_xero(client):
+    """The finance ledger must be useful without turning a browser click into an unreviewed charge."""
+    from backend.database import db_session
+
+    client.cookies.clear()
+    admin_csrf = sign_in(client, ADMIN)
+    staff = client.get("/api/admin/staff").json()["staff"]
+    created_class = client.post(
+        "/api/admin/classes",
+        json={
+            "code": "BILLING-LEDGER",
+            "title": "Billing ledger regression class",
+            "level": "Test",
+            "location_slug": "wood-street",
+            "instructor_id": staff[0]["id"],
+            "weekday": 1,
+            "start_time": "12:15",
+            "duration_minutes": 30,
+            "capacity": 5,
+            "price_cents": 2250,
+        },
+        headers={"X-CSRF-Token": admin_csrf},
+    )
+    assert created_class.status_code == 200, created_class.text
+
+    client.cookies.clear()
+    family_csrf = sign_in(client, FAMILY)
+    swimmer_id = client.get("/api/customer/swimmers").json()["swimmers"][0]["id"]
+    booking = client.post(
+        "/api/customer/bookings",
+        json={"class_id": created_class.json()["id"], "swimmer_id": swimmer_id},
+        headers={"X-CSRF-Token": family_csrf},
+    )
+    assert booking.status_code == 200, booking.text
+    assert booking.json()["payment"]["provider"] == "Xero"
+
+    client.cookies.clear()
+    admin_csrf = sign_in(client, ADMIN)
+    accounts = client.get("/api/admin/accounts").json()["accounts"]
+    family = next(account for account in accounts if account["email"] == FAMILY[0])
+    mapped = client.patch(
+        f"/api/admin/customers/{family['id']}/integration-mapping",
+        json={"xero_contact_id": "00000000-0000-4000-8000-000000000101", "shopify_customer_gid": ""},
+        headers={"X-CSRF-Token": admin_csrf},
+    )
+    assert mapped.status_code == 200, mapped.text
+
+    billing = client.get("/api/admin/billing")
+    assert billing.status_code == 200, billing.text
+    charge = next(
+        item for item in billing.json()["unbilled_charges"]
+        if "Billing ledger regression class" in item["invoice_description"]
+    )
+    created = client.post(
+        "/api/admin/billing/invoices",
+        json={
+            "customer_id": family["id"],
+            "charge_ids": [charge["id"]],
+            "due_date": date.today().isoformat(),
+            "management_note": "Regression test — never visible to the family.",
+        },
+        headers={"X-CSRF-Token": admin_csrf},
+    )
+    assert created.status_code == 200, created.text
+    invoice = created.json()["invoice"]
+    assert invoice["status"] == "draft"
+    assert invoice["total_cents"] == charge["amount_cents"]
+    assert invoice["provider"] == "xero"
+    with db_session() as db:
+        stored_note = db.execute(
+            "SELECT management_note FROM billing_invoices WHERE id=?", (invoice["id"],)
+        ).fetchone()[0]
+    assert "Regression test" not in stored_note
+
+    duplicate = client.post(
+        "/api/admin/billing/invoices",
+        json={
+            "customer_id": family["id"],
+            "charge_ids": [charge["id"]],
+            "due_date": date.today().isoformat(),
+            "management_note": "Must be rejected.",
+        },
+        headers={"X-CSRF-Token": admin_csrf},
+    )
+    assert duplicate.status_code == 409
+
+    client.cookies.clear()
+    sign_in(client, FAMILY)
+    family_billing = client.get("/api/customer/billing")
+    assert family_billing.status_code == 200
+    assert invoice["invoice_number"] not in family_billing.text
+    assert "Regression test" not in family_billing.text
+    assert client.get("/api/admin/billing").status_code == 403
+
+    client.cookies.clear()
+    admin_csrf = sign_in(client, ADMIN)
+    approved = client.post(
+        f"/api/admin/billing/invoices/{invoice['id']}/approve",
+        headers={"X-CSRF-Token": admin_csrf},
+    )
+    assert approved.status_code == 200, approved.text
+    assert approved.json()["invoice"]["status"] == "approved"
+    locked_sync = client.post(
+        f"/api/admin/billing/invoices/{invoice['id']}/sync-xero",
+        headers={"X-CSRF-Token": admin_csrf},
+    )
+    assert locked_sync.status_code == 409
+    assert "configuration" in locked_sync.text.lower()
+
+    client.cookies.clear()
+    sign_in(client, FAMILY)
+    family_billing = client.get("/api/customer/billing")
+    assert invoice["invoice_number"] in family_billing.text
+    assert "Regression test" not in family_billing.text
+
+
 def test_staff_clock_records_breaks_and_paid_hours_without_location_tracking(client):
     client.cookies.clear()
     csrf = sign_in(client, STAFF)
