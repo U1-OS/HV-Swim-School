@@ -14,6 +14,10 @@ from __future__ import annotations
 import importlib
 import os
 import sys
+import base64
+import binascii
+import struct
+import zlib
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -56,6 +60,21 @@ def sign_in(client, credentials):
     response = client.post("/api/auth/login", json={"email": credentials[0], "password": credentials[1]})
     assert response.status_code == 200, response.text
     return response.json()["csrf_token"]
+
+
+def make_test_png_base64(width=64, height=64):
+    """Create a small valid RGBA PNG with only the Python standard library."""
+    def chunk(kind, data):
+        return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", binascii.crc32(kind + data) & 0xFFFFFFFF)
+
+    pixels = b"".join(b"\x00" + (b"\x08\x75\xa5\xff" * width) for _ in range(height))
+    png = (
+        b"\x89PNG\r\n\x1a\n"
+        + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 6, 0, 0, 0))
+        + chunk(b"IDAT", zlib.compress(pixels))
+        + chunk(b"IEND", b"")
+    )
+    return base64.b64encode(png).decode("ascii")
 
 
 # --- public surface -------------------------------------------------------------------
@@ -154,6 +173,110 @@ def test_management_feature_controls_enforce_real_launch_gates(client):
                 ),
             )
             db.execute("UPDATE site_settings SET value='0' WHERE key='feature_merch_home'")
+            db.execute("UPDATE site_settings SET value='0' WHERE key='feature_association_badges'")
+        client.cookies.clear()
+
+
+def test_association_artwork_evidence_workflow_is_verified_and_fail_closed(client):
+    from backend.database import db_session
+
+    client.cookies.clear()
+    csrf = sign_in(client, ADMIN)
+    staff_client_response = None
+
+    credentials = client.get("/api/admin/association-badges")
+    assert credentials.status_code == 200
+    assert len(credentials.json()["credentials"]) == 3
+    assert all(not item["ready"] for item in credentials.json()["credentials"])
+    assert client.get("/api/public/association-badges").json() == {"badges": [], "published": False}
+
+    invalid = client.patch(
+        "/api/admin/association-badges/austswim",
+        json={
+            "membership_reference": "test-reference",
+            "valid_until": (datetime.now(timezone.utc) + timedelta(days=365)).date().isoformat(),
+            "usage_rights_confirmed": True,
+            "internal_notes": "Test-only evidence",
+            "artwork_png_base64": base64.b64encode(b"not a png").decode("ascii"),
+        },
+        headers={"X-CSRF-Token": csrf},
+    )
+    assert invalid.status_code == 422
+    assert "PNG" in invalid.json()["detail"]
+
+    future = (datetime.now(timezone.utc) + timedelta(days=365)).date().isoformat()
+    artwork = make_test_png_base64()
+    keys = ("swim_schools_australia", "austswim", "autism_swim")
+    for key in keys:
+        saved = client.patch(
+            f"/api/admin/association-badges/{key}",
+            json={
+                "membership_reference": f"test-{key}",
+                "valid_until": future,
+                "usage_rights_confirmed": True,
+                "internal_notes": "Automated test evidence only",
+                "artwork_png_base64": artwork,
+            },
+            headers={"X-CSRF-Token": csrf},
+        )
+        assert saved.status_code == 200, saved.text
+        assert saved.json()["credential"]["ready"] is True
+    assert saved.json()["feature_control"]["can_enable"] is True
+
+    site = client.get("/api/admin/site-settings").json()["settings"]
+    publish_payload = {
+        "announcement_enabled": site["announcement_enabled"],
+        "announcement_text": site["announcement_text"],
+        "enrolment_status": site["enrolment_status"],
+        "hero_eyebrow": site["hero_eyebrow"],
+        "hero_heading": site["hero_heading"],
+        "hero_accent": site["hero_accent"],
+        "hero_intro": site["hero_intro"],
+        "primary_cta": site["primary_cta"],
+        "feature_merch_home": False,
+        "feature_association_badges": True,
+    }
+    published = client.patch("/api/admin/site-settings", json=publish_payload, headers={"X-CSRF-Token": csrf})
+    assert published.status_code == 200, published.text
+    assert published.json()["feature_controls"]["association_badges"]["effective_enabled"] is True
+    public_badges = client.get("/api/public/association-badges").json()
+    assert public_badges["published"] is True
+    assert len(public_badges["badges"]) == 3
+    assert "membership_reference" not in public_badges["badges"][0]
+    image = client.get(public_badges["badges"][0]["artwork_url"])
+    assert image.status_code == 200
+    assert image.headers["content-type"].startswith("image/png")
+    assert image.content.startswith(b"\x89PNG")
+
+    expired = client.patch(
+        "/api/admin/association-badges/swim_schools_australia",
+        json={
+            "membership_reference": "test-swim_schools_australia",
+            "valid_until": "2020-01-01",
+            "usage_rights_confirmed": True,
+            "internal_notes": "Expired in test",
+            "artwork_png_base64": None,
+        },
+        headers={"X-CSRF-Token": csrf},
+    )
+    assert expired.status_code == 200
+    assert expired.json()["credential"]["ready"] is False
+    assert client.get("/api/public/site-settings").json()["features"]["association_badges"] is False
+    assert client.get("/api/public/association-badges").json()["badges"] == []
+    assert client.get(public_badges["badges"][0]["artwork_url"]).status_code == 404
+
+    try:
+        client.cookies.clear()
+        sign_in(client, STAFF)
+        staff_client_response = client.get("/api/admin/association-badges")
+        assert staff_client_response.status_code == 403
+    finally:
+        with db_session() as db:
+            db.execute(
+                """UPDATE association_credentials SET membership_reference=NULL,valid_until=NULL,
+                          usage_rights_confirmed=0,internal_notes=NULL,artwork_filename=NULL,
+                          artwork_sha256=NULL,verified_by=NULL,verified_at=NULL"""
+            )
             db.execute("UPDATE site_settings SET value='0' WHERE key='feature_association_badges'")
         client.cookies.clear()
 

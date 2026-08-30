@@ -152,6 +152,22 @@ CREATE TABLE IF NOT EXISTS qualifications (
   status TEXT NOT NULL DEFAULT 'current',
   verified_at TEXT
 );
+CREATE TABLE IF NOT EXISTS association_credentials (
+  key TEXT PRIMARY KEY,
+  display_name TEXT NOT NULL,
+  short_label TEXT NOT NULL,
+  directory_url TEXT NOT NULL,
+  requirements_url TEXT NOT NULL,
+  membership_reference TEXT,
+  valid_until TEXT,
+  usage_rights_confirmed INTEGER NOT NULL DEFAULT 0,
+  internal_notes TEXT,
+  artwork_filename TEXT,
+  artwork_sha256 TEXT,
+  verified_by INTEGER REFERENCES users(id),
+  verified_at TEXT,
+  updated_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS notifications (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   user_id INTEGER REFERENCES users(id),
@@ -471,6 +487,43 @@ def initialise_database() -> None:
             if column not in user_columns:
                 db.execute(f"ALTER TABLE users ADD COLUMN {column} {definition}")
         created = now_iso()
+        association_credentials = (
+            (
+                "swim_schools_australia",
+                "SWIM Schools Australia",
+                "SWIM",
+                "https://12524.locationlandingpages.com/australia/victoria/california-gully/hv-swim-school-bendigo/2807",
+                "https://swim.org.au/swim-schools-membership/",
+            ),
+            (
+                "austswim",
+                "AUSTSWIM Swim School Network",
+                "AUSTSWIM",
+                "https://austswim.com.au/australian-swim-school-finder",
+                "https://austswim.com.au/swim-school-network",
+            ),
+            (
+                "autism_swim",
+                "Autism Swim Approved Provider",
+                "AUTISM SWIM",
+                "https://autism-swim.org/providers/aquatic-centre-hidden-valley-swim-school-bendigo/",
+                "https://autismswim.com.au/aquatic-certifications/",
+            ),
+        )
+        db.executemany(
+            """INSERT OR IGNORE INTO association_credentials(
+                   key,display_name,short_label,directory_url,requirements_url,updated_at
+               ) VALUES(?,?,?,?,?,?)""",
+            [(*record, created) for record in association_credentials],
+        )
+        # Canonical labels and source links are application-controlled; evidence,
+        # renewal dates and artwork remain deliberately untouched on every startup.
+        db.executemany(
+            """UPDATE association_credentials
+               SET display_name=?,short_label=?,directory_url=?,requirements_url=?
+               WHERE key=?""",
+            [(name, label, directory, requirements, key) for key, name, label, directory, requirements in association_credentials],
+        )
         base_products = [
             ("HV-SWIMWEAR", "HV Swim Team Swimwear", "Swimwear", "Logo-branded training swimwear for children and adults.", 5995, '["Kids 4-14","Adult XS-XL"]', "planned", "🩱"),
             ("HV-RASHIE", "HV Swim Kids Rashie", "Swimwear", "Chlorine-resistant long-sleeve swimming shirt for lessons and outdoor pool days.", 4495, '["Kids 2","Kids 4","Kids 6","Kids 8","Kids 10","Kids 12","Kids 14"]', "planned", "◊"),

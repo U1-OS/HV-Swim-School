@@ -74,6 +74,24 @@
   }
   window.HVSwim = Object.assign(window.HVSwim || {}, { fetchJSON, formatClassTime, formatDateTime });
 
+  const escapePublic = value => String(value ?? '').replace(/[&<>'"]/g, character => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[character]));
+  async function hydrateAssociationBadges() {
+    const featureNodes=[...document.querySelectorAll('[data-public-feature="association_badges"]')];
+    featureNodes.forEach(node=>{node.hidden=true;});
+    try {
+      const payload=await fetchJSON('/api/public/association-badges',{headers:{Accept:'application/json'}});
+      if(!payload.published||!Array.isArray(payload.badges)||payload.badges.length!==3)return;
+      const cards=payload.badges.map(badge=>`<a class="credential-card" href="${escapePublic(badge.directory_url)}" target="_blank" rel="noopener"><span class="directory-card-mark issued" aria-hidden="true"><img src="${escapePublic(badge.artwork_url)}" alt=""></span><span><strong>${escapePublic(badge.display_name)}</strong><small>View the current public organisation record</small><em class="credential-state listed">Verified through ${escapePublic(new Intl.DateTimeFormat('en-AU',{day:'numeric',month:'short',year:'numeric'}).format(new Date(`${badge.valid_until}T00:00:00`)))}</em></span></a>`).join('');
+      const publicGrid=document.getElementById('association-badge-list');
+      if(publicGrid)publicGrid.innerHTML=cards;
+      const footerLinks=document.querySelector('.footer-association-links');
+      if(footerLinks)footerLinks.innerHTML=payload.badges.map(badge=>`<a href="${escapePublic(badge.directory_url)}" target="_blank" rel="noopener"><img src="${escapePublic(badge.artwork_url)}" alt="${escapePublic(badge.display_name)}"><span>View current record</span><em>Verified to ${escapePublic(badge.valid_until)}</em></a>`).join('');
+      featureNodes.forEach(node=>{node.hidden=false;});
+    } catch (_) {
+      featureNodes.forEach(node=>{node.hidden=true;});
+    }
+  }
+
   // Public modules fail closed. Preview-only and not-yet-approved brand/commerce
   // sections remain absent if the server cannot confirm the current environment.
   async function hydratePublicMode() {
@@ -84,8 +102,9 @@
       document.documentElement.dataset.siteMode = mode;
       document.querySelectorAll('[data-preview-only]').forEach(element => { element.hidden = mode !== 'preview'; });
       document.querySelectorAll('[data-public-feature]').forEach(element => {
-        element.hidden = payload.features?.[element.dataset.publicFeature] !== true;
+        element.hidden = element.dataset.publicFeature === 'association_badges' || payload.features?.[element.dataset.publicFeature] !== true;
       });
+      if(payload.features?.association_badges===true)await hydrateAssociationBadges();
       const primaryLabel = String(payload.settings?.primary_cta || 'Find the right lesson').trim();
       document.querySelectorAll('[data-primary-cta-label]').forEach(element => { element.textContent = primaryLabel; });
     } catch (_) {
@@ -160,10 +179,9 @@
   const updateHeader = () => header?.classList.toggle('scrolled', window.scrollY > 24);
   updateHeader(); window.addEventListener('scroll', updateHeader, { passive:true });
 
-  // Association records are shown consistently at the bottom of every public page.
-  // These are source links and reserved authorised-badge positions — never downloaded or
-  // redrawn corporate logos. Issued artwork can replace the text plates only after the
-  // business records current usage rights and renewal evidence.
+  // Verified association artwork is shown consistently at the bottom of public pages.
+  // The strip begins empty and stays hidden unless the server returns all three current,
+  // integrity-checked records through the explicit publication gate.
   const footer = document.querySelector('.site-footer');
   if (footer && !footer.querySelector('.footer-business-identity')) {
     const identity = document.createElement('p');
@@ -178,7 +196,7 @@
     strip.dataset.publicFeature = 'association_badges';
     strip.hidden = true;
     strip.setAttribute('aria-label', 'HV Swim aquatic industry directory links');
-    strip.innerHTML = `<div class="footer-association-intro"><span>Industry records</span><strong>Check HV Swim at the source.</strong><small>Authorised member/provider badge artwork is still required.</small></div><div class="footer-association-links"><a href="https://12524.locationlandingpages.com/australia/victoria/california-gully/hv-swim-school-bendigo/2807" target="_blank" rel="noopener"><b>SWIM</b><span>Public school record</span><em>Badge file required</em></a><a href="https://austswim.com.au/australian-swim-school-finder" target="_blank" rel="noopener"><b>AUSTSWIM</b><span>Swim School Network finder</span><em>Issued badge required</em></a><a href="https://autism-swim.org/providers/aquatic-centre-hidden-valley-swim-school-bendigo/" target="_blank" rel="noopener"><b>AUTISM SWIM</b><span>Provider-directory record</span><em>Renewal to confirm</em></a></div>`;
+    strip.innerHTML = `<div class="footer-association-intro"><span>Current credentials</span><strong>Check HV Swim at the source.</strong><small>Organisation-issued marks with management-verified evidence and expiry dates.</small></div><div class="footer-association-links"></div>`;
     const footerBottom = footer.querySelector('.footer-bottom');
     if (footerBottom) footer.insertBefore(strip, footerBottom);
     else footer.append(strip);

@@ -37,7 +37,7 @@ def expect(label, condition):
 def main():
     public = urllib.request.build_opener()
     status, health = request(public, "/api/health")
-    expect("health endpoint", status == 200 and health.get("version") == "5.6.1")
+    expect("health endpoint", status == 200 and health.get("version") == "5.6.2")
     home_page = public.open(BASE + "/index.html", timeout=30).read().decode("utf-8")
     expect("live homepage day view", "Today at HV Swim" in home_page and "today-grid" in home_page and "staff reading" in home_page)
     about_page = public.open(BASE + "/about.html", timeout=30).read().decode("utf-8")
@@ -50,7 +50,7 @@ def main():
     enquire_page = public.open(BASE + "/enquire.html", timeout=30).read().decode("utf-8")
     expect("guided enrolment concierge", "Four clear steps" in enquire_page and "wizard-class-grid" in enquire_page and "enrolment-success" in enquire_page)
     mobile_shell = public.open(BASE + "/mobile-shell.html", timeout=30).read().decode("utf-8")
-    expect("native mobile launch shell", "Open connected app" in mobile_shell and "V5.6.1" in mobile_shell)
+    expect("native mobile launch shell", "Open connected app" in mobile_shell and "V5.6.2" in mobile_shell)
     manifest = json.loads(public.open(BASE + "/manifest.webmanifest", timeout=30).read().decode("utf-8"))
     expect("installable app manifest", manifest.get("display") == "standalone" and len(manifest.get("icons", [])) >= 3)
     for path, key in (("/api/public/locations", "locations"), ("/api/classes", "classes")):
@@ -60,6 +60,8 @@ def main():
     expect("urgent public alert feed", status == 200 and isinstance(alerts.get("alerts"), list) and alerts.get("delivery", {}).get("website_polling") == "live")
     status, site = request(public, "/api/public/site-settings")
     expect("public website settings", status == 200 and site.get("settings", {}).get("hero_heading"))
+    status, badges = request(public, "/api/public/association-badges")
+    expect("association marks fail closed", status == 200 and badges == {"badges": [], "published": False})
 
     roles = {
         "customer": ("parent@hvswim.demo", "FamilyDemo!26", "/api/customer/swimmers", "swimmers"),
@@ -99,6 +101,8 @@ def main():
             expect("management alert publisher", status == 200 and isinstance(alerts.get("alerts"), list))
             status, website = request(opener, "/api/admin/site-settings")
             expect("admin website editor", status == 200 and website.get("settings", {}).get("primary_cta") and website.get("feature_controls", {}).get("association_badges", {}).get("can_enable") is False)
+            status, badge_register = request(opener, "/api/admin/association-badges")
+            expect("association evidence register", status == 200 and len(badge_register.get("credentials", [])) == 3 and badge_register.get("feature_control", {}).get("ready_items") == 0)
             status, inbox = request(opener, "/api/admin/enquiries")
             expect("admin enquiry inbox", status == 200 and isinstance(inbox.get("enquiries"), list))
 
