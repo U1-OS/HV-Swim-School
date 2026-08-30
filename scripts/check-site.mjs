@@ -143,13 +143,15 @@ if (!/data-action="staff-clock"/.test(read('assets/platform.js'))) fail('busines
 if (/navigator\.geolocation|accuracy_metres/.test(read('assets/platform.js'))) fail('business workflow', 'staff clock controls must not collect continuous device location data');
 if (!/\/api\/staff\/incidents/.test(read('assets/platform.js'))) fail('business workflow', 'staff incident reporting route is missing');
 if (!/swimmer_number/.test(read('backend/server.py')) || !/customer_number/.test(read('backend/server.py'))) fail('business workflow', 'family/student number linkage is missing from the service');
+if (!/id="platform-nav-search"/.test(read('platform.html')) || !/function filterNav/.test(read('assets/platform.js'))) fail('platform navigation', 'workspace section search is missing');
 const shopPage = read('shop.html');
 if (!/id="production-routes"/.test(shopPage) || !/not a claim of available stock/i.test(shopPage)) {
   fail('production copy', 'public supplier routes are missing their stock/connection boundary in shop.html');
 }
-if (/Save this kit|choices save on this device|persistent preview cart/i.test(shopPage)) {
+if (/Save this kit|choices save on this device|persistent preview cart|saved collection|build a saved list/i.test(shopPage)) {
   fail('production copy', 'shop.html still presents a simulated saved-cart workflow');
 }
+if (!/id="shop-load-more"/.test(shopPage)) fail('shop experience', 'progressive product loading is missing from shop.html');
 
 if (problems.length) {
   console.error(`${problems.length} problem${problems.length === 1 ? '' : 's'} found:\n`);

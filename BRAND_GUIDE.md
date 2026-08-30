@@ -1,6 +1,6 @@
 # HV Swim Bendigo brand guide
 
-V5.10.0 refines the existing HV Swim identity rather than replacing it. The rising sun,
+V5.10.1 refines the existing HV Swim identity rather than replacing it. The rising sun,
 freestyle swimmer, layered wave, navy/cyan/gold palette and `HV SWIM BENDIGO` name remain
 the recognisable core.
 

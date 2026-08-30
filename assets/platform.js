@@ -233,7 +233,7 @@
     toggle.setAttribute('aria-expanded','true'); toggle.setAttribute('aria-label','Close workspace navigation');
     if(main){main.inert=true;main.setAttribute('aria-hidden','true');} if(tabbar){tabbar.inert=true;tabbar.setAttribute('aria-hidden','true');}
     if (backdrop) backdrop.hidden=false;
-    requestAnimationFrame(()=>sidebar.querySelector('button,a')?.focus());
+    requestAnimationFrame(()=>sidebar.querySelector('input,button,a')?.focus());
   }
 
   function syncSidebarMode() {
@@ -250,7 +250,7 @@
     if (!compactSidebar.matches || !sidebar?.classList.contains('open')) return;
     if (event.key === 'Escape') { event.preventDefault(); closeSidebar({returnFocus:true}); return; }
     if (event.key !== 'Tab') return;
-    const stops=[...sidebar.querySelectorAll('button:not(:disabled),a[href]')].filter(item=>!item.hidden);
+    const stops=[...sidebar.querySelectorAll('input:not(:disabled),button:not(:disabled),a[href]')].filter(item=>!item.hidden);
     if (!stops.length) return;
     const first=stops[0]; const last=stops[stops.length-1];
     if (event.shiftKey && document.activeElement===first) { event.preventDefault(); last.focus(); }
@@ -344,7 +344,36 @@
       currentGroup=group;
       return `${heading}<button type="button" data-route="${route}"><span class="nav-icon" aria-hidden="true">${iconSvg(icon)}</span>${esc(label)}</button>`;
     }).join('');
-    nav.querySelectorAll('[data-route]').forEach(button => button.addEventListener('click', () => { location.hash=button.dataset.route; closeSidebar({returnFocus:true}); }));
+    nav.querySelectorAll('[data-route]').forEach(button => button.addEventListener('click', () => { clearNavSearch(); location.hash=button.dataset.route; closeSidebar({returnFocus:true}); }));
+    const search=document.getElementById('platform-nav-search');
+    search?.addEventListener('input',()=>filterNav(search.value));
+    search?.addEventListener('keydown',event=>{if(event.key==='Escape'&&search.value){event.preventDefault();event.stopPropagation();clearNavSearch();search.focus();}});
+  }
+
+  function filterNav(value='') {
+    const nav=document.getElementById('platform-nav');
+    const emptyState=document.getElementById('platform-nav-empty');
+    if(!nav)return;
+    const term=String(value).trim().toLowerCase();
+    let heading=null; let groupMatches=0; let totalMatches=0;
+    [...nav.children].forEach(child=>{
+      if(child.classList.contains('platform-nav-group')){
+        if(heading)heading.hidden=groupMatches===0;
+        heading=child;groupMatches=0;return;
+      }
+      if(!child.matches('[data-route]'))return;
+      const matches=!term||child.textContent.toLowerCase().includes(term);
+      child.hidden=!matches;
+      if(matches){groupMatches++;totalMatches++;}
+    });
+    if(heading)heading.hidden=groupMatches===0;
+    if(emptyState)emptyState.hidden=totalMatches!==0;
+  }
+
+  function clearNavSearch() {
+    const search=document.getElementById('platform-nav-search');
+    if(search)search.value='';
+    filterNav('');
   }
 
   function buildMobileTabbar() {
@@ -598,7 +627,7 @@
     const enquiryLabels={new:'New',contacted:'Contacted',trial_booked:'Trial booked',closed:'Closed'};
     const enquiryTotal=Math.max(1,Object.values(data.enquiry_mix).reduce((sum,value)=>sum+Number(value),0));
     const enquiries=Object.entries(data.enquiry_mix).map(([key,value])=>`<div class="ops-bar-row"><div class="ops-bar-label"><strong>${esc(enquiryLabels[key]||key)}</strong><span>${value} · ${Math.round(100*value/enquiryTotal)}%</span></div><div class="ops-bar-track" role="img" aria-label="${esc(enquiryLabels[key]||key)}: ${value}"><span class="ops-bar-fill enquiry-${esc(key)}" style="width:${value?Math.max(4,100*value/enquiryTotal):0}%"></span></div></div>`).join('');
-    const classes=data.classes.map(item=>`<div class="ops-bar-row"><div class="ops-bar-label"><strong>${esc(item.title)}</strong><span>${item.enrolled}/${item.capacity} · ${item.utilisation}%</span></div><div class="ops-bar-track" role="img" aria-label="${esc(item.title)} utilisation ${item.utilisation}%"><span class="ops-bar-fill" style="width:${Math.min(100,item.utilisation)}%"></span></div><small>${esc(item.code)} · ${esc(item.location_name)} · ${item.available} places available</small></div>`).join('');
+    const classes=data.classes.map(item=>`<div class="ops-bar-row"><div class="ops-bar-label"><strong>${esc(item.title)}</strong><span>${item.enrolled}/${item.capacity} · ${item.utilisation}%</span></div><div class="ops-bar-track" role="img" aria-label="${esc(item.title)} utilisation ${item.utilisation}%"><span class="ops-bar-fill" style="width:${Math.min(100,item.utilisation)}%"></span></div><small>${esc(item.code)} · ${esc(item.location_name)} · ${item.available} ${item.available===1?'place':'places'} available</small></div>`).join('');
     const hourLabels={draft:'Draft',submitted:'Awaiting approval',approved:'Approved',exported:'Recorded as exported'};
     const hourTotal=Object.values(data.hour_mix).reduce((sum,value)=>sum+Number(value),0);
     const hours=Object.entries(data.hour_mix).map(([key,value])=>`<div class="hours-key"><span class="hours-dot hours-${esc(key)}"></span><strong>${esc(hourLabels[key]||key)}</strong><em>${Number(value).toFixed(1)} h</em></div>`).join('');

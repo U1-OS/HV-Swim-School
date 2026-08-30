@@ -6,12 +6,14 @@
   document.querySelectorAll('[data-cart-open]').forEach(button=>button.hidden=true);
   document.querySelectorAll('[data-kit-add]').forEach(button=>{button.disabled=true;button.textContent='Shopify setup required';});
 
-  const CART_KEY = 'hv-swim-v48-preview-cart';
+  const CART_KEY = 'hv-swim-shopify-cart-v1';
   let products = [];
   let activeFilter = 'all';
   let searchTerm = '';
   let sortOrder = 'featured';
   let catalogueSource = 'planned_catalogue';
+  const pageSize = window.matchMedia('(max-width:700px)').matches ? 6 : 9;
+  let visibleLimit = pageSize;
   let cart = loadCart();
   let cartOpener = null;
   let productOpener = null;
@@ -138,8 +140,9 @@
   }
   function render() {
     const visible = visibleProducts();
-    document.getElementById('shop-result-count').textContent = `${visible.length} ${visible.length === 1 ? 'product' : 'products'} showing`;
-    grid.innerHTML = visible.map((product,index) => {
+    const displayed=visible.slice(0,visibleLimit);
+    document.getElementById('shop-result-count').textContent = visible.length ? `Showing ${displayed.length} of ${visible.length} ${visible.length === 1 ? 'product' : 'products'}` : 'No products showing';
+    grid.innerHTML = displayed.map((product,index) => {
       const sizes = sizeList(product);
       const chooseVariant = catalogueSource === 'shopify';
       const available = product.status === 'available';
@@ -148,6 +151,11 @@
       const route = routeFor(product);
       return `<article class="shop-card reveal visible" data-audience="${slug(audienceFor(product))}" style="--reveal-delay:${Math.min(index*45,180)}ms"><button class="shop-product-visual" type="button" data-product-view="${esc(product.id)}" aria-label="View ${esc(product.title)}">${visual(product)}<span class="shop-product-badge">${badge}</span><span class="shop-quick-view">View details <span aria-hidden="true">→</span></span></button><div class="shop-card-copy"><div class="shop-card-heading"><span class="shop-category">${esc(product.category)}</span><span>${esc(audienceFor(product))}</span></div><span class="shop-route-chip route-${slug(product.supplier_route || 'review')}">${esc(route.short)}</span><h3>${esc(product.title)}</h3><p>${esc(product.description)}</p><div class="shop-sizes">${sizes.slice(0,4).map(size=>`<span>${esc(size)}</span>`).join('')||'<span>Final sizing pending</span>'}${sizes.length>4?`<span>+${sizes.length-4}</span>`:''}</div><div class="shop-card-foot"><div>${priceMarkup(product,chooseVariant)}</div><button type="button" class="shop-add-button" data-product-add="${esc(product.id)}" ${!chooseVariant||!available?'disabled':''}>${addLabel} <span aria-hidden="true">${chooseVariant?'→':'◇'}</span></button></div></div></article>`;
     }).join('') || '<div class="empty-state"><strong>Nothing matches that search.</strong><p>Try a different category, or clear the search to see the whole collection.</p><button type="button" class="btn btn-outline btn-small" data-clear-search>Show everything</button></div>';
+    const loadMore=document.getElementById('shop-load-more');
+    const loadMoreCopy=document.getElementById('shop-load-more-copy');
+    const remaining=Math.max(0,visible.length-displayed.length);
+    if(loadMore){loadMore.hidden=remaining===0;}
+    if(loadMoreCopy)loadMoreCopy.textContent=remaining?`${remaining} more ${remaining===1?'product':'products'} in this view`:'';
   }
 
   function addToCart(product,selection,quantity=1,openDrawer=true) {
@@ -174,7 +182,7 @@
   function addKit(kitId) {
     if (catalogueSource === 'shopify') {
       const status=document.getElementById('kit-builder-status');
-      if(status){status.classList.remove('complete');status.innerHTML='<span>→</span><p><strong>Choose options from the live collection.</strong> Sizes and variants must be selected for each product before it can be saved.</p>';}
+      if(status){status.classList.remove('complete');status.innerHTML='<span>→</span><p><strong>Choose options from the live collection.</strong> Sizes and variants must be selected for each product before it can be added to the shopping bag.</p>';}
       document.getElementById('collection')?.scrollIntoView({behavior:'smooth',block:'start'});
       return;
     }
@@ -189,20 +197,19 @@
     const mobileBar=document.querySelector('.shop-mobile-bar');
     if(mobileBar)mobileBar.hidden=itemCount===0;
     const mobileSummary=document.querySelector('[data-cart-summary]');
-    if(mobileSummary)mobileSummary.textContent=`${itemCount} ${itemCount===1?'item':'items'} saved`;
+    if(mobileSummary)mobileSummary.textContent=`${itemCount} ${itemCount===1?'item':'items'} in bag`;
     document.getElementById('cart-subtotal').textContent=money(subtotal);
     const items=document.getElementById('cart-items');
-    if (!cart.length) items.innerHTML='<div class="cart-empty"><span>◇</span><h3>Your saved collection is empty.</h3><p>Choose preferred products and options to create a lesson-day collection list.</p><button class="btn btn-soft" type="button" data-cart-close>Explore the collection</button></div>';
+    if (!cart.length) items.innerHTML='<div class="cart-empty"><span>◇</span><h3>Your shopping bag is empty.</h3><p>Choose an approved product and option from the live Shopify range.</p><button class="btn btn-soft" type="button" data-cart-close>Explore the collection</button></div>';
     else items.innerHTML=cart.map(item=>`<article class="cart-item" data-cart-key="${esc(item.key)}"><div class="cart-item-thumb"><span>${esc((item.title||'H').charAt(0))}</span></div><div class="cart-item-copy"><span>${esc(item.category)}</span><strong>${esc(item.title)}</strong><small>${esc(item.size)} · ${money(item.price_cents)} each</small><div class="cart-item-controls"><button type="button" data-cart-change="-1" aria-label="Decrease ${esc(item.title)} quantity">−</button><b>${item.quantity}</b><button type="button" data-cart-change="1" aria-label="Increase ${esc(item.title)} quantity">+</button><button type="button" data-cart-remove>Remove</button></div></div><strong>${money(Number(item.price_cents)*Number(item.quantity))}</strong></article>`).join('');
     const action=document.getElementById('cart-primary-action');
-    const summary=cart.map(item=>`${item.quantity}× ${item.title} (${item.size})`).join(', ');
     const needsReselection=catalogueSource==='shopify'&&cart.some(item=>!item.variant_id);
-    action.textContent=catalogueSource==='shopify'?'Sign in to review saved items':'Send collection interest';
-    action.href=catalogueSource==='shopify'?'login.html':`enquire.html?${new URLSearchParams({merch:summary||'HV Swim Collection interest'})}`;
+    action.textContent=catalogueSource==='shopify'?'Sign in to continue':'Shopify setup required';
+    action.href=catalogueSource==='shopify'?'login.html':'shop.html#production-routes';
     action.classList.toggle('disabled',!cart.length||needsReselection);
     action.setAttribute('aria-disabled',String(!cart.length||needsReselection));
     if(needsReselection){
-      document.getElementById('cart-mode-copy').textContent='Some saved preview items need to be reselected from the live Shopify catalogue before checkout.';
+      document.getElementById('cart-mode-copy').textContent='Some earlier selections need to be chosen again from the live Shopify catalogue before checkout.';
     }
   }
 
@@ -252,6 +259,7 @@
 
   function setActiveFilter(filter,scroll=false) {
     activeFilter=filter;
+    visibleLimit=pageSize;
     document.querySelectorAll('[data-shop-filter]').forEach(item=>{
       const selected=item.dataset.shopFilter===filter;
       item.classList.toggle('active',selected);
@@ -266,8 +274,9 @@
     setActiveFilter(button.dataset.collectionFilter,true);
   }));
   document.getElementById('kit-grid')?.addEventListener('click',event=>{const button=event.target.closest('[data-kit-add]');if(button)addKit(button.dataset.kitAdd);});
-  document.getElementById('shop-search')?.addEventListener('input',event=>{searchTerm=event.target.value.trim().toLowerCase();render();});
-  document.getElementById('shop-sort')?.addEventListener('change',event=>{sortOrder=event.target.value;render();});
+  document.getElementById('shop-search')?.addEventListener('input',event=>{searchTerm=event.target.value.trim().toLowerCase();visibleLimit=pageSize;render();});
+  document.getElementById('shop-sort')?.addEventListener('change',event=>{sortOrder=event.target.value;visibleLimit=pageSize;render();});
+  document.getElementById('shop-load-more-button')?.addEventListener('click',()=>{const firstNewIndex=visibleLimit;visibleLimit+=pageSize;render();grid.querySelectorAll('[data-product-view]')[firstNewIndex]?.focus();});
   // "Show everything" in the empty state clears both the search and the category filter.
   grid.addEventListener('click',event=>{
     if(!event.target.closest('[data-clear-search]'))return;
@@ -352,7 +361,7 @@
     document.getElementById('shop-source').innerHTML=`<span class="status ${live?'open':'changed'}">${sourceLabel}</span>`;
     document.getElementById('cart-mode-status').className=`status ${live?'open':'changed'}`;
     document.getElementById('cart-mode-status').textContent=live?'Shopify catalogue connected':'Shopify setup required';
-    document.getElementById('cart-mode-copy').textContent=live?'Only sampled and approved Shopify products are visible. Sign in to review saved items.':'Product specifications are visible, but cart and checkout are unavailable.';
+    document.getElementById('cart-mode-copy').textContent=live?'Only sampled and approved Shopify products are visible. Sign in to continue to the shopping bag.':'Product specifications are visible, but cart and checkout are unavailable.';
     document.querySelectorAll('[data-cart-open]').forEach(button=>button.hidden=!live);
     document.querySelectorAll('[data-kit-add]').forEach(button=>{button.disabled=!live;button.textContent=live?'Choose kit products':'Shopify setup required';});
     if(!live){cart=[];saveCart();closeCart();}
@@ -361,5 +370,6 @@
     grid.innerHTML='<div class="empty-state"><strong>The collection is not loading right now.</strong><p>This is a temporary problem on our side. The range is still there — get in touch and the team can talk you through it.</p><a class="btn btn-blue btn-small" href="enquire.html">Talk to the team <span aria-hidden="true">&rarr;</span></a></div>';
     document.getElementById('shop-result-count').textContent='Catalogue temporarily unavailable';
     document.getElementById('shop-source').innerHTML='<span class="status closed">Catalogue unavailable</span>';
+    document.getElementById('shop-load-more').hidden=true;
   }).finally(()=>grid.setAttribute('aria-busy','false'));
 })();

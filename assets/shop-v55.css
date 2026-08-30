@@ -364,6 +364,9 @@ body[data-page="shop"] .shop-toolbar button:hover,
 body[data-page="shop"] .shop-toolbar button.active { border-color:#075f91; background:#075f91; box-shadow:0 8px 18px rgba(7,95,145,.16); }
 body[data-page="shop"] .shop-results-line { margin:0 0 22px; }
 body[data-page="shop"] .shop-grid { gap:24px; }
+body[data-page="shop"] .shop-load-more { margin:32px auto 0; display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap:14px; }
+body[data-page="shop"] .shop-load-more[hidden] { display:none; }
+body[data-page="shop"] .shop-load-more span { color:#647d90; font-size:.68rem; font-weight:750; }
 body[data-page="shop"] .shop-card {
   display:flex;
   flex-direction:column;
