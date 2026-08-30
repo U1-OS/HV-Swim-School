@@ -1029,6 +1029,32 @@ body:not(.certificate-printing) #certificate-print-layer { display:none; }
   .platform-user { display:none; }
 }
 
+.publishing-gates { margin:8px 0 2px; padding:0; border:0; }
+.publishing-gates legend { margin-bottom:10px; color:#31516a; font-size:.68rem; font-weight:900; }
+.publishing-gate { min-width:0; padding:13px; display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:start; gap:12px; border:1px solid #d6e3ea; border-radius:14px; background:#fbfdfe; cursor:pointer; transition:transform .18s,border-color .18s,box-shadow .18s,background .18s; }
+.publishing-gate + .publishing-gate { margin-top:9px; }
+.publishing-gate:hover { transform:translateY(-1px); border-color:#b8d2df; box-shadow:0 8px 20px rgba(5,45,73,.055); }
+.publishing-gate.is-live { border-color:#a8ddca; background:#f2fbf7; }
+.publishing-gate.is-locked { cursor:not-allowed; background:#f4f6f7; }
+.publishing-gate.is-locked:hover { transform:none; border-color:#d6e3ea; box-shadow:none; }
+.publishing-gate-toggle { position:relative; width:38px; height:22px; display:block; }
+.publishing-gate-toggle input { position:absolute; width:1px; height:1px; opacity:0; }
+.publishing-gate-toggle > span { position:absolute; inset:0; border-radius:999px; background:#c8d4dc; box-shadow:inset 0 0 0 1px rgba(33,64,82,.09); transition:background .18s; }
+.publishing-gate-toggle > span::after { content:""; position:absolute; width:16px; height:16px; left:3px; top:3px; border-radius:50%; background:#fff; box-shadow:0 2px 6px rgba(5,36,58,.24); transition:transform .18s; }
+.publishing-gate-toggle input:checked + span { background:#15967d; }
+.publishing-gate-toggle input:checked + span::after { transform:translateX(16px); }
+.publishing-gate-toggle input:focus-visible + span { outline:3px solid rgba(31,172,214,.26); outline-offset:3px; }
+.publishing-gate-toggle input:disabled + span { opacity:.62; }
+.publishing-gate > span:nth-child(2) strong,.publishing-gate > span:nth-child(2) small,.publishing-gate > span:nth-child(2) em { display:block; }
+.publishing-gate > span:nth-child(2) strong { color:#20445e; font-size:.7rem; }
+.publishing-gate > span:nth-child(2) small { margin-top:3px; color:#6b8193; font-size:.57rem; line-height:1.45; }
+.publishing-gate > span:nth-child(2) em { margin-top:7px; color:#45657b; font-size:.54rem; font-style:normal; font-weight:800; }
+.business-settings-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:9px; }
+.business-settings-grid > div { min-width:0; padding:14px; border:1px solid #dce7ed; border-radius:13px; background:#fbfdfe; }
+.business-settings-grid span,.business-settings-grid strong { display:block; }
+.business-settings-grid span { color:#728798; font-size:.52rem; font-weight:900; letter-spacing:.06em; text-transform:uppercase; }
+.business-settings-grid strong { margin-top:5px; overflow-wrap:anywhere; color:#224760; font-size:.67rem; line-height:1.4; }
+
 /* V5.4 role homepages: make the first useful action unmistakable. */
 body[data-login-role] {
   --login-role-accent:#0a86b8;
@@ -1111,6 +1137,7 @@ body[data-login-role] .auth-form .input:focus { border-color:var(--login-role-ac
   .role-action-facts { grid-template-columns:repeat(4,minmax(0,1fr)); }
 }
 @media(max-width:720px) {
+  .business-settings-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
   .role-action-hub { padding:23px 20px; gap:22px; border-radius:20px; }
   .role-action-facts { grid-template-columns:repeat(2,minmax(0,1fr)); }
   .attention-row { grid-template-columns:42px minmax(0,1fr) auto; }
@@ -1118,6 +1145,9 @@ body[data-login-role] .auth-form .input:focus { border-color:var(--login-role-ac
   .attention-value { align-self:start; padding-top:4px; }
 }
 @media(max-width:480px) {
+  .publishing-gate { grid-template-columns:auto minmax(0,1fr); }
+  .publishing-gate > .status { grid-column:2; justify-self:start; }
+  .business-settings-grid { grid-template-columns:1fr; }
   .role-action-buttons { align-items:stretch; flex-direction:column; }
   .role-action-buttons .btn { width:100%; }
   .role-action-facts { grid-template-columns:1fr 1fr; }

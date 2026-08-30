@@ -37,7 +37,7 @@ def expect(label, condition):
 def main():
     public = urllib.request.build_opener()
     status, health = request(public, "/api/health")
-    expect("health endpoint", status == 200 and health.get("version") == "5.6.0")
+    expect("health endpoint", status == 200 and health.get("version") == "5.6.1")
     home_page = public.open(BASE + "/index.html", timeout=30).read().decode("utf-8")
     expect("live homepage day view", "Today at HV Swim" in home_page and "today-grid" in home_page and "staff reading" in home_page)
     about_page = public.open(BASE + "/about.html", timeout=30).read().decode("utf-8")
@@ -50,7 +50,7 @@ def main():
     enquire_page = public.open(BASE + "/enquire.html", timeout=30).read().decode("utf-8")
     expect("guided enrolment concierge", "Four clear steps" in enquire_page and "wizard-class-grid" in enquire_page and "enrolment-success" in enquire_page)
     mobile_shell = public.open(BASE + "/mobile-shell.html", timeout=30).read().decode("utf-8")
-    expect("native mobile launch shell", "Open connected app" in mobile_shell and "V5.6" in mobile_shell)
+    expect("native mobile launch shell", "Open connected app" in mobile_shell and "V5.6.1" in mobile_shell)
     manifest = json.loads(public.open(BASE + "/manifest.webmanifest", timeout=30).read().decode("utf-8"))
     expect("installable app manifest", manifest.get("display") == "standalone" and len(manifest.get("icons", [])) >= 3)
     for path, key in (("/api/public/locations", "locations"), ("/api/classes", "classes")):
@@ -98,7 +98,7 @@ def main():
             status, alerts = request(opener, "/api/admin/alerts")
             expect("management alert publisher", status == 200 and isinstance(alerts.get("alerts"), list))
             status, website = request(opener, "/api/admin/site-settings")
-            expect("admin website editor", status == 200 and website.get("settings", {}).get("primary_cta"))
+            expect("admin website editor", status == 200 and website.get("settings", {}).get("primary_cta") and website.get("feature_controls", {}).get("association_badges", {}).get("can_enable") is False)
             status, inbox = request(opener, "/api/admin/enquiries")
             expect("admin enquiry inbox", status == 200 and isinstance(inbox.get("enquiries"), list))
 

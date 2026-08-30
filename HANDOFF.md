@@ -3,11 +3,11 @@
 Andrew swaps between Claude and Codex. Read this first and rewrite it last.
 
 **Wheel:** Unassigned
-**Last updated:** 2026-08-30 by Codex — V5.6 production upgrade complete
+**Last updated:** 2026-08-30 by Codex — V5.6.1 release-gate upgrade complete
 
 ## Current state
 
-V5.6 is the verified production foundation for the public website, family/staff/
+V5.6.1 is the verified production foundation for the public website, family/staff/
 management workspaces, installable PWA, Capacitor mobile shell, merchandise studio and
 FastAPI service. It preserves the working V5 architecture while substantially tightening
 public truthfulness, responsive polish, operational workflows, legal/business copy,
@@ -20,7 +20,7 @@ real providers. Pool temperatures are staff-verified until a compatible sensor f
 selected. Xero OAuth/readiness exists, but payroll transmission remains locked. SQLite
 and demo accounts are preview-only and must not hold real customer, child or payroll data.
 
-## Delivered in V5.6
+## Delivered in V5.6.1
 
 - Confirmed HVS BENDIGO PTY LTD identity, ABN, business/postal details and primary email
   are carried through the footer, structured data, privacy, terms and handoff material.
@@ -42,6 +42,13 @@ and demo accounts are preview-only and must not hold real customer, child or pay
   Management → Staff compliance now records the AUSTSWIM, SWIM Schools Australia and
   Autism Swim publication rules and official links. No third-party mark is shown without
   current issued artwork and usage evidence.
+- Management → Website content now shows polished release-gate controls for homepage
+  merchandise and qualification/member marks. The server—not only the interface—blocks
+  concept products without approved samples/costs/mappings and blocks association marks
+  without issued artwork, current evidence and usage rights.
+- The Website content workspace also presents the confirmed entity, ABN, primary email,
+  complaint contacts, lesson fee and no-clock-tracking rule as locked source-controlled
+  business settings, avoiding accidental one-page identity changes.
 - The 21-product premium catalogue now has enforceable launch blockers for a physical
   sample, costs, variants, supplier route/reference and Shopify/Printify mapping. Supplier
   costs and private mapping IDs no longer leak through public product responses.
@@ -51,18 +58,21 @@ and demo accounts are preview-only and must not hold real customer, child or pay
 - Service-worker installation is smaller and safer: 14 core assets instead of the former
   full-site precache, runtime caching for pages/assets, network-only authenticated APIs,
   fresh/no-store public alerts and cached public-data fallbacks.
-- V5.6 metadata, mobile/store guides, brand/merch plans, production handoff and automated
+- V5.6.1 asset URLs and cache names force existing installed apps to receive the new
+  management code instead of retaining a cached V5.6 screen.
+- V5.6.1 metadata, mobile/store guides, brand/merch plans, production handoff and automated
   regression checks are aligned.
 
 ## Verification — 30 August 2026
 
-- Python API/security suite: **88 passed, 1 intentionally skipped**.
+- Python API/security suite: **89 passed, 1 intentionally skipped**.
 - Running-server smoke suite: **37 checks passed**.
 - Static site checker: **19 pages, 14 precached files and 8 scripts passed**.
 - JavaScript syntax, whitespace/error checks and Capacitor mobile web-shell build passed.
 - Real-browser desktop and 390×844 mobile walkthrough covered all public pages, shop,
-  sign-in, management command centre and staff-compliance/badge gates. No horizontal
-  overflow, broken visible images or browser console warnings/errors were found.
+  sign-in, management command centre, staff compliance and the new Website content
+  release-gate controls. No horizontal overflow, broken visible images or browser console
+  warnings/errors were found.
 
 ## External work before production
 

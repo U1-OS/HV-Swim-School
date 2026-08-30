@@ -1,4 +1,4 @@
-# HV Swim Bendigo V5.6 Premium Platform
+# HV Swim Bendigo V5.6.1 Premium Platform
 
 Premium public website, installable Progressive Web App and connected operations platform for HV Swim Bendigo. The build combines a polished responsive front end with a FastAPI service, role-based accounts and a SQLite preview database. SQLite is not approved for the final production deployment that will store customer, child or payroll data.
 
@@ -53,7 +53,9 @@ Demo credentials only work while `HV_APP_ENV=development`. Production mode disab
 - Safe CSV exports for enquiries, staff hours and the merchandise catalogue
 - Staff-verified water temperatures, opening checklists and public condition updates
 - Management metrics, roster/class creation, timesheet approvals, communications and audit trail
-- Management website editor for the homepage announcement, enrolment status, hero message and primary call-to-action
+- Management website editor for the homepage announcement, enrolment status, hero message
+  and primary call-to-action, plus server-enforced release gates for merchandise and
+  third-party qualification/member marks
 - Management account and swimmer provisioning with a mandatory first password change
 - Enquiry inbox with new, contacted, trial-booked and closed follow-up stages
 - Asynchronous public support tickets with a returned reference and staff queue; the widget is not live chat or an emergency channel, and no external support email is sent yet

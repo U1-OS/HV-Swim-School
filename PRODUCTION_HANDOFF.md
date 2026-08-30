@@ -119,8 +119,9 @@ Before displaying organisation logos or badges, complete
 `ASSOCIATION_BADGE_REQUIREMENTS.md`: obtain the exact current member/provider artwork
 issued through HV Swim's own account, record the renewal/expiry evidence and confirm the
 applicable usage rights. The public badge block is deliberately disabled by default, and
-the Management → Staff compliance screen records the publication gate and official
-requirement links. Do not scrape, redraw, recolour or use generic corporate logos as
+the Management → Staff compliance screen records the official requirement links. The
+Management → Website content release control also stays server-locked until those external
+requirements are complete. Do not scrape, redraw, recolour or use generic corporate logos as
 substitute membership badges. Do not publish personal AUSTSWIM, SWIM or Autism Swim
 qualifications for Laura or another instructor without a current certificate/licence type,
 issuing body and expiry date.

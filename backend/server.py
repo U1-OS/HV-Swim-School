@@ -132,7 +132,7 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(
     title="HV Swim Bendigo Platform API",
-    version="5.6.0",
+    version="5.6.1",
     docs_url="/api/docs" if not settings.production else None,
     openapi_url="/openapi.json" if not settings.production else None,
     redoc_url=None,
@@ -509,6 +509,8 @@ class SiteSettingsInput(BaseModel):
     hero_accent: str = Field(min_length=3, max_length=80)
     hero_intro: str = Field(min_length=20, max_length=360)
     primary_cta: str = Field(min_length=3, max_length=50)
+    feature_merch_home: bool = False
+    feature_association_badges: bool = False
 
 
 class ProductUpdateInput(BaseModel):
@@ -890,7 +892,49 @@ def integration_summary(db: sqlite3.Connection) -> list[dict[str, Any]]:
 def site_settings_payload(db: sqlite3.Connection) -> dict[str, Any]:
     settings_rows = {row["key"]: row["value"] for row in db.execute("SELECT key,value FROM site_settings")}
     settings_rows["announcement_enabled"] = settings_rows.get("announcement_enabled") == "1"
+    settings_rows["feature_merch_home"] = settings_rows.get("feature_merch_home") == "1"
+    settings_rows["feature_association_badges"] = settings_rows.get("feature_association_badges") == "1"
     return settings_rows
+
+
+def public_feature_controls(db: sqlite3.Connection) -> dict[str, dict[str, Any]]:
+    """Report requested and effective public features with their production launch gates."""
+    raw = {row["key"]: row["value"] for row in db.execute("SELECT key,value FROM site_settings")}
+    catalogue = rows(
+        db.execute(
+            """SELECT id,price_cents,cost_cents,status,sample_status,sizes,supplier_route,
+                      shopify_gid,printify_product_id,supplier_reference
+               FROM products"""
+        )
+    )
+    public_ready_products = sum(
+        1 for product in catalogue
+        if product.get("status") == "available" and not product_launch_blockers(product)
+    )
+    merch_requested = raw.get("feature_merch_home") == "1"
+    badge_requested = raw.get("feature_association_badges") == "1"
+    merch_ready = public_ready_products > 0
+
+    return {
+        "merch_home": {
+            "requested": merch_requested,
+            "effective_enabled": merch_requested and merch_ready,
+            "can_enable": merch_ready,
+            "ready_items": public_ready_products,
+            "reason": (
+                f"{public_ready_products} sampled, costed and mapped product{'s' if public_ready_products != 1 else ''} ready for publication."
+                if merch_ready
+                else "No product has passed the physical-sample, cost, supplier and Shopify mapping gates."
+            ),
+        },
+        "association_badges": {
+            "requested": badge_requested,
+            "effective_enabled": False,
+            "can_enable": False,
+            "ready_items": 0,
+            "reason": "Current issued badge files, renewal evidence and recorded usage rights are still required.",
+        },
+    }
 
 
 def csv_download(filename: str, headings: list[str], records: list[list[Any]]) -> Response:
@@ -913,17 +957,17 @@ def renumber_waitlist(db: sqlite3.Connection, class_id: int) -> None:
 
 @app.get("/api/health")
 def health() -> dict[str, Any]:
-    return {"ok": True, "service": "HV Swim Bendigo", "version": "5.6.0", "environment": settings.app_env, "time": now_iso()}
+    return {"ok": True, "service": "HV Swim Bendigo", "version": "5.6.1", "environment": settings.app_env, "time": now_iso()}
 
 
 @app.get("/api/public/site-settings")
 def public_site_settings() -> dict[str, Any]:
     with db_session() as db:
         public_settings = site_settings_payload(db)
-        features = {
-            "merch_home": public_settings.pop("feature_merch_home", "0") == "1",
-            "association_badges": public_settings.pop("feature_association_badges", "0") == "1",
-        }
+        controls = public_feature_controls(db)
+        public_settings.pop("feature_merch_home", None)
+        public_settings.pop("feature_association_badges", None)
+        features = {key: bool(value["effective_enabled"]) for key, value in controls.items()}
         return {
             "settings": public_settings,
             "mode": "production" if settings.production else "preview",
@@ -2022,7 +2066,18 @@ def export_timesheets(request: Request, user: dict[str, Any] = Depends(require_r
 @app.get("/api/admin/site-settings")
 def admin_site_settings(user: dict[str, Any] = Depends(require_roles("admin"))) -> dict[str, Any]:
     with db_session() as db:
-        return {"settings": site_settings_payload(db)}
+        return {
+            "settings": site_settings_payload(db),
+            "feature_controls": public_feature_controls(db),
+            "confirmed_business": {
+                "legal_name": "HVS BENDIGO PTY LTD",
+                "abn": "46 687 937 962",
+                "email": "bendigo@hvswimschool.com",
+                "complaints_contacts": "Paul and Laura Smith",
+                "lesson_fee": "$22.50 per lesson · term billing",
+                "clock_tracking": "Not used",
+            },
+        }
 
 
 @app.patch("/api/admin/site-settings")
@@ -2031,10 +2086,17 @@ def update_site_settings(payload: SiteSettingsInput, request: Request, user: dic
     values = payload.model_dump()
     values["announcement_enabled"] = "1" if values["announcement_enabled"] else "0"
     with db_session() as db:
+        feature_controls = public_feature_controls(db)
+        if payload.feature_merch_home and not feature_controls["merch_home"]["can_enable"]:
+            raise HTTPException(status_code=409, detail=feature_controls["merch_home"]["reason"])
+        if payload.feature_association_badges and not feature_controls["association_badges"]["can_enable"]:
+            raise HTTPException(status_code=409, detail=feature_controls["association_badges"]["reason"])
+        values["feature_merch_home"] = "1" if payload.feature_merch_home else "0"
+        values["feature_association_badges"] = "1" if payload.feature_association_badges else "0"
         for key, value in values.items():
             db.execute("INSERT INTO site_settings(key,value,updated_by,updated_at) VALUES(?,?,?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_by=excluded.updated_by,updated_at=excluded.updated_at", (key, str(value), user["id"], now_iso()))
         audit(db, user["id"], "update_public_website", "site_settings", "homepage", {"fields": list(values)}, client_ip(request))
-        return {"saved": True, "settings": site_settings_payload(db)}
+        return {"saved": True, "settings": site_settings_payload(db), "feature_controls": public_feature_controls(db)}
 
 
 @app.get("/api/admin/enquiries")

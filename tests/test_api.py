@@ -78,6 +78,86 @@ def test_public_site_mode_and_sensitive_features_fail_closed(client):
     assert "feature_merch_home" not in payload["settings"]
 
 
+def test_management_feature_controls_enforce_real_launch_gates(client):
+    from backend.database import db_session
+
+    client.cookies.clear()
+    csrf = sign_in(client, ADMIN)
+    admin_response = client.get("/api/admin/site-settings")
+    assert admin_response.status_code == 200
+    admin_payload = admin_response.json()
+    assert admin_payload["confirmed_business"]["abn"] == "46 687 937 962"
+    assert admin_payload["confirmed_business"]["clock_tracking"] == "Not used"
+    assert admin_payload["feature_controls"]["merch_home"]["can_enable"] is False
+    assert admin_payload["feature_controls"]["association_badges"]["can_enable"] is False
+
+    settings = admin_payload["settings"]
+    update_payload = {
+        "announcement_enabled": settings["announcement_enabled"],
+        "announcement_text": settings["announcement_text"],
+        "enrolment_status": settings["enrolment_status"],
+        "hero_eyebrow": settings["hero_eyebrow"],
+        "hero_heading": settings["hero_heading"],
+        "hero_accent": settings["hero_accent"],
+        "hero_intro": settings["hero_intro"],
+        "primary_cta": settings["primary_cta"],
+        "feature_merch_home": False,
+        "feature_association_badges": True,
+    }
+    association_blocked = client.patch(
+        "/api/admin/site-settings", json=update_payload, headers={"X-CSRF-Token": csrf}
+    )
+    assert association_blocked.status_code == 409
+    assert "issued badge files" in association_blocked.json()["detail"]
+
+    update_payload["feature_association_badges"] = False
+    update_payload["feature_merch_home"] = True
+    merch_blocked = client.patch(
+        "/api/admin/site-settings", json=update_payload, headers={"X-CSRF-Token": csrf}
+    )
+    assert merch_blocked.status_code == 409
+    assert "physical-sample" in merch_blocked.json()["detail"]
+
+    with db_session() as db:
+        original = dict(
+            db.execute(
+                """SELECT id,price_cents,cost_cents,status,sample_status,sizes,supplier_route,
+                          shopify_gid,printify_product_id,supplier_reference
+                   FROM products ORDER BY id LIMIT 1"""
+            ).fetchone()
+        )
+        db.execute(
+            """UPDATE products SET price_cents=6500,cost_cents=3000,status='available',
+                      sample_status='approved',sizes='[\"Standard\"]',supplier_route='printify',
+                      shopify_gid='gid://shopify/Product/test-ready',printify_product_id='printify-ready',
+                      supplier_reference=NULL WHERE id=?""",
+            (original["id"],),
+        )
+    try:
+        published = client.patch(
+            "/api/admin/site-settings", json=update_payload, headers={"X-CSRF-Token": csrf}
+        )
+        assert published.status_code == 200, published.text
+        assert published.json()["feature_controls"]["merch_home"]["effective_enabled"] is True
+        assert client.get("/api/public/site-settings").json()["features"]["merch_home"] is True
+    finally:
+        with db_session() as db:
+            db.execute(
+                """UPDATE products SET price_cents=?,cost_cents=?,status=?,sample_status=?,sizes=?,
+                          supplier_route=?,shopify_gid=?,printify_product_id=?,supplier_reference=?
+                   WHERE id=?""",
+                (
+                    original["price_cents"], original["cost_cents"], original["status"],
+                    original["sample_status"], original["sizes"], original["supplier_route"],
+                    original["shopify_gid"], original["printify_product_id"],
+                    original["supplier_reference"], original["id"],
+                ),
+            )
+            db.execute("UPDATE site_settings SET value='0' WHERE key='feature_merch_home'")
+            db.execute("UPDATE site_settings SET value='0' WHERE key='feature_association_badges'")
+        client.cookies.clear()
+
+
 def test_public_site_serves_only_explicitly_approved_files(client):
     for path in ("/", "/index.html", "/assets/styles.css", "/service-worker.js", "/robots.txt", "/favicon.ico"):
         assert client.get(path).status_code == 200, path
