@@ -4,7 +4,7 @@
 
 - Proposed app name: **HV Swim Bendigo**
 - Proposed bundle/application ID: `au.com.hvswimbendigo.mobile`
-- Release line: `5.10.0`
+- Release line: `5.10.1`
 - Category: Education / Sports
 - Primary audience: HV Swim families, staff and management
 

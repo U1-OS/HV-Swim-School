@@ -462,11 +462,13 @@ def test_public_files_support_head_for_probes_and_crawlers(client):
 
 
 def test_security_policy_allows_only_the_opt_in_facebook_frame(client):
-    policy = client.get("/index.html").headers.get("content-security-policy", "")
+    response = client.get("/index.html")
+    policy = response.headers.get("content-security-policy", "")
     assert "script-src 'self'" in policy
     assert "connect-src 'self'" in policy
     assert "frame-src https://www.facebook.com" in policy
     assert "frame-ancestors 'self'" in policy
+    assert response.headers.get("permissions-policy") == "camera=(), microphone=(), geolocation=()"
 
 
 def test_native_app_origin_can_reach_the_api(client):

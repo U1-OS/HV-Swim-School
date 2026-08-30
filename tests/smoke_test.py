@@ -37,7 +37,7 @@ def expect(label, condition):
 def main():
     public = urllib.request.build_opener()
     status, health = request(public, "/api/health")
-    expect("health endpoint", status == 200 and health.get("version") == "5.10.0")
+    expect("health endpoint", status == 200 and health.get("version") == "5.10.1")
     status, account_providers = request(public, "/api/auth/oauth/providers")
     expect(
         "family Google and Apple account boundary",
@@ -53,7 +53,7 @@ def main():
     programs_page = public.open(BASE + "/programs.html", timeout=30).read().decode("utf-8")
     expect("premium programs and pricing page", "Every swimmer has" in programs_page and "Guided lesson matcher" in programs_page and "program-availability" in programs_page)
     shop_page = public.open(BASE + "/shop.html", timeout=30).read().decode("utf-8")
-    expect("premium commerce storefront", "Saved collection" in shop_page and "The right maker for every item" in shop_page and "cart-drawer" in shop_page)
+    expect("premium commerce storefront", "Shopping bag" in shop_page and "The right maker for every item" in shop_page and "shop-load-more" in shop_page and "cart-drawer" in shop_page)
     expect("embroidered towels and POD shop", "The towel edit" in shop_page and "POD family wear" in shop_page and "Printify → Shopify" in shop_page)
     expect("guided merchandise kit builder", "First Splash Kit" in shop_page and "Lesson Day Kit" in shop_page and "data-kit-add" in shop_page and "Size it, care for it" in shop_page)
     enquire_page = public.open(BASE + "/enquire.html", timeout=30).read().decode("utf-8")

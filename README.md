@@ -1,4 +1,4 @@
-# HV Swim Bendigo V5.10.0 Premium Platform
+# HV Swim Bendigo V5.10.1 Premium Platform
 
 Premium public website and connected operations platform for HV Swim Bendigo. The build combines a polished responsive front end with a FastAPI service, role-based accounts and a SQLite preview database. SQLite is not approved for the final production deployment that will store customer, child or payroll data.
 
@@ -54,7 +54,7 @@ Demo credentials only work while `HV_APP_ENV=development`. Production mode disab
 - Management enrolment desk with today's run sheet, weekly capacity board and audited waitlist promotion
 - Management term operations with draft/active/closed calendars, absence-credit ledger,
   term-aware “today” schedules and all-staff lesson-register oversight
-- Responsive website navigation tailored to family, staff and management roles
+- Responsive, searchable website navigation tailored to family, staff and management roles
 - Location manager for public status, venue details, parking and accessibility information
 - Safe CSV exports for enquiries, staff hours and the merchandise catalogue
 - Staff-verified water temperatures, opening checklists and public condition updates
@@ -70,7 +70,7 @@ Demo credentials only work while `HV_APP_ENV=development`. Production mode disab
 - Family-visible swimmer achievements with evidence, staff-private notes, audited issue/revocation and eight printable certificate styles that are not qualifications or accreditation
 - Family-controlled in-portal lesson reminders plus urgent pool-closure and changed-condition alerts that poll while a website page is open; email/SMS and off-device push are not active
 - Management merchandise workspace for the premium 24-product plan, with sample tracking, supplier routes, costs, projected margin and quantified launch readiness
-- Guided First Splash, Lesson Day and Family Club product plans that remain non-orderable until the approved Shopify catalogue is connected
+- Guided First Splash, Lesson Day and Family Club product plans that remain non-orderable until the approved Shopify catalogue is connected, with progressive product loading for faster mobile browsing
 - Role-protected staff uniform catalogue available only inside the Staff and Management workspaces; staff products are excluded from the public product API
 - Product material, care and personalisation guidance with explicit sample-approval boundaries
 - Local catalogue price/status controls before products are approved for Shopify

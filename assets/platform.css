@@ -630,6 +630,14 @@
 .platform-sidebar > * { position:relative; }
 .side-label { margin:0 14px 13px; color:#708ca8; font-size:.57rem; letter-spacing:.18em; }
 .platform-nav { gap:5px; }
+.platform-nav-search { position:relative; display:block; margin:0 5px 17px; }
+.platform-nav-search > span:not(.sr-only) { position:absolute; z-index:1; left:13px; top:50%; color:#72bcd0; font-size:1rem; transform:translateY(-52%); pointer-events:none; }
+.platform-nav-search input { width:100%; min-height:43px; padding:0 13px 0 37px; border:1px solid rgba(var(--portal-accent-rgb),.15); border-radius:13px; color:#eef8fc; background:rgba(255,255,255,.055); font:inherit; font-size:.68rem; font-weight:750; outline:0; }
+.platform-nav-search input::placeholder { color:#8099af; opacity:1; }
+.platform-nav-search input:hover { border-color:rgba(var(--portal-accent-rgb),.3); background:rgba(255,255,255,.075); }
+.platform-nav-search input:focus-visible { border-color:var(--portal-accent); box-shadow:0 0 0 3px rgba(var(--portal-accent-rgb),.17); }
+.platform-nav-search input::-webkit-search-cancel-button { filter:invert(1); opacity:.65; }
+.platform-nav-empty { margin:11px 10px 20px; padding:13px; border:1px solid rgba(255,255,255,.08); border-radius:12px; color:#9bb0c4; background:rgba(255,255,255,.03); font-size:.65rem; text-align:center; }
 .platform-nav button {
   position:relative;
   min-height:47px;

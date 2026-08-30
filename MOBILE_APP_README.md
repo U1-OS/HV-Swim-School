@@ -1,4 +1,4 @@
-# HV Swim Bendigo mobile app · paused after V5.10.0
+# HV Swim Bendigo mobile app · paused after V5.10.1
 
 > **Not part of the current website release.** The public app and mobile-shell routes are
 > disabled while HV Swim focuses on the website. This source is retained only so a later,
@@ -47,8 +47,9 @@ The launcher detects missing Node.js. Xcode and Android Studio still need to be 
 
 - Replace demo accounts and migrate approved production data.
 - Complete privacy, child-safeguarding, retention and account-deletion policies.
-- Configure production email/SMS/Web Push/APNs/FCM providers and notification consent. V5.10.0 browser alerts update while the site is open; background native delivery is not claimed yet.
-- Test denied geolocation, offline mode, expired sessions and password recovery.
+- Configure production email/SMS/Web Push/APNs/FCM providers and notification consent. V5.10.1 browser alerts update while the site is open; background native delivery is not claimed yet.
+- Test offline mode, expired sessions and password recovery. Geolocation is disabled because
+  the staff clock uses a selected workplace rather than GPS or background location.
 - Add native screenshots, store copy, support contact and privacy disclosures.
 - Test iPhone, iPad and Android physical devices before beta distribution.
 - Use TestFlight and a closed Google Play testing track before public release.
