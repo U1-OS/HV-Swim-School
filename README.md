@@ -1,4 +1,4 @@
-# HV Swim Bendigo V5.6.2 Premium Platform
+# HV Swim Bendigo V5.7.0 Premium Platform
 
 Premium public website, installable Progressive Web App and connected operations platform for HV Swim Bendigo. The build combines a polished responsive front end with a FastAPI service, role-based accounts and a SQLite preview database. SQLite is not approved for the final production deployment that will store customer, child or payroll data.
 
@@ -41,10 +41,16 @@ Demo credentials only work while `HV_APP_ENV=development`. Production mode disab
 
 - PBKDF2 password hashing, HttpOnly sessions, CSRF protection, rate limiting and role permissions
 - Family swimmers, class availability, bookings, cancellations, waitlists and notices
+- Family absence reporting against the active term calendar, with a visible two-credit
+  allowance per swimmer and an explicit no-make-up/no-automatic-refund boundary
 - Filtered family class finder with live capacity meters and visible waitlist positions
 - Staff rosters, reviewed timesheets, pool checks, achievements and qualification tracking without clock-in tracking
+- Date-based staff lesson registers with attendance, family-reported absence status,
+  parent/guardian-on-site enforcement, photo-clearance snapshots and privacy-limited notes
 - Source-labelled management dashboard with class utilisation, enquiry workload, hours pipeline and pool readiness
 - Management enrolment desk with today's run sheet, weekly capacity board and audited waitlist promotion
+- Management term operations with draft/active/closed calendars, absence-credit ledger,
+  term-aware “today” schedules and all-staff lesson-register oversight
 - App-style mobile tab navigation tailored to family, staff and management roles
 - Native-ready Capacitor 8 launch shell for iOS and Android
 - Safe-area layouts, offline public-data cache and honest connection status
@@ -76,6 +82,9 @@ Demo credentials only work while `HV_APP_ENV=development`. Production mode disab
 - Role-specific family and staff next-action hubs plus a management attention queue built from existing API data
 - Cached Shopify storefront/cart and Printify catalogue boundaries
 - Xero OAuth connection, staff mapping and an audited payroll-readiness preview; outbound payroll transmission remains locked until real pay periods and idempotent export tracking are implemented
+- Explicit payment routing: lesson/term charges and approved absence-credit adjustments
+  belong to the reviewed Xero invoicing workflow; merchandise and uniforms belong to
+  Shopify Checkout. Neither route fabricates payments when credentials or launch gates are incomplete.
 - VistaPrint/manual and specialist-swim supplier plans for products unsuitable for generic POD
 - PWA manifest, app icons, offline public shell and mobile-first interfaces
 - Refined transparent HV Swim logo system, simplified digital mark, refreshed social image,
@@ -93,7 +102,7 @@ The 21 merchandise records are a production plan, not available stock. Every pro
 
 Support messages currently enter the protected management queue and return a reference; external email delivery is not implemented. Urgent notices refresh on active website/app pages, but reaching a device while the site or app is closed still requires a consented production provider, device-token handling and working Web Push/APNs/FCM adapter.
 
-The direct management entry is `http://127.0.0.1:8765/login.html?role=admin`. In development, the page can load the Management demo account from the local server. Production never exposes demo credentials. After signing in, use **Website content** for approved homepage fields, **Enquiry inbox** for family follow-up and **Merchandise** for the launch catalogue.
+The direct management entry is `http://127.0.0.1:8765/login.html?role=admin`. In development, the page can load the Management demo account from the local server. Production never exposes demo credentials. After signing in, use **Term operations** for approved calendar dates and credit oversight, **Lesson registers** for attendance review, **Website content** for approved homepage fields, **Enquiry inbox** for family follow-up and **Merchandise** for the launch catalogue.
 
 Pool water temperature is not inferred from outdoor weather. It remains a daily staff-verified reading unless the venue supplies a compatible sensor feed.
 

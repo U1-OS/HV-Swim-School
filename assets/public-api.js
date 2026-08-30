@@ -40,13 +40,14 @@
   if (availability) {
     availability.setAttribute('aria-busy', 'true');
     getClasses().then(payload => {
-      const open = (payload.classes || []).filter(item => Number(item.available) > 0).slice(0, 6);
+      const term=payload.term_calendar||{};
+      const open = term.configured&&term.in_session?(payload.classes || []).filter(item => Number(item.available) > 0).slice(0, 6):[];
       availability.innerHTML = open.map((item, index) => {
         const time = classTime(item.start_time);
         const query = new URLSearchParams({program:item.title,class:`${days[item.weekday]} ${time} at ${item.location_name}`});
         return `<article class="availability-card reveal visible" style="--reveal-delay:${Math.min(index * 60, 240)}ms"><span class="class-day">${esc(days[item.weekday])} · ${esc(time)}</span><h3>${esc(item.title)}</h3><p>${esc(item.level)} · ${esc(item.duration_minutes)} minutes<br>${esc(item.location_name)}</p><div class="availability-card-foot"><div><strong>${item.available} ${item.available === 1 ? 'place' : 'places'} showing</strong><span>${new Intl.NumberFormat('en-AU',{style:'currency',currency:'AUD'}).format(Number(item.price || 0))} per lesson · confirmed before enrolment</span></div><a class="text-link" href="enquire.html?${query}">Enquire</a></div></article>`;
       }).join('') || '<div class="empty-state"><strong>No classes are showing places right now.</strong><p>Places can reopen as families change days. Send an enquiry and the team will check the current timetable for you.</p><a class="btn btn-blue btn-small" href="enquire.html">Join the list <span aria-hidden="true">&rarr;</span></a></div>';
-      document.getElementById('availability-source').textContent = 'Current published places are shown here. Lessons are $22.50 each, charged by the term and due on enrolment; HV Swim confirms class fit before the place is finalised.';
+      document.getElementById('availability-source').textContent = term.configured&&term.in_session?'Current in-term places are shown here. Lessons are $22.50 each, charged by the term and due on enrolment through the approved Xero invoicing workflow; HV Swim confirms class fit before the place is finalised.':term.configured?'Today is outside the published term. Send an enquiry and the team will confirm the next enrolment window.':'Management term dates have not been published yet. Send an enquiry and the team will confirm the next enrolment window.';
     }).catch(() => {
       availability.innerHTML = '<div class="empty-state"><strong>Class times are not loading right now.</strong><p>This is a temporary connection problem, not a sign that classes are full. Tell us what you need and the team will check what is open.</p><a class="btn btn-blue btn-small" href="enquire.html">Find a lesson <span aria-hidden="true">&rarr;</span></a></div>';
       const badge = document.getElementById('availability-connection');
@@ -112,12 +113,13 @@
 
     if (classResult.status === 'fulfilled') {
       const now = currentMelbourneTime();
-      const open = (classResult.value.classes || []).filter(item => Number(item.available) > 0).map(item => {
+      const term=classResult.value.term_calendar||{};
+      const open = term.configured&&term.in_session?(classResult.value.classes || []).filter(item => Number(item.available) > 0).map(item => {
         const [hour, minute] = String(item.start_time).split(':').map(Number);
         let dayDelta = (Number(item.weekday) - now.day + 7) % 7;
         if (dayDelta === 0 && hour * 60 + minute <= now.minutes) dayDelta = 7;
         return {...item, sort:dayDelta * 1440 + hour * 60 + minute};
-      }).sort((a,b) => a.sort - b.sort);
+      }).sort((a,b) => a.sort - b.sort):[];
       const next = open[0];
       if (next) {
         const time = classTime(next.start_time);
@@ -126,7 +128,7 @@
         document.getElementById('today-class-link').href = `enquire.html?${new URLSearchParams({program:next.title,class:`${days[next.weekday]} ${time} at ${next.location_name}`})}`;
       } else {
         document.getElementById('today-class-title').textContent = 'Ask the team';
-        document.getElementById('today-class-detail').textContent = 'No open class is currently showing online.';
+        document.getElementById('today-class-detail').textContent = term.configured?(term.in_session?'No open class is currently showing online.':'Today is outside the published term.'):'Term dates are awaiting management publication.';
       }
     } else {
       document.getElementById('today-class-title').textContent = 'Ask the team';

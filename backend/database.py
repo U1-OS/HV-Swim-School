@@ -110,6 +110,44 @@ CREATE TABLE IF NOT EXISTS bookings (
   status TEXT NOT NULL CHECK (status IN ('confirmed','cancelled','completed')),
   created_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS school_terms (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  start_date TEXT NOT NULL,
+  end_date TEXT NOT NULL,
+  absence_credit_limit INTEGER NOT NULL DEFAULT 2 CHECK (absence_credit_limit BETWEEN 0 AND 10),
+  status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','active','closed')),
+  source TEXT NOT NULL DEFAULT 'management' CHECK (source IN ('management','preview')),
+  created_by INTEGER REFERENCES users(id),
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  CHECK (end_date >= start_date)
+);
+CREATE TABLE IF NOT EXISTS absence_reports (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  booking_id INTEGER NOT NULL REFERENCES bookings(id),
+  term_id INTEGER NOT NULL REFERENCES school_terms(id),
+  occurrence_date TEXT NOT NULL,
+  reason_category TEXT NOT NULL CHECK (reason_category IN ('illness','family','school','other')),
+  credit_status TEXT NOT NULL CHECK (credit_status IN ('credited','recorded_no_credit','withdrawn')),
+  reported_by INTEGER NOT NULL REFERENCES users(id),
+  reported_at TEXT NOT NULL,
+  UNIQUE (booking_id, occurrence_date)
+);
+CREATE TABLE IF NOT EXISTS lesson_attendance (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  booking_id INTEGER NOT NULL REFERENCES bookings(id),
+  term_id INTEGER NOT NULL REFERENCES school_terms(id),
+  occurrence_date TEXT NOT NULL,
+  attendance_status TEXT NOT NULL CHECK (attendance_status IN ('present','absent','late','excused')),
+  parent_onsite_confirmed INTEGER,
+  photo_clearance_snapshot INTEGER NOT NULL DEFAULT 0,
+  private_note TEXT,
+  recorded_by INTEGER NOT NULL REFERENCES users(id),
+  recorded_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  UNIQUE (booking_id, occurrence_date)
+);
 CREATE TABLE IF NOT EXISTS waitlist (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   class_id INTEGER NOT NULL REFERENCES classes(id),
@@ -330,6 +368,10 @@ CREATE TABLE IF NOT EXISTS audit_log (
 );
 CREATE INDEX IF NOT EXISTS idx_sessions_expiry ON sessions(expires_at);
 CREATE INDEX IF NOT EXISTS idx_bookings_class ON bookings(class_id, status);
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_active_school_term ON school_terms(status) WHERE status='active';
+CREATE INDEX IF NOT EXISTS idx_school_terms_dates ON school_terms(start_date,end_date,status);
+CREATE INDEX IF NOT EXISTS idx_absence_reports_term ON absence_reports(term_id,credit_status,occurrence_date);
+CREATE INDEX IF NOT EXISTS idx_lesson_attendance_date ON lesson_attendance(occurrence_date,booking_id);
 CREATE INDEX IF NOT EXISTS idx_pool_readings_location ON pool_readings(location_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_notification_receipts_user ON notification_receipts(user_id, read_at DESC);
@@ -486,6 +528,12 @@ def initialise_database() -> None:
         }.items():
             if column not in user_columns:
                 db.execute(f"ALTER TABLE users ADD COLUMN {column} {definition}")
+        attendance_columns = {row[1] for row in db.execute("PRAGMA table_info(lesson_attendance)")}
+        if "term_id" not in attendance_columns:
+            # V5.7 preview databases created during development may have register rows
+            # without this historical link. New writes always supply it; a production
+            # migration can reconcile any pre-release rows before enforcing NOT NULL.
+            db.execute("ALTER TABLE lesson_attendance ADD COLUMN term_id INTEGER REFERENCES school_terms(id)")
         created = now_iso()
         association_credentials = (
             (
@@ -651,6 +699,26 @@ def initialise_database() -> None:
         # The confirmed business fee is $22.50 for every lesson. Keep existing preview
         # databases aligned before the early return as well as seeding new databases.
         db.execute("UPDATE classes SET price_cents=2250")
+        # Development needs enough calendar data to exercise absence and lesson-register
+        # workflows, but invented term dates must never appear as production truth. The
+        # preview term is deliberately labelled and is only created outside production.
+        if not settings.production and not db.execute("SELECT 1 FROM school_terms LIMIT 1").fetchone():
+            today = business_today()
+            db.execute(
+                """INSERT INTO school_terms(
+                       name,start_date,end_date,absence_credit_limit,status,source,created_at,updated_at
+                   ) VALUES(?,?,?,?,?,?,?,?)""",
+                (
+                    "Preview operating term",
+                    (today - timedelta(days=7)).isoformat(),
+                    (today + timedelta(days=84)).isoformat(),
+                    2,
+                    "active",
+                    "preview",
+                    created,
+                    created,
+                ),
+            )
         if db.execute("SELECT COUNT(*) FROM users").fetchone()[0]:
             return
         if settings.production:

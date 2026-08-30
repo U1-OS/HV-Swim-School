@@ -56,6 +56,13 @@ with HV Swim before production deployment.
 ## 3. Existing Xero organisation
 
 - Register a private Xero OAuth application and add its client ID, secret and callback URL.
+- Use Xero as the financial route for lesson enrolments, term invoices and any approved
+  absence-credit adjustment. Shopify is reserved for merchandise and uniforms; do not mix
+  lesson fees into the Shopify cart.
+- Implement and review Xero contact matching, invoice creation, GST/tax settings, payment
+  service configuration, idempotency, reconciliation and credit-note handling before the
+  management readiness matrix can be treated as live. The current term/absence workflow
+  records eligibility only and never changes an invoice automatically.
 - Map HV Swim staff to Xero employee and payroll-calendar IDs in the management workspace and confirm the earnings rate.
 - Use the audited readiness preview to identify incomplete mappings. It never transmits payroll data.
 - Import Xero pay-period boundaries and implement idempotent export tracking against the current AU Payroll API before any live transmission is enabled. `XERO_SYNC_ENABLED` is intentionally not sufficient to bypass this lock.
@@ -65,6 +72,8 @@ with HV Swim before production deployment.
 
 - Treat all 21 premium catalogue records as planned until each product passes the release gates below; a public concept card or saved-list entry is not inventory or an offer to supply.
 - Use Shopify as the customer-facing source of truth for products, variants, stock, checkout, GST and refunds.
+- Keep Shopify Checkout scoped to approved merchandise and staff uniforms. Lesson and term
+  payments stay in the Xero invoicing route.
 - Connect Printify to Shopify for suitable on-demand garments and accessories. Keep Printify order approval manual during sampling and launch.
 - Use VistaPrint/manual ordering for selected embroidered uniforms, bottles and bulk promotional products where it wins on quality or price.
 - Use a specialist swim supplier for chlorine-resistant swimwear, silicone caps, goggles and any item whose safety or durability cannot be assured by generic POD.
@@ -98,7 +107,12 @@ with HV Swim before production deployment.
 
 - Add an Open-Meteo commercial customer API key for production. The free endpoint is used only for local development.
 - Keep the server-side cache enabled so each visitor does not create a new provider request.
-- Add approved term dates, public holidays, venue closures and one-off lesson exceptions before treating recurring “today” class suggestions as an authoritative operating run sheet.
+- Enter and activate approved term dates under Management → Term operations. The platform
+  now suppresses “today” classes outside the active term and uses those dates for family
+  absence credits and staff lesson registers. The bundled development term is visibly
+  labelled preview-only and is never seeded in production.
+- Add approved public holidays, venue closures and one-off lesson exceptions before treating
+  the recurring in-term “today” class suggestions as a fully authoritative operating run sheet.
 
 ## 8. Associations, public directories and third-party marks
 
