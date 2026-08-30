@@ -135,6 +135,7 @@
       </dialog>`;
 
     document.body.append(widget);
+    document.body.classList.add('hv-support-present');
     if (document.querySelector('.mobile-book-bar, .shop-mobile-bar')) {
       document.body.classList.add('hv-support-has-mobile-bar');
     }

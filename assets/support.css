@@ -442,3 +442,11 @@ body.hv-support-lock { overflow: hidden; }
   .hv-support-secondary { transition-duration: .01ms !important; }
 }
 .hv-support-form { display:grid; gap:14px; }
+
+/* Keep the desktop help launcher clear of the verified-condition hero card. */
+@media (min-width:721px) and (max-width:1399px) {
+  body.hv-support-present[data-page="home"] .hero-float { display:none; }
+}
+@media (min-width:1400px) and (max-width:1699px) {
+  body.hv-support-present[data-page="home"] .hero-float { right:230px; }
+}

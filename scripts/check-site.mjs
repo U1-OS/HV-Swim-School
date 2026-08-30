@@ -36,7 +36,7 @@ for (const page of pages) {
 
 // 2. Every service-worker precache entry exists, and its ?v= matches what the pages request.
 const sw = read('service-worker.js');
-const shell = [...(sw.match(/const SHELL\s*=\s*\[([\s\S]*?)\];/)?.[1] || '').matchAll(/'([^']+)'/g)].map((m) => m[1]);
+const shell = [...(sw.match(/const (?:CORE_)?SHELL\s*=\s*\[([\s\S]*?)\];/)?.[1] || '').matchAll(/'([^']+)'/g)].map((m) => m[1]);
 if (!shell.length) fail('service worker', 'could not read the SHELL list');
 for (const entry of shell) {
   const [path, query] = entry.replace(/^\.\//, '').split('?');
@@ -120,6 +120,27 @@ for (const page of pages) {
     if (!/\brel="[^"]*\bnoopener\b[^"]*"/i.test(tag)) fail('security', `${page} opens a new tab without rel="noopener"`);
   }
 }
+
+// Production markup must fail closed: examples and unverified claims cannot flash before
+// JavaScript has confirmed an explicit preview or feature flag.
+for (const [phrase, allowedPage] of [
+  ['Demo sample', null],
+  ['Awaiting today\'s check', null],
+  ['31.8°C', null],
+  ['Badge-ready', 'index.html'],
+]) {
+  for (const page of pages) {
+    if (page === allowedPage) continue;
+    if (read(page).includes(phrase)) fail('production copy', `${page} contains prototype phrase “${phrase}”`);
+  }
+}
+if (read('index.html').includes('Badge-ready') && !/data-public-feature="association_badges"[^>]*hidden/.test(read('index.html'))) {
+  fail('production copy', 'association badge preview is not fail-closed in index.html');
+}
+if (allHtml.includes('sloanswimschool@hotmail.com')) fail('business identity', 'an obsolete contact email remains in public markup');
+if (!read('programs.html').includes('$22.50 per lesson')) fail('business terms', 'the confirmed lesson fee is missing from programs.html');
+if (/data-route-jump="clock"|data-action="clock"/.test(read('assets/platform.js'))) fail('business workflow', 'clock-in controls remain in the staff interface');
+if (!/data-preview-only[^>]*hidden/.test(read('shop.html'))) fail('production copy', 'supplier implementation detail is not fail-closed in shop.html');
 
 if (problems.length) {
   console.error(`${problems.length} problem${problems.length === 1 ? '' : 's'} found:\n`);

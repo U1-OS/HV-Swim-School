@@ -46,7 +46,7 @@
         const query = new URLSearchParams({program:item.title,class:`${days[item.weekday]} ${time} at ${item.location_name}`});
         return `<article class="availability-card reveal visible" style="--reveal-delay:${Math.min(index * 60, 240)}ms"><span class="class-day">${esc(days[item.weekday])} · ${esc(time)}</span><h3>${esc(item.title)}</h3><p>${esc(item.level)} · ${esc(item.duration_minutes)} minutes<br>${esc(item.location_name)}</p><div class="availability-card-foot"><div><strong>${item.available} ${item.available === 1 ? 'place' : 'places'} showing</strong><span>${new Intl.NumberFormat('en-AU',{style:'currency',currency:'AUD'}).format(Number(item.price || 0))} per lesson · confirmed before enrolment</span></div><a class="text-link" href="enquire.html?${query}">Enquire</a></div></article>`;
       }).join('') || '<div class="empty-state"><strong>No classes are showing places right now.</strong><p>Places can reopen as families change days. Send an enquiry and the team will check the current timetable for you.</p><a class="btn btn-blue btn-small" href="enquire.html">Join the list <span aria-hidden="true">&rarr;</span></a></div>';
-      document.getElementById('availability-source').textContent = 'Current published places and indicative fees are shown here. HV Swim confirms class fit, availability and billing before enrolment.';
+      document.getElementById('availability-source').textContent = 'Current published places are shown here. Lessons are $22.50 each, charged by the term and due on enrolment; HV Swim confirms class fit before the place is finalised.';
     }).catch(() => {
       availability.innerHTML = '<div class="empty-state"><strong>Class times are not loading right now.</strong><p>This is a temporary connection problem, not a sign that classes are full. Tell us what you need and the team will check what is open.</p><a class="btn btn-blue btn-small" href="enquire.html">Find a lesson <span aria-hidden="true">&rarr;</span></a></div>';
       const badge = document.getElementById('availability-connection');
@@ -95,8 +95,9 @@
       const reading = wood?.latest_reading;
       const readingDate = new Date(reading?.created_at || '');
       const stale = !reading || Number.isNaN(readingDate.getTime()) || Date.now() - readingDate.getTime() > DAY;
-      document.getElementById('today-pool-temp').textContent = reading?.temperature != null ? `${Number(reading.temperature).toFixed(1)}°C` : 'Update due';
-      document.getElementById('today-pool-detail').textContent = reading ? `${stale ? 'Reading over 24 hours old' : 'Staff verified'} · ${dateTime(reading.created_at)} · ${reading.first_name || 'HV Swim team'}` : 'No current staff reading published';
+      const currentReading = Boolean(reading && !stale && reading.temperature != null);
+      document.getElementById('today-pool-temp').textContent = currentReading ? `${Number(reading.temperature).toFixed(1)}°C` : 'Check conditions';
+      document.getElementById('today-pool-detail').textContent = currentReading ? `Staff verified · ${dateTime(reading.created_at)} · ${reading.first_name || 'HV Swim team'}` : 'No verified water reading has been published in the last 24 hours.';
       const seasonal = locations.find(item => item.slug === 'bendigo-east');
       document.getElementById('today-seasonal-copy').textContent = seasonal?.public_status || 'Status unavailable';
       const isClosed = seasonal?.public_status?.toLowerCase().includes('closed');

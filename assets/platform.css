@@ -750,7 +750,7 @@
 .merch-mapping .table-input { width:100%; margin-top:4px; }
 .merch-personalisation-input { min-width:220px; }
 
-/* V5.5 swimmer achievement studio and printable certificate system. */
+/* V5.6 swimmer achievement studio and printable certificate system. */
 .achievement-intro { display:flex; align-items:center; justify-content:space-between; gap:28px; overflow:hidden; background:radial-gradient(circle at 90% 0,rgba(var(--portal-accent-rgb),.16),transparent 23rem),linear-gradient(145deg,#fff,#f5fafc); }
 .achievement-intro h2 { margin-top:7px; color:#143e60; font-family:"Manrope",sans-serif; font-size:1.3rem; letter-spacing:-.035em; }
 .achievement-intro p { max-width:770px; margin-top:7px; color:#597287; font-size:.68rem; line-height:1.65; }
@@ -810,7 +810,7 @@
 #certificate-print-layer .certificate-card { width:min(100%,980px); min-height:650px; margin:auto; box-shadow:none; }
 body:not(.certificate-printing) #certificate-print-layer { display:none; }
 
-/* V5.5 asynchronous family messages and staff ticket desk. */
+/* V5.6 asynchronous family messages and staff ticket desk. */
 .ticket-compose-panel { align-self:start; }
 .ticket-compose-form { grid-template-columns:1fr; }
 .ticket-compose-form .field-help { color:#5d7487; font-size:.59rem; line-height:1.45; }

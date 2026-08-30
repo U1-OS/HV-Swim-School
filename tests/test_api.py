@@ -69,6 +69,15 @@ def test_public_endpoints_need_no_session(client):
         assert client.get(path).status_code == 200, path
 
 
+def test_public_site_mode_and_sensitive_features_fail_closed(client):
+    response = client.get("/api/public/site-settings")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["mode"] == "preview"
+    assert payload["features"] == {"merch_home": False, "association_badges": False}
+    assert "feature_merch_home" not in payload["settings"]
+
+
 def test_public_site_serves_only_explicitly_approved_files(client):
     for path in ("/", "/index.html", "/assets/styles.css", "/service-worker.js", "/robots.txt", "/favicon.ico"):
         assert client.get(path).status_code == 200, path
@@ -329,6 +338,9 @@ def test_merchandise_workspace_reports_real_sync_boundaries(client, monkeypatch)
     rashie = next(product for product in payload["catalogue"] if product["sku"] == "HV-RASHIE")
     assert rashie["production"]["supplier"] == "specialist_swim"
     assert rashie["sync"]["printify"] == "not_applicable"
+    assert rashie["production_ready"] is False
+    assert "Physical sample not approved" in rashie["blocking_reasons"]
+    assert "Approved supplier or sample reference missing" in rashie["blocking_reasons"]
     junior_cup = next(product for product in payload["catalogue"] if product["sku"] == "HV-JUNIOR-WARM-CUP")
     assert "parent-supervised warm, never hot" in junior_cup["production"]["method"]
 
@@ -1401,22 +1413,13 @@ def test_a_family_can_cancel_rebook_and_cancel_the_same_class(client):
     assert client.delete(f"/api/customer/bookings/{second.json()['booking_id']}", headers=headers).status_code == 200
 
 
-def test_two_clock_in_requests_leave_only_one_open_shift(client):
-    from backend.database import db_session
-
+def test_clock_in_tracking_is_disabled_by_business_policy(client):
     client.cookies.clear()
     csrf = sign_in(client, STAFF)
-    staff_id = client.get("/api/auth/me").json()["user"]["id"]
     headers = {"X-CSRF-Token": csrf}
-    first = client.post("/api/staff/clock", json={"action": "in", "location_slug": "wood-street"}, headers=headers)
-    second = client.post("/api/staff/clock", json={"action": "in", "location_slug": "wood-street"}, headers=headers)
-    assert first.status_code == 200, first.text
-    assert second.status_code == 409, second.text
-    with db_session() as db:
-        assert db.execute(
-            "SELECT COUNT(*) FROM time_entries WHERE staff_id=? AND clock_out IS NULL", (staff_id,)
-        ).fetchone()[0] == 1
-    assert client.post("/api/staff/clock", json={"action": "out", "location_slug": "wood-street"}, headers=headers).status_code == 200
+    response = client.post("/api/staff/clock", json={"action": "in", "location_slug": "wood-street"}, headers=headers)
+    assert response.status_code == 410
+    assert "does not use clock-in tracking" in response.json()["detail"]
 
 
 # --- input validation ----------------------------------------------------------------

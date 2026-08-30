@@ -419,6 +419,10 @@ def initialise_database() -> None:
         # grow or retain these rows indefinitely.
         login_cutoff = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
         db.execute("DELETE FROM login_attempts WHERE created_at<=?", (login_cutoff,))
+        # Public lesson enquiries are kept for six months under the confirmed business
+        # policy. Enrolled-family and ticket records have separate operational purposes.
+        enquiry_cutoff = (datetime.now(timezone.utc) - timedelta(days=183)).isoformat()
+        db.execute("DELETE FROM enquiries WHERE created_at<=?", (enquiry_cutoff,))
         # Database-level guards against double booking. Application code already checks,
         # but two requests arriving together can both pass that check before either writes.
         # Created defensively: an older database containing duplicates must not stop startup.
@@ -557,6 +561,8 @@ def initialise_database() -> None:
             "hero_accent": "in the water.",
             "hero_intro": "Personal, inclusive swimming lessons from four months to adults — taught with patience, safety and genuine care by a team that knows every swimmer is different.",
             "primary_cta": "Find the right lesson",
+            "feature_merch_home": "0",
+            "feature_association_badges": "0",
         }
         db.executemany("INSERT OR IGNORE INTO site_settings(key,value,updated_at) VALUES(?,?,?)", [(key, value, created) for key, value in site_defaults.items()])
         achievement_templates = [
@@ -589,6 +595,9 @@ def initialise_database() -> None:
         )
         # Keep the bundled demo account aligned with the current business team.
         db.execute("UPDATE users SET first_name='Laura',last_name='' WHERE email='admin@hvswim.demo'")
+        # The confirmed business fee is $22.50 for every lesson. Keep existing preview
+        # databases aligned before the early return as well as seeding new databases.
+        db.execute("UPDATE classes SET price_cents=2250")
         if db.execute("SELECT COUNT(*) FROM users").fetchone()[0]:
             return
         if settings.production:
@@ -633,11 +642,11 @@ def initialise_database() -> None:
             (user_ids["parent@hvswim.demo"], "Noah", "Smith", "2024-01-22", "Infant Aquatics", "Jordan Smith · 0413 000 101", "No medical alerts in demo record", 0, created),
         )
         classes = [
-            ("INF-A-MON", "Infant Aquatics", "Infant Aquatics", location_ids["wood-street"], user_ids["staff@hvswim.demo"], 0, "09:00", 30, 5, 2200),
-            ("LTS1-TUE", "Learn to Swim 1", "Beginner", location_ids["wood-street"], user_ids["casey@hvswim.demo"], 1, "15:45", 30, 5, 2400),
-            ("LTS3-THU", "Learn to Swim 3", "Learn to Swim 3", location_ids["wood-street"], user_ids["staff@hvswim.demo"], 3, "16:15", 45, 5, 2600),
-            ("PRIV-FRI", "Private Lesson", "All levels", location_ids["wood-street"], user_ids["staff@hvswim.demo"], 4, "17:10", 30, 1, 5200),
-            ("STROKE-SAT", "Stroke Development", "Stroke Development", location_ids["wood-street"], user_ids["casey@hvswim.demo"], 5, "10:30", 45, 6, 2800),
+            ("INF-A-MON", "Infant Aquatics", "Infant Aquatics", location_ids["wood-street"], user_ids["staff@hvswim.demo"], 0, "09:00", 30, 5, 2250),
+            ("LTS1-TUE", "Learn to Swim 1", "Beginner", location_ids["wood-street"], user_ids["casey@hvswim.demo"], 1, "15:45", 30, 5, 2250),
+            ("LTS3-THU", "Learn to Swim 3", "Learn to Swim 3", location_ids["wood-street"], user_ids["staff@hvswim.demo"], 3, "16:15", 45, 5, 2250),
+            ("PRIV-FRI", "Private Lesson", "All levels", location_ids["wood-street"], user_ids["staff@hvswim.demo"], 4, "17:10", 30, 1, 2250),
+            ("STROKE-SAT", "Stroke Development", "Stroke Development", location_ids["wood-street"], user_ids["casey@hvswim.demo"], 5, "10:30", 45, 6, 2250),
         ]
         db.executemany("INSERT INTO classes(code,title,level,location_id,instructor_id,weekday,start_time,duration_minutes,capacity,price_cents) VALUES(?,?,?,?,?,?,?,?,?,?)", classes)
         swimmer_ids = {row["first_name"]: row["id"] for row in db.execute("SELECT id,first_name FROM swimmers")}

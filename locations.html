@@ -20,10 +20,10 @@
   <meta name="twitter:image" content="assets/og-share-v3.jpg">  <title>Locations &amp; Pool Conditions | HV Swim Bendigo</title>
   <link rel="icon" href="assets/app-icon-v3-64.png">
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="stylesheet" href="assets/styles.css?v=5.5.0">
-  <link rel="stylesheet" href="assets/support.css?v=5.5.0">
-  <script defer src="assets/app.js?v=5.5.0"></script>
-  <script defer src="assets/support.js?v=5.5.0"></script>
+  <link rel="stylesheet" href="assets/styles.css?v=5.6.0">
+  <link rel="stylesheet" href="assets/support.css?v=5.6.0">
+  <script defer src="assets/app.js?v=5.6.0"></script>
+  <script defer src="assets/support.js?v=5.6.0"></script>
 </head>
 <body data-page="locations">
   <a class="skip-link" href="#main-content">Skip to main content</a>
@@ -45,12 +45,14 @@
         <article class="card location-detail reveal" data-location="wood-street">
           <div class="location-visual">
             <div><span class="location-place" aria-hidden="true">⌂</span><p class="location-visual-note">Private, warm indoor teaching environment for year-round swimming lessons.</p></div>
-            <div class="temp-bubble"><strong data-temp>31.8°C</strong><span data-temp-label>Demo sample</span></div>
+            <div class="temp-bubble" data-reading hidden><strong data-temp>—</strong><span data-temp-label>Staff verified</span></div>
+            <div class="condition-fallback" data-reading-fallback><strong>Check today’s condition</strong><span>No verified water reading has been published in the last 24 hours.</span></div>
           </div>
           <div class="location-content">
-            <div class="location-heading-row"><div><div class="eyebrow">Primary teaching venue</div><h2 class="location-detail-title">Wood Street Indoor Pool</h2></div><span class="status demo" data-status aria-live="polite">Awaiting today's check</span></div>
+            <div class="location-heading-row"><div><div class="eyebrow">Primary teaching venue</div><h2 class="location-detail-title">Wood Street Indoor Pool</h2></div><span class="status changed" data-status aria-live="polite">Check today’s conditions</span></div>
             <p class="location-address">76 Wood Street, California Gully VIC 3556</p>
-            <div class="condition-hero"><div class="condition-temp"><strong data-temp>31.8°C</strong><span>Latest water reading</span></div><div><strong class="verified-copy" data-verified-by>Sample only</strong><span class="micro" data-updated aria-live="polite">Staff update required before treating as current</span></div></div>
+            <div class="condition-hero" data-reading hidden><div class="condition-temp"><strong data-temp>—</strong><span>Latest verified water reading</span></div><div><strong class="verified-copy" data-verified-by>HV Swim staff</strong><span class="micro" data-updated aria-live="polite">Published today</span></div></div>
+            <div class="condition-empty" data-reading-fallback><strong>No verified water reading today.</strong><p>Check this page again before travelling or message HV Swim for the latest pool condition.</p></div>
             <div class="detail-list"><div><strong>Parking</strong><span>On-site / street access near the Wood Street entrance. Confirm final arrival instructions with HV Swim.</span></div><div><strong>Accessibility</strong><span>Public information lists wheelchair access and toilets. Contact the team for individual support needs.</span></div><div><strong>Pool type</strong><span>Private indoor, heated saltwater teaching pool; year-round programs.</span></div><div><strong>Best for</strong><span>Infant aquatics, learn to swim, private tuition and individualised support.</span></div></div>
             <h3 class="lesson-heading">Today's lesson guide <span class="status demo">Indicative</span></h3>
             <div class="lesson-list"><div class="lesson-row"><time>9:00 am</time><span>Infant aquatics</span><strong>Small group</strong></div><div class="lesson-row"><time>3:45 pm</time><span>Learn to swim</span><strong>Beginner</strong></div><div class="lesson-row"><time>5:10 pm</time><span>Private lesson</span><strong>1:1</strong></div></div>
@@ -103,7 +105,7 @@
     </section>
   </main>
 
-  <footer class="site-footer"><div class="container footer-main"><div class="footer-brand"><img src="assets/hv-swim-logo-v3.png" width="400" height="265" alt="HV Swim Bendigo"><p>Personal swimming lessons focused on confidence, water safety and progress for every age and ability.</p></div><div class="footer-col"><strong>Explore</strong><a href="programs.html">Programs &amp; pricing</a><a href="locations.html">Locations</a><a href="about.html">Our approach</a></div><div class="footer-col"><strong>Platform</strong><a href="login.html?role=customer">Family account</a><a href="login.html?role=staff">Staff account</a><a href="login.html?role=admin">Management account</a></div><div class="footer-col"><strong>Contact</strong><a href="tel:+61413462112">0413 462 112</a><a href="mailto:sloanswimschool@hotmail.com">sloanswimschool@hotmail.com</a><a href="https://www.facebook.com/hvswimschoolbendigo" target="_blank" rel="noopener">Facebook</a></div></div><div class="container footer-bottom"><span>© <span data-year></span> HV Swim Bendigo.</span><nav class="footer-legal" aria-label="Legal"><a href="privacy.html">Privacy</a><a href="terms.html">Terms &amp; cancellations</a><a href="photo-consent.html">Photo consent</a></nav><span>Water readings are staff-published unless a verified sensor is connected.</span></div></footer>
+  <footer class="site-footer"><div class="container footer-main"><div class="footer-brand"><img src="assets/hv-swim-logo-v3.png" width="400" height="265" alt="HV Swim Bendigo"><p>Personal swimming lessons focused on confidence, water safety and progress for every age and ability.</p></div><div class="footer-col"><strong>Explore</strong><a href="programs.html">Programs &amp; pricing</a><a href="locations.html">Locations</a><a href="about.html">Our approach</a></div><div class="footer-col"><strong>Platform</strong><a href="login.html?role=customer">Family account</a><a href="login.html?role=staff">Staff account</a><a href="login.html?role=admin">Management account</a></div><div class="footer-col"><strong>Contact</strong><a href="tel:+61413462112">0413 462 112</a><a href="mailto:bendigo@hvswimschool.com">bendigo@hvswimschool.com</a><a href="https://www.facebook.com/hvswimschoolbendigo" target="_blank" rel="noopener">Facebook</a></div></div><div class="container footer-bottom"><span>© <span data-year></span> HV Swim Bendigo.</span><nav class="footer-legal" aria-label="Legal"><a href="privacy.html">Privacy</a><a href="terms.html">Terms &amp; cancellations</a><a href="photo-consent.html">Photo consent</a></nav><span>Water readings are staff-published unless a verified sensor is connected.</span></div></footer>
   <div class="toast" role="status" aria-live="polite"></div>
 </body>
 </html>

@@ -75,7 +75,7 @@
         price_cents:Math.round(Number(variant.price?.amount || 0) * 100)
       }));
       const priceVariant = variants.find(variant => variant.availableForSale) || variants[0];
-      return {id:product.id,sku:slug(product.handle || product.title),title:product.title,category:categoryFor(product),description:product.description || 'Connected Shopify product.',price_cents:Number(priceVariant?.price_cents || 0),sizes:variants.map(item=>item.title === 'Default Title' ? 'Standard' : item.title),status:variants.some(variant=>variant.availableForSale)?'available':'unavailable',image:product.featuredImage?.url,variants};
+      return {id:product.id,sku:slug(product.handle || product.title),title:product.title,category:categoryFor(product),description:product.description || 'Connected Shopify product.',price_cents:Number(priceVariant?.price_cents || 0),sizes:variants.map(item=>item.title === 'Default Title' ? 'Standard' : item.title),status:variants.some(variant=>variant.availableForSale)?'available':'unavailable',image:product.featuredImage?.url,image_alt:product.featuredImage?.altText||product.title,variants};
     }
     return product;
   };
@@ -85,15 +85,6 @@
     if (product.category === 'Uniforms' || /staff|instructor|puffer|track ?pants/.test(value)) return 'Staff';
     if (/junior|kids|rash|swimwear|swim shorts|goggle|training mitt|swim cap/.test(value)) return 'Kids + youth';
     return 'Family';
-  };
-  const supplierFor = product => {
-    const route = String(product.supplier_route || '').toLowerCase();
-    if (route.includes('printify')) return {label:'Printify eligible',className:'pod'};
-    if (route.includes('vistaprint')) return {label:'Manual bulk route',className:'bulk'};
-    if (route.includes('manual')) return {label:'Manual supplier review',className:'bulk'};
-    if (route.includes('specialist')) return {label:'Swim specialist',className:'specialist'};
-    if (catalogueSource === 'shopify') return {label:'Shopify catalogue',className:'live'};
-    return {label:'Supplier review',className:'review'};
   };
   const matchesFilter = (product,filter) => {
     if (filter === 'all') return true;
@@ -109,7 +100,7 @@
     return category === filter.toLowerCase();
   };
   const visualClass = product => `product-${slug(product.sku || product.title)} ${['Uniforms'].includes(product.category)?'uniform-studio-crop':''}`;
-  const visual = product => product.image ? `<img src="${esc(product.image)}" alt="${esc(product.title)}" loading="lazy" decoding="async">` : `<div class="shop-product-crop ${visualClass(product)}" role="img" aria-label="${esc(product.title)} concept"><span class="shop-product-monogram" aria-hidden="true">${esc(product.emoji || 'HV')}</span></div>`;
+  const visual = product => product.image ? `<img src="${esc(product.image)}" alt="${esc(product.image_alt||product.title)}" loading="lazy" decoding="async">` : `<div class="shop-product-crop ${visualClass(product)}" role="img" aria-label="${esc(product.title)} concept"><span class="shop-product-monogram" aria-hidden="true">${esc(product.emoji || 'HV')}</span></div>`;
   const priceMarkup = (product,live=false) => Number(product.price_cents) > 0 ? `<strong>${money(product.price_cents)}</strong><small>${live?'Current price':'Indicative price'}</small>` : '<strong>Price pending</strong><small>Supplier quote required</small>';
   const cartKey = (id,size) => `${id}::${size || 'Standard'}`;
 
@@ -137,10 +128,9 @@
       const sizes = sizeList(product);
       const chooseVariant = catalogueSource === 'shopify';
       const available = product.status === 'available';
-      const supplier = supplierFor(product);
       const badge = available ? 'Available' : (chooseVariant ? 'Currently unavailable' : (product.sample_status === 'approved' ? 'Sample approved' : 'Collection concept'));
       const addLabel = chooseVariant ? (available ? 'Choose option' : 'Unavailable') : 'Save';
-      return `<article class="shop-card reveal visible" data-audience="${slug(audienceFor(product))}" style="--reveal-delay:${Math.min(index*45,180)}ms"><button class="shop-product-visual" type="button" data-product-view="${esc(product.id)}" aria-label="View ${esc(product.title)}">${visual(product)}<span class="shop-product-badge">${badge}</span><span class="shop-quick-view">View details <span aria-hidden="true">→</span></span></button><div class="shop-card-copy"><div class="shop-card-heading"><span class="shop-category">${esc(product.category)}</span><span>${esc(audienceFor(product))}</span></div><h3>${esc(product.title)}</h3><p>${esc(product.description)}</p><div class="shop-production-route ${supplier.className}"><span aria-hidden="true"></span>${esc(supplier.label)}</div><div class="shop-sizes">${sizes.slice(0,4).map(size=>`<span>${esc(size)}</span>`).join('')||'<span>Final sizing pending</span>'}${sizes.length>4?`<span>+${sizes.length-4}</span>`:''}</div><div class="shop-card-foot"><div>${priceMarkup(product,chooseVariant)}</div><button type="button" class="shop-add-button" data-product-add="${esc(product.id)}" ${chooseVariant&&!available?'disabled':''}>${addLabel} <span aria-hidden="true">${chooseVariant?'→':'+'}</span></button></div></div></article>`;
+      return `<article class="shop-card reveal visible" data-audience="${slug(audienceFor(product))}" style="--reveal-delay:${Math.min(index*45,180)}ms"><button class="shop-product-visual" type="button" data-product-view="${esc(product.id)}" aria-label="View ${esc(product.title)}">${visual(product)}<span class="shop-product-badge">${badge}</span><span class="shop-quick-view">View details <span aria-hidden="true">→</span></span></button><div class="shop-card-copy"><div class="shop-card-heading"><span class="shop-category">${esc(product.category)}</span><span>${esc(audienceFor(product))}</span></div><h3>${esc(product.title)}</h3><p>${esc(product.description)}</p><div class="shop-sizes">${sizes.slice(0,4).map(size=>`<span>${esc(size)}</span>`).join('')||'<span>Final sizing pending</span>'}${sizes.length>4?`<span>+${sizes.length-4}</span>`:''}</div><div class="shop-card-foot"><div>${priceMarkup(product,chooseVariant)}</div><button type="button" class="shop-add-button" data-product-add="${esc(product.id)}" ${chooseVariant&&!available?'disabled':''}>${addLabel} <span aria-hidden="true">${chooseVariant?'→':'+'}</span></button></div></div></article>`;
     }).join('') || '<div class="empty-state"><strong>Nothing matches that search.</strong><p>Try a different category, or clear the search to see the whole collection.</p><button type="button" class="btn btn-outline btn-small" data-clear-search>Show everything</button></div>';
   }
 
@@ -202,7 +192,7 @@
     const action=document.getElementById('cart-primary-action');
     const summary=cart.map(item=>`${item.quantity}× ${item.title} (${item.size})`).join(', ');
     const needsReselection=catalogueSource==='shopify'&&cart.some(item=>!item.variant_id);
-    action.textContent=catalogueSource==='shopify'?'Sign in to continue checkout':'Send collection interest';
+    action.textContent=catalogueSource==='shopify'?'Sign in to review saved items':'Send collection interest';
     action.href=catalogueSource==='shopify'?'login.html':`enquire.html?${new URLSearchParams({merch:summary||'HV Swim Collection interest'})}`;
     action.classList.toggle('disabled',!cart.length||needsReselection);
     action.setAttribute('aria-disabled',String(!cart.length||needsReselection));
@@ -245,13 +235,12 @@
     const dialog=document.getElementById('product-dialog');
     productOpener=opener instanceof HTMLElement?opener:null;
     const live=catalogueSource==='shopify';
-    const supplier=supplierFor(product);
     const available=!live||(product.variants||[]).some(variant=>variant.availableForSale);
     const options=live
       ? `<option value="">Choose an option</option>${(product.variants||[]).map(variant=>`<option value="${esc(variant.id)}" ${variant.availableForSale?'':'disabled'}>${esc(variant.title==='Default Title'?'Standard':variant.title)}${variant.availableForSale?'':' — unavailable'}</option>`).join('')}`
       : (sizes.length?sizes:['Standard']).map(size=>`<option value="${esc(size)}">${esc(size)}</option>`).join('');
     const dialogPrice=Number(product.price_cents)>0?money(product.price_cents):'Price pending';
-    document.getElementById('product-dialog-content').innerHTML=`<div class="dialog-product-visual">${visual(product)}<span class="dialog-concept-label">HV Swim Collection</span></div><div class="dialog-product-copy"><div class="dialog-product-meta"><span class="shop-category">${esc(product.category)}</span><span>${esc(audienceFor(product))}</span></div><h2 id="product-dialog-title">${esc(product.title)}</h2><strong class="dialog-price">${dialogPrice}</strong><p>${esc(product.description)}</p><div class="shop-production-route ${supplier.className}"><span aria-hidden="true"></span>${esc(supplier.label)} · ${live?'catalogue connected':'not yet live'}</div><dl class="product-specs"><div><dt>Material direction</dt><dd>${esc(detail.material)}</dd></div><div><dt>Care</dt><dd>${esc(detail.care)}</dd></div><div><dt>Personalisation</dt><dd>${esc(detail.personalisation)}</dd></div></dl><div class="product-dialog-options"><div class="product-option"><label for="dialog-size">${live?'Select option':'Preferred option'}</label><select id="dialog-size" required>${options}</select></div><div class="product-option"><label for="dialog-quantity">Quantity</label><select id="dialog-quantity">${[1,2,3,4,5].map(value=>`<option value="${value}">${value}</option>`).join('')}</select></div></div><p class="wizard-error" id="dialog-option-error" role="alert" hidden>Please choose an available option.</p><div class="info-note"><strong>${live?'Live catalogue':'Collection availability'}:</strong> ${live?(available?'Availability and options come from Shopify. Sign in is required before secure checkout.':'This product is currently unavailable in Shopify. You can still review its details and check again later.'):'No stock is reserved and no payment is taken while final samples and suppliers are approved.'}</div><button class="btn btn-primary" type="button" data-dialog-add="${esc(product.id)}" ${available?'':'disabled'}>${live?(available?'Add selected option':'Currently unavailable'):'Save to collection list'}</button></div>`;
+    document.getElementById('product-dialog-content').innerHTML=`<div class="dialog-product-visual">${visual(product)}<span class="dialog-concept-label">${live?'HV Swim approved range':'Concept image · sample pending'}</span></div><div class="dialog-product-copy"><div class="dialog-product-meta"><span class="shop-category">${esc(product.category)}</span><span>${esc(audienceFor(product))}</span></div><h2 id="product-dialog-title">${esc(product.title)}</h2><strong class="dialog-price">${dialogPrice}</strong><p>${esc(product.description)}</p><dl class="product-specs"><div><dt>Material direction</dt><dd>${esc(detail.material)}</dd></div><div><dt>Care</dt><dd>${esc(detail.care)}</dd></div><div><dt>Personalisation</dt><dd>${esc(detail.personalisation)}</dd></div></dl><div class="product-dialog-options"><div class="product-option"><label for="dialog-size">${live?'Select option':'Preferred option'}</label><select id="dialog-size" required>${options}</select></div><div class="product-option"><label for="dialog-quantity">Quantity</label><select id="dialog-quantity">${[1,2,3,4,5].map(value=>`<option value="${value}">${value}</option>`).join('')}</select></div></div><p class="wizard-error" id="dialog-option-error" role="alert" hidden>Please choose an available option.</p><div class="info-note"><strong>${live?'Live catalogue':'Collection availability'}:</strong> ${live?(available?'Availability and options come from the approved Shopify catalogue.':'This product is currently unavailable in Shopify. You can still review its details and check again later.'):'No stock is reserved and no payment is taken while final samples and suppliers are approved.'}</div><button class="btn btn-primary" type="button" data-dialog-add="${esc(product.id)}" ${available?'':'disabled'}>${live?(available?'Add selected option':'Currently unavailable'):'Save to collection list'}</button></div>`;
     dialog.showModal();
   }
 
@@ -357,7 +346,7 @@
     document.getElementById('shop-source').innerHTML=`<span class="status ${live?'open':'changed'}">${sourceLabel}</span>`;
     document.getElementById('cart-mode-status').className=`status ${live?'open':'changed'}`;
     document.getElementById('cart-mode-status').textContent=live?'Shopify catalogue connected':'Collection in development';
-    document.getElementById('cart-mode-copy').textContent=live?'Connected products are visible. Sign in before secure checkout.':'Your choices save on this device. No stock is reserved and no payment is taken.';
+    document.getElementById('cart-mode-copy').textContent=live?'Only sampled and approved Shopify products are visible. Sign in to review saved items.':'Your choices save on this device. No stock is reserved and no payment is taken.';
     render(); renderCart();
   }).catch(()=>{
     grid.innerHTML='<div class="empty-state"><strong>The collection is not loading right now.</strong><p>This is a temporary problem on our side. The range is still there — get in touch and the team can talk you through it.</p><a class="btn btn-blue btn-small" href="enquire.html">Talk to the team <span aria-hidden="true">&rarr;</span></a></div>';

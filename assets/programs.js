@@ -52,7 +52,7 @@
     classes = payload.classes || [];
     updateProgramSummaries();
     renderAvailability();
-    document.getElementById('program-availability-source').textContent = 'Current published places and indicative fees are shown here. HV Swim confirms class fit, availability and billing before enrolment.';
+    document.getElementById('program-availability-source').textContent = 'Current published places are shown here. Lessons are $22.50 each, charged by the term and due on enrolment; HV Swim confirms class fit before the place is finalised.';
   }).catch(() => {
     document.querySelectorAll('[data-price]').forEach(element => element.textContent = 'Ask the team');
     document.querySelectorAll('[data-place]').forEach(element => element.textContent = 'Availability confirmed personally');

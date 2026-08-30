@@ -21,18 +21,20 @@
   <link rel="icon" href="assets/app-icon-v3-64.png">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="assets/app-icon-v3-180.png">
-  <link rel="stylesheet" href="assets/styles.css?v=5.5.0">
-  <link rel="stylesheet" href="assets/support.css?v=5.5.0">
-  <script defer src="assets/app.js?v=5.5.0"></script>
-  <script defer src="assets/support.js?v=5.5.0"></script>
-  <script defer src="assets/public-api.js?v=5.5.0"></script>
+  <link rel="stylesheet" href="assets/styles.css?v=5.6.0">
+  <link rel="stylesheet" href="assets/support.css?v=5.6.0">
+  <script defer src="assets/app.js?v=5.6.0"></script>
+  <script defer src="assets/support.js?v=5.6.0"></script>
+  <script defer src="assets/public-api.js?v=5.6.0"></script>
   <script type="application/ld+json">{
   "@context": "https://schema.org",
   "@type": "SportsActivityLocation",
   "name": "HV Swim Bendigo",
+  "legalName": "HVS BENDIGO PTY LTD",
+  "taxID": "ABN 46 687 937 962",
   "description": "Confidence-first swimming lessons for infants, children, teens and adults in Bendigo.",
   "telephone": "+61 413 462 112",
-  "email": "sloanswimschool@hotmail.com",
+  "email": "bendigo@hvswimschool.com",
   "address": {
     "@type": "PostalAddress",
     "streetAddress": "76 Wood Street",
@@ -69,7 +71,7 @@
       </nav>
       <div class="nav-actions">
         <a class="nav-login" href="login.html">Sign in</a>
-        <a class="btn btn-primary btn-small" href="enquire.html">Enquire now <span aria-hidden="true">→</span></a>
+        <a class="btn btn-primary btn-small" href="enquire.html" data-primary-cta data-analytics-cta="header_find_lesson"><span data-primary-cta-label>Find the right lesson</span> <span aria-hidden="true">→</span></a>
         <button class="menu-toggle" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="main-nav"><span></span></button>
       </div>
     </div>
@@ -86,7 +88,7 @@
           <h1><span class="hero-heading-main" data-site-field="hero_heading">Confidence starts</span> <span data-site-field="hero_accent">in the water.</span></h1>
           <p class="intro" data-site-field="hero_intro">Personal, inclusive swimming lessons from four months to adults — taught with patience, safety and genuine care by a team that knows every swimmer is different.</p>
           <div class="hero-actions">
-            <a class="btn btn-primary" href="enquire.html"><span data-site-field="primary_cta">Find the right lesson</span> <span aria-hidden="true">→</span></a>
+            <a class="btn btn-primary" href="enquire.html" data-primary-cta data-analytics-cta="hero_find_lesson"><span data-site-field="primary_cta" data-primary-cta-label>Find the right lesson</span> <span aria-hidden="true">→</span></a>
             <a class="btn btn-outline" href="locations.html">View pool conditions</a>
           </div>
           <div class="hero-trust" aria-label="Program benefits">
@@ -96,13 +98,13 @@
           </div>
         </div>
       </div>
-      <aside class="hero-float reveal" aria-label="Latest pool condition">
+      <aside class="hero-float reveal" aria-label="Latest verified pool condition" data-current-reading-only hidden>
         <div class="hero-float-top">
           <div><strong>Wood Street pool</strong><p>Latest condition from the staff portal.</p></div>
-          <span class="status changed" data-home-status>Awaiting check</span>
+          <span class="status open" data-home-status>Staff verified</span>
         </div>
         <div class="hero-condition-row">
-          <div class="temp-bubble"><strong data-home-temp>—</strong><span data-home-updated>Update due</span></div>
+          <div class="temp-bubble"><strong data-home-temp>—</strong><span data-home-updated>Staff verified today</span></div>
           <a class="text-link" href="locations.html">Details</a>
         </div>
       </aside>
@@ -130,13 +132,6 @@
         <p class="micro today-boundary" id="today-boundary">Outdoor weather updates from the connected weather service. Water temperature is checked and published by staff; class places and fees are confirmed before enrolment.</p>
       </div>
     </section>
-
-    <div class="swim-ticker">
-      <span class="sr-only">HV Swim values: confidence, water safety, belonging, small groups and personal progress.</span>
-      <div class="ticker-track" aria-hidden="true">
-        <span>Confidence</span><i></i><span>Water safety</span><i></i><span>Belonging</span><i></i><span>Small groups</span><i></i><span>Personal progress</span><i></i><span>Confidence</span><i></i><span>Water safety</span><i></i><span>Belonging</span><i></i><span>Small groups</span><i></i><span>Personal progress</span><i></i>
-      </div>
-    </div>
 
     <section class="section" id="about">
       <div class="container about-layout">
@@ -176,7 +171,7 @@
       <div class="container">
         <div class="section-head reveal">
           <div><div class="eyebrow">Connected timetable</div><h2>Find a lesson that fits.</h2><p class="lead" style="margin-top:16px">See a snapshot of classes with room available, then sign in or enquire so the team can confirm the right level.</p></div>
-          <a class="btn btn-soft" href="enquire.html">Get a personalised match</a>
+          <a class="btn btn-soft" href="enquire.html" data-primary-cta data-analytics-cta="availability_match"><span data-primary-cta-label>Find the right lesson</span></a>
         </div>
         <div class="availability-toolbar reveal"><span class="status open" id="availability-connection">Timetable connected</span><p id="availability-connection-note">Current published availability is shown below.</p></div>
         <div class="availability-grid" id="public-availability" aria-live="polite">
@@ -188,40 +183,7 @@
       </div>
     </section>
 
-    <section class="section">
-      <div class="container">
-        <div class="section-head reveal">
-          <div><div class="eyebrow">Know before you go</div><h2>Locations &amp; pool conditions.</h2><p class="lead" style="margin-top:16px">See the latest staff-published water reading, venue status, today's lesson plan, directions and accessibility information.</p></div>
-          <a class="text-link" href="locations.html">View full location details</a>
-        </div>
-        <div class="grid-2" id="home-locations">
-          <article class="card location-preview reveal" data-location="wood-street">
-            <div class="location-visual"><span class="location-place" aria-hidden="true">⌂</span><div class="temp-bubble"><strong data-temp>—</strong><span data-temp-label>Update due</span></div></div>
-            <div class="location-body"><span class="status" data-status>Check today’s conditions</span><h3>Wood Street Indoor Pool</h3><p class="location-address">76 Wood Street, California Gully VIC 3556</p><div class="location-meta"><div><strong>Today</strong><span data-lessons>See today’s schedule</span></div><div><strong>Best for</strong><span>Year-round learn-to-swim programs</span></div></div><div class="location-actions"><a class="btn btn-blue btn-small" href="locations.html#wood-street">View conditions</a><a class="btn btn-outline dark btn-small" target="_blank" rel="noopener" href="https://www.google.com/maps/dir/?api=1&destination=76+Wood+Street+California+Gully+VIC+3556">Directions</a></div></div>
-          </article>
-          <article class="card location-preview reveal" data-location="bendigo-east">
-            <div class="location-visual seasonal"><span class="location-place" aria-hidden="true">☀</span><div class="temp-bubble"><strong data-temp>—</strong><span data-temp-label>No current reading</span></div></div>
-            <div class="location-body"><span class="status closed" data-status>Closed for winter</span><h3>Bendigo East Swimming Pool</h3><p class="location-address">31 Lansell Street, East Bendigo VIC 3550</p><div class="location-meta"><div><strong>Season</strong><span>2026/27 reopening details pending</span></div><div><strong>Facilities</strong><span>Heated 50m, intermediate &amp; toddler pools</span></div></div><div class="location-actions"><a class="btn btn-blue btn-small" href="locations.html#bendigo-east">View conditions</a><a class="btn btn-outline dark btn-small" target="_blank" rel="noopener" href="https://www.google.com/maps/dir/?api=1&destination=31+Lansell+Street+East+Bendigo+VIC+3550">Directions</a></div></div>
-          </article>
-        </div>
-      </div>
-    </section>
-
-    <section class="section white journey-section">
-      <div class="container">
-        <div class="section-head reveal">
-          <div><div class="eyebrow">A simpler way to start</div><h2>From enquiry to first splash.</h2><p class="lead" style="margin-top:16px">A calm, guided enrolment journey designed around the swimmer—not a confusing list of levels.</p></div>
-          <a class="btn btn-soft" href="enquire.html">Start the lesson finder</a>
-        </div>
-        <div class="journey-grid">
-          <article class="journey-card reveal"><span class="journey-number">01</span><div class="journey-icon" aria-hidden="true">♡</div><h3>Tell us about the swimmer</h3><p>Share their age, water confidence, experience and what you would love them to achieve.</p></article>
-          <article class="journey-card reveal"><span class="journey-number">02</span><div class="journey-icon" aria-hidden="true">≈</div><h3>We match the right pathway</h3><p>HV Swim recommends a suitable program, location and lesson style with availability.</p></article>
-          <article class="journey-card reveal"><span class="journey-number">03</span><div class="journey-icon" aria-hidden="true">✓</div><h3>Manage it all in one place</h3><p>Bookings, lesson notices, pool conditions and family updates stay together in the secure app.</p></article>
-        </div>
-      </div>
-    </section>
-
-    <section class="section navy merch-section" id="merch">
+    <section class="section navy merch-section" id="merch" data-public-feature="merch_home" hidden>
       <div class="merch-orb" aria-hidden="true"></div>
       <div class="container merch-wrap">
         <div class="merch-copy reveal"><div class="eyebrow">The premium HV Swim collection</div><h2>Better gear for every lesson day.</h2><p class="lead space-top-18">A premium-only swimmer and staff capsule built around chlorine-rated materials, embroidered HV branding, reliable hardware and physical sample approval.</p><div class="merch-tags"><span>Kids swimwear</span><span>Embroidered uniforms</span><span>Warm drinkware</span><span>Pool gear</span></div><div class="merch-actions"><a class="btn btn-primary" href="shop.html#kit-builder">Build a premium kit <span aria-hidden="true">→</span></a><span class="status changed">Sampling before launch</span></div><p class="micro merch-note">Third-party premium labels are sourced only through authorised resellers. Stock, checkout and fulfilment open after supplier rights, landed cost and physical samples are approved.</p></div>
@@ -238,17 +200,6 @@
       </div>
     </section>
 
-    <section class="section white">
-      <div class="container">
-        <div class="section-head reveal"><div><div class="eyebrow">One connected experience</div><h2>Built for families, staff and managers.</h2><p class="lead" style="margin-top:16px">Secure role-based accounts connect lesson bookings, pool-deck operations and business oversight to one shared database.</p></div><a class="btn btn-soft" href="login.html">Open secure platform</a></div>
-        <div class="grid-3">
-          <article class="card card-pad experience-card reveal"><span class="icon-box" aria-hidden="true">♡</span><span class="experience-label">Families</span><h3>Installable HV Swim app</h3><p class="lead">Bookings, swimmers, notices, pool conditions and merchandise from one simple home-screen app.</p><a class="text-link" href="login.html?role=customer">Open family account</a></article>
-          <article class="card card-pad experience-card reveal"><span class="icon-box" aria-hidden="true">↗</span><span class="experience-label">Pool deck</span><h3>Staff operations</h3><p class="lead">Rosters, clock-in/out, work location, safety checks, water readings and timesheets.</p><a class="text-link" href="login.html?role=staff">Open staff account</a></article>
-          <article class="card card-pad experience-card reveal"><span class="icon-box" aria-hidden="true">◇</span><span class="experience-label">Management</span><h3>Website &amp; operations admin</h3><p class="lead">Products, suppliers, approvals, compliance, scheduling, Shopify, Printify and Xero readiness.</p><a class="text-link" href="login.html?role=admin">Open admin panel</a></article>
-        </div>
-      </div>
-    </section>
-
     <section class="section faq-section">
       <div class="container faq-layout">
         <div class="reveal"><div class="eyebrow">Helpful answers</div><h2>Before you dive in.</h2><p class="lead" style="margin-top:18px">Clear answers for families choosing a program, preparing for lessons or checking a venue.</p><a class="text-link" href="enquire.html" style="margin-top:24px">Still have a question?</a></div>
@@ -256,12 +207,14 @@
           <details open><summary>What age can swimmers start?<span>+</span></summary><p>HV Swim's pathway begins from approximately four months with a parent or carer, and continues through children, teens and adults.</p></details>
           <details><summary>Are private lessons available?<span>+</span></summary><p>Yes. One-on-one tuition can support specific goals, confidence, communication preferences or a more individual pace.</p></details>
           <details><summary>How do I know which level to choose?<span>+</span></summary><p>Use the lesson finder as a starting point. The team will confirm the most suitable program after learning about the swimmer's current confidence and experience.</p></details>
+          <details><summary>What do lessons cost?<span>+</span></summary><p>Lessons are $22.50 each and are charged for the full school term, with payment due on enrolment. Each swimmer can receive two absence credits per term; HV Swim does not offer make-up classes.</p></details>
+          <details><summary>Do parents need to stay onsite?<span>+</span></summary><p>Yes. A parent or guardian must remain onsite throughout the lesson, except for swimmers attending a Stroke Development class.</p></details>
           <details><summary>Where can I see pool conditions?<span>+</span></summary><p>The Locations page shows venue access, directions, live local weather and the latest water reading published by HV Swim staff.</p></details>
         </div>
       </div>
     </section>
 
-    <section class="section white facebook-section" aria-labelledby="facebook-title">
+    <section class="section white facebook-section facebook-section-compact" aria-labelledby="facebook-title">
       <div class="container facebook-grid">
         <div class="facebook-copy reveal">
           <div class="facebook-kicker"><span aria-hidden="true">f</span> Facebook updates</div>
@@ -289,11 +242,11 @@
     <section class="section" id="enquire">
       <div class="container cta-panel reveal">
         <div><div class="eyebrow">Ready when they are</div><h2>Let's find the right lesson.</h2><p>Tell us about the swimmer, their experience and what you would love them to achieve. HV Swim Bendigo can help you choose the best starting point.</p></div>
-        <div class="cta-actions"><a class="btn btn-primary" href="enquire.html">Find a lesson</a><a class="btn btn-outline" href="login.html">Secure platform sign in</a></div>
+        <div class="cta-actions"><a class="btn btn-primary" href="enquire.html" data-primary-cta data-analytics-cta="final_find_lesson"><span data-primary-cta-label>Find the right lesson</span></a><a class="btn btn-outline" href="login.html">Secure platform sign in</a></div>
       </div>
     </section>
 
-    <section class="credential-section" aria-labelledby="credentials-title">
+    <section class="credential-section" aria-labelledby="credentials-title" data-public-feature="association_badges" hidden>
       <div class="container credential-shell reveal">
         <div class="credential-intro">
           <div class="eyebrow">Public industry listings</div>
@@ -336,11 +289,11 @@
       <div class="footer-brand"><img src="assets/hv-swim-logo-v3.png" width="400" height="265" alt="HV Swim Bendigo"><p>Personal swimming lessons focused on confidence, water safety and progress for every age and ability.</p></div>
       <div class="footer-col"><strong>Explore</strong><a href="programs.html">Programs &amp; pricing</a><a href="#availability">Availability</a><a href="locations.html">Locations</a><a href="about.html">Our approach</a><a href="shop.html">Merch shop</a></div>
       <div class="footer-col"><strong>Platform</strong><a href="login.html?role=customer">Family account</a><a href="login.html?role=staff">Staff account</a><a href="login.html?role=admin">Website admin</a></div>
-      <div class="footer-col"><strong>Contact</strong><a href="tel:+61413462112">0413 462 112</a><a href="mailto:sloanswimschool@hotmail.com">sloanswimschool@hotmail.com</a><a href="https://www.facebook.com/hvswimschoolbendigo" target="_blank" rel="noopener">Facebook</a></div>
+      <div class="footer-col"><strong>Contact</strong><a href="tel:+61413462112">0413 462 112</a><a href="mailto:bendigo@hvswimschool.com">bendigo@hvswimschool.com</a><a href="https://www.facebook.com/hvswimschoolbendigo" target="_blank" rel="noopener">Facebook</a></div>
     </div>
     <div class="container footer-bottom"><span>© <span data-year></span> HV Swim Bendigo.</span><nav class="footer-legal" aria-label="Legal"><a href="privacy.html">Privacy</a><a href="terms.html">Terms &amp; cancellations</a><a href="photo-consent.html">Photo consent</a></nav><span>Safety • Confidence • Belonging</span></div>
   </footer>
-  <nav class="mobile-book-bar" aria-label="Quick actions"><a href="locations.html">Pool conditions</a><a class="btn btn-primary" href="enquire.html">Find a lesson</a></nav>
+  <nav class="mobile-book-bar" aria-label="Quick actions"><a href="locations.html">Pool conditions</a><a class="btn btn-primary" href="enquire.html" data-primary-cta data-analytics-cta="mobile_find_lesson"><span data-primary-cta-label>Find the right lesson</span></a></nav>
   <div class="toast" role="status" aria-live="polite"></div>
 </body>
 </html>

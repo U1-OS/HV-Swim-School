@@ -73,6 +73,26 @@
     return pending;
   }
   window.HVSwim = Object.assign(window.HVSwim || {}, { fetchJSON, formatClassTime, formatDateTime });
+
+  // Public modules fail closed. Preview-only and not-yet-approved brand/commerce
+  // sections remain absent if the server cannot confirm the current environment.
+  async function hydratePublicMode() {
+    if (!/^https?:$/.test(location.protocol)) return;
+    try {
+      const payload = await fetchJSON('/api/public/site-settings', { headers:{ Accept:'application/json' } });
+      const mode = payload.mode === 'preview' ? 'preview' : 'production';
+      document.documentElement.dataset.siteMode = mode;
+      document.querySelectorAll('[data-preview-only]').forEach(element => { element.hidden = mode !== 'preview'; });
+      document.querySelectorAll('[data-public-feature]').forEach(element => {
+        element.hidden = payload.features?.[element.dataset.publicFeature] !== true;
+      });
+      const primaryLabel = String(payload.settings?.primary_cta || 'Find the right lesson').trim();
+      document.querySelectorAll('[data-primary-cta-label]').forEach(element => { element.textContent = primaryLabel; });
+    } catch (_) {
+      document.documentElement.dataset.siteMode = 'production';
+    }
+  }
+  hydratePublicMode();
   function showToast(message) {
     const toast = document.querySelector('.toast');
     if (!toast) return;
@@ -145,9 +165,18 @@
   // redrawn corporate logos. Issued artwork can replace the text plates only after the
   // business records current usage rights and renewal evidence.
   const footer = document.querySelector('.site-footer');
+  if (footer && !footer.querySelector('.footer-business-identity')) {
+    const identity = document.createElement('p');
+    identity.className = 'container footer-business-identity';
+    identity.textContent = 'HVS BENDIGO PTY LTD · ABN 46 687 937 962 · 76 Wood Street, California Gully VIC 3556';
+    const bottom = footer.querySelector('.footer-bottom');
+    if (bottom) footer.insertBefore(identity, bottom); else footer.append(identity);
+  }
   if (footer && !footer.querySelector('.footer-association-strip')) {
     const strip = document.createElement('div');
     strip.className = 'container footer-association-strip';
+    strip.dataset.publicFeature = 'association_badges';
+    strip.hidden = true;
     strip.setAttribute('aria-label', 'HV Swim aquatic industry directory links');
     strip.innerHTML = `<div class="footer-association-intro"><span>Industry records</span><strong>Check HV Swim at the source.</strong><small>Authorised member/provider badge artwork is still required.</small></div><div class="footer-association-links"><a href="https://12524.locationlandingpages.com/australia/victoria/california-gully/hv-swim-school-bendigo/2807" target="_blank" rel="noopener"><b>SWIM</b><span>Public school record</span><em>Badge file required</em></a><a href="https://austswim.com.au/australian-swim-school-finder" target="_blank" rel="noopener"><b>AUSTSWIM</b><span>Swim School Network finder</span><em>Issued badge required</em></a><a href="https://autism-swim.org/providers/aquatic-centre-hidden-valley-swim-school-bendigo/" target="_blank" rel="noopener"><b>AUTISM SWIM</b><span>Provider-directory record</span><em>Renewal to confirm</em></a></div>`;
     const footerBottom = footer.querySelector('.footer-bottom');
@@ -252,22 +281,25 @@
   function conditionView(condition) {
     const updatedTime = new Date(condition.updatedAt || '').getTime();
     const isStale = condition.verified && (!Number.isFinite(updatedTime) || Date.now() - updatedTime > DAY);
-    const temp = condition.temperature == null ? '—' : `${Number(condition.temperature).toFixed(1)}°C`;
-    const tempLabel = condition.verified ? (isStale ? 'Reading over 24h old' : 'Staff verified') : 'Update due';
+    const hasCurrentReading = Boolean(condition.verified && !isStale && condition.temperature != null);
+    const temp = hasCurrentReading ? `${Number(condition.temperature).toFixed(1)}°C` : '—';
+    const tempLabel = hasCurrentReading ? 'Staff verified today' : 'No verified reading today';
     const updated = condition.updatedAt ? `${formatDateTime(condition.updatedAt)} · ${condition.staff}` : 'No current staff reading published';
     const statusText = isStale && condition.status === 'open' ? `Check required · ${condition.statusText}` : condition.statusText;
     const statusClass = isStale && condition.status === 'open' ? 'changed' : (condition.verified ? condition.status : 'changed');
-    return { temp, tempLabel, updated, statusText, statusClass, isStale };
+    return { temp, tempLabel, updated, statusText, statusClass, isStale, hasCurrentReading };
   }
   function renderConditions() {
     document.querySelectorAll('[data-location]').forEach(card => {
       const condition = conditions[card.dataset.location];
       if (!condition) return;
       const view = conditionView(condition);
+      card.querySelectorAll('[data-reading]').forEach(el => { el.hidden = !view.hasCurrentReading; });
+      card.querySelectorAll('[data-reading-fallback]').forEach(el => { el.hidden = view.hasCurrentReading; });
       card.querySelectorAll('[data-temp]').forEach(el => el.textContent = view.temp);
       card.querySelectorAll('[data-temp-label]').forEach(el => el.textContent = view.tempLabel);
       card.querySelectorAll('[data-updated]').forEach(el => el.textContent = view.updated);
-      card.querySelectorAll('[data-verified-by]').forEach(el => el.textContent = condition.verified ? `Verified by ${condition.staff}` : 'Awaiting staff verification');
+      card.querySelectorAll('[data-verified-by]').forEach(el => el.textContent = view.hasCurrentReading ? `Verified by ${condition.staff}` : 'No current verified reading');
       card.querySelectorAll('[data-status]').forEach(el => {
         el.textContent = condition.verified ? view.statusText : view.statusText;
         el.classList.remove('open','closed','changed','demo');
@@ -275,10 +307,11 @@
       });
     });
     const wood = conditionView(conditions['wood-street']);
+    document.querySelectorAll('[data-current-reading-only]').forEach(el => { el.hidden = !wood.hasCurrentReading; });
     document.querySelectorAll('[data-home-temp]').forEach(el => el.textContent = wood.temp);
     document.querySelectorAll('[data-home-updated]').forEach(el => el.textContent = wood.tempLabel);
     document.querySelectorAll('[data-home-status]').forEach(el => {
-      el.textContent = conditions['wood-street'].verified ? wood.statusText : 'Awaiting check';
+      el.textContent = wood.hasCurrentReading ? wood.statusText : 'Check conditions';
       el.className = `status ${wood.statusClass}`;
     });
   }

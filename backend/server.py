@@ -132,7 +132,7 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(
     title="HV Swim Bendigo Platform API",
-    version="5.5.0",
+    version="5.6.0",
     docs_url="/api/docs" if not settings.production else None,
     openapi_url="/openapi.json" if not settings.production else None,
     redoc_url=None,
@@ -913,13 +913,22 @@ def renumber_waitlist(db: sqlite3.Connection, class_id: int) -> None:
 
 @app.get("/api/health")
 def health() -> dict[str, Any]:
-    return {"ok": True, "service": "HV Swim Bendigo", "version": "5.5.0", "environment": settings.app_env, "time": now_iso()}
+    return {"ok": True, "service": "HV Swim Bendigo", "version": "5.6.0", "environment": settings.app_env, "time": now_iso()}
 
 
 @app.get("/api/public/site-settings")
 def public_site_settings() -> dict[str, Any]:
     with db_session() as db:
-        return {"settings": site_settings_payload(db)}
+        public_settings = site_settings_payload(db)
+        features = {
+            "merch_home": public_settings.pop("feature_merch_home", "0") == "1",
+            "association_badges": public_settings.pop("feature_association_badges", "0") == "1",
+        }
+        return {
+            "settings": public_settings,
+            "mode": "production" if settings.production else "preview",
+            "features": features,
+        }
 
 
 @app.get("/api/demo-accounts")
@@ -1643,45 +1652,10 @@ def staff_roster(user: dict[str, Any] = Depends(require_roles("staff", "admin"))
 @app.post("/api/staff/clock")
 def staff_clock(payload: ClockInput, request: Request, user: dict[str, Any] = Depends(require_roles("staff", "admin")), x_csrf_token: str | None = Header(default=None)) -> dict[str, Any]:
     csrf_guard(request, user, x_csrf_token)
-    with db_session() as db:
-        if payload.action == "in":
-            # Serialise the active-shift check and insert. The partial unique index is the
-            # final guard; the write lock also produces a clear 409 instead of a race-time
-            # integrity error under two nearly simultaneous taps.
-            db.execute("BEGIN IMMEDIATE")
-            active = db.execute("SELECT * FROM time_entries WHERE staff_id=? AND clock_out IS NULL", (user["id"],)).fetchone()
-            if active:
-                raise HTTPException(status_code=409, detail="You are already clocked in")
-            location = location_by_slug(db, payload.location_slug)
-            try:
-                cursor = db.execute("INSERT INTO time_entries(staff_id,location_id,clock_in,latitude,longitude,accuracy_metres,status) VALUES(?,?,?,?,?,?,?)", (user["id"], location["id"], now_iso(), payload.latitude, payload.longitude, payload.accuracy_metres, "draft"))
-            except sqlite3.IntegrityError:
-                raise HTTPException(status_code=409, detail="You are already clocked in")
-            audit(db, user["id"], "clock_in", "time_entry", cursor.lastrowid, {"location": payload.location_slug}, client_ip(request))
-            return {"status": "clocked_in", "entry_id": cursor.lastrowid, "clock_in": now_iso(), "location": location["name"]}
-        active = db.execute("SELECT * FROM time_entries WHERE staff_id=? AND clock_out IS NULL ORDER BY clock_in DESC LIMIT 1", (user["id"],)).fetchone()
-        if not active:
-            raise HTTPException(status_code=409, detail="No active shift was found")
-        finish = datetime.now(timezone.utc)
-        start = datetime.fromisoformat(active["clock_in"])
-        hours = round(max(0, (finish - start).total_seconds() / 3600), 2)
-        db.execute("UPDATE time_entries SET clock_out=?,hours=? WHERE id=?", (finish.isoformat(), hours, active["id"]))
-        audit(db, user["id"], "clock_out", "time_entry", active["id"], {"hours": hours}, client_ip(request))
-        # A forgotten clock-out records every hour in between, and that figure is headed for
-        # payroll. The true value is never altered — but it must not pass silently.
-        if hours > LONG_SHIFT_REVIEW_HOURS:
-            db.execute(
-                "INSERT INTO notifications(audience_role,title,message,kind,delivery_channels,created_at) VALUES(?,?,?,?,?,?)",
-                ("admin", "Unusually long shift recorded",
-                 f"{user['first_name']} {user['last_name']} recorded {hours} hours in one shift. Check this before approving it for payroll.",
-                 "compliance", '["in_app"]', now_iso()),
-            )
-            return {
-                "status": "clocked_out", "entry_id": active["id"], "clock_out": finish.isoformat(), "hours": hours,
-                "review_required": True,
-                "message": f"Clocked out · {hours} hours. That is longer than a usual shift, so management has been asked to check it before payroll.",
-            }
-        return {"status": "clocked_out", "entry_id": active["id"], "clock_out": finish.isoformat(), "hours": hours}
+    raise HTTPException(
+        status_code=410,
+        detail="HV Swim does not use clock-in tracking. Use the roster and reviewed timesheet workflow.",
+    )
 
 
 @app.get("/api/staff/time-entries")
@@ -2040,7 +2014,7 @@ def export_timesheets(request: Request, user: dict[str, Any] = Depends(require_r
         audit(db, user["id"], "export_timesheets", "export", "hv-swim-timesheets.csv", {"record_count": len(records)}, client_ip(request))
     return csv_download(
         "hv-swim-timesheets.csv",
-        ["Staff", "Clock in", "Clock out", "Location", "Hours", "Status", "Approved at"],
+        ["Staff", "Shift start", "Shift finish", "Location", "Hours", "Status", "Approved at"],
         [[f'{item["first_name"]} {item["last_name"]}'.strip(), item["clock_in"], item["clock_out"], item["location_name"], item["hours"], item["status"], item["approved_at"]] for item in records],
     )
 
@@ -2460,20 +2434,68 @@ async def sync_xero_timesheets(request: Request, user: dict[str, Any] = Depends(
         }
 
 
+def product_launch_blockers(product: dict[str, Any]) -> list[str]:
+    """Return every gate that prevents a catalogue record becoming a sellable product."""
+    blockers: list[str] = []
+    route = str(product.get("supplier_route") or "manual_review")
+    try:
+        sizes = json.loads(product.get("sizes") or "[]") if isinstance(product.get("sizes"), str) else product.get("sizes") or []
+    except json.JSONDecodeError:
+        sizes = []
+    if product.get("sample_status") != "approved":
+        blockers.append("Physical sample not approved")
+    if product.get("status") not in {"approved", "available"}:
+        blockers.append("Launch status not approved")
+    if not product.get("price_cents") or product.get("cost_cents") is None:
+        blockers.append("Retail price or supplier cost missing")
+    if not sizes:
+        blockers.append("Final options or sizes missing")
+    if not product.get("shopify_gid"):
+        blockers.append("Shopify product mapping missing")
+    if route == "manual_review":
+        blockers.append("Supplier route still requires review")
+    elif "printify" in route and not product.get("printify_product_id"):
+        blockers.append("Printify product mapping missing")
+    elif "printify" not in route and not product.get("supplier_reference"):
+        blockers.append("Approved supplier or sample reference missing")
+    return blockers
+
+
+def public_product_view(product: dict[str, Any]) -> dict[str, Any]:
+    """Keep supplier costs and private integration mappings out of public responses."""
+    private_fields = {"cost_cents", "shopify_gid", "printify_product_id", "supplier_reference"}
+    return {key: value for key, value in product.items() if key not in private_fields}
+
+
 @app.get("/api/products")
 async def products() -> dict[str, Any]:
     public_product_query = """SELECT id,sku,title,category,description,price_cents,sizes,status,emoji,
-                                     sample_status,supplier_route,personalisation,audience,fulfilment_mode
+                                     sample_status,supplier_route,personalisation,audience,fulfilment_mode,
+                                     cost_cents,shopify_gid,printify_product_id,supplier_reference
                               FROM products ORDER BY category,title"""
     if shopify_ready():
         try:
-            return {"source": "shopify", "products": await shopify_products()}
+            with db_session() as db:
+                local_catalogue = rows(db.execute(public_product_query))
+            approved_by_gid = {
+                str(product["shopify_gid"]): product
+                for product in local_catalogue
+                if product.get("status") == "available" and not product_launch_blockers(product)
+            }
+            live_products = await shopify_products()
+            approved_live = [product for product in live_products if str(product.get("id")) in approved_by_gid]
+            return {
+                "source": "shopify",
+                "products": approved_live,
+                "publication_boundary": "Only locally approved, sampled, costed and mapped products are shown from Shopify.",
+            }
         except Exception as exc:
             with db_session() as db:
                 fallback = rows(db.execute(public_product_query))
-            return {"source": "local_fallback", "products": fallback, "warning": f"Shopify unavailable: {type(exc).__name__}"}
+            return {"source": "local_fallback", "products": [public_product_view(item) for item in fallback], "warning": f"Shopify unavailable: {type(exc).__name__}"}
     with db_session() as db:
-        return {"source": "planned_catalogue", "products": rows(db.execute(public_product_query))}
+        local_products = rows(db.execute(public_product_query))
+        return {"source": "planned_catalogue", "products": [public_product_view(item) for item in local_products]}
 
 
 @app.get("/api/admin/merch-production")
@@ -2517,10 +2539,14 @@ async def merch_production(user: dict[str, Any] = Depends(require_roles("admin")
             "printify": printify_status,
             "manual_order_reference": "recorded" if product.get("supplier_reference") else "required",
         }
+        product["blocking_reasons"] = product_launch_blockers(product)
+        product["production_ready"] = not product["blocking_reasons"]
+        product["public_ready"] = product["production_ready"] and product.get("status") == "available"
 
     approved_samples = sum(1 for product in catalogue if product.get("sample_status") == "approved")
     costed_products = sum(1 for product in catalogue if product.get("cost_cents") is not None)
-    launchable_products = sum(1 for product in catalogue if product.get("sample_status") == "approved" and product.get("status") in {"approved", "available"})
+    launchable_products = sum(1 for product in catalogue if product.get("production_ready"))
+    public_ready_products = sum(1 for product in catalogue if product.get("public_ready"))
     shopify_mapped = sum(1 for product in catalogue if product.get("shopify_gid"))
     printify_eligible = sum(1 for product in catalogue if "printify" in (product.get("supplier_route") or ""))
     printify_mapped = sum(1 for product in catalogue if "printify" in (product.get("supplier_route") or "") and product.get("printify_product_id"))
@@ -2538,6 +2564,7 @@ async def merch_production(user: dict[str, Any] = Depends(require_roles("admin")
             "approved_samples": approved_samples,
             "costed_products": costed_products,
             "launchable_products": launchable_products,
+            "public_ready_products": public_ready_products,
             "readiness_percent": round((approved_samples + costed_products + launchable_products) / (max(len(catalogue), 1) * 3) * 100),
         },
         "sync_readiness": {
@@ -2622,11 +2649,6 @@ async def sensor(user: dict[str, Any] = Depends(require_roles("staff", "admin"))
 
 
 ENQUIRY_LIMIT_PER_HOUR = 5
-# Above this, a shift is treated as a probable forgotten clock-out and flagged for
-# management before it reaches payroll. HV Swim should confirm the figure.
-LONG_SHIFT_REVIEW_HOURS = 12
-
-
 @app.post("/api/public/enquiries")
 def create_enquiry(payload: EnquiryInput, request: Request) -> dict[str, Any]:
     ip = client_ip(request)
