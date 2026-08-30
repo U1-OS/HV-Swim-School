@@ -172,7 +172,7 @@
     ['staff','Staff uniform','What the HV Swim team wears on deck, in every season.'],
   ];
 
-  function renderKits() {
+  function renderKits(live = false) {
     const wrap = document.getElementById('kit-grid');
     if (!wrap) return;
     const bySku = new Map(products.map(product => [String(product.sku).toUpperCase(), product]));
@@ -193,7 +193,7 @@
           <ul class="kit-items">${items.map(item => `<li><span>${esc(item.title)}</span><em>${money(item.price_cents)}</em></li>`).join('')}</ul>
           <div class="kit-foot">
             <div><strong>${money(total)}</strong><small>${items.length} item${items.length === 1 ? '' : 's'} · components total</small></div>
-            <button type="button" class="btn btn-soft btn-small" data-kit-add="${esc(kit.id)}">Add kit</button>
+            <button type="button" class="btn btn-soft btn-small" data-kit-add="${esc(kit.id)}"${live ? "" : " disabled"}>${live ? "Choose kit products" : "Shopify setup required"}</button>
           </div>
         </article>`;
       }).join('');
@@ -427,13 +427,14 @@
     document.getElementById('cart-mode-status').textContent=live?'Shopify catalogue connected':'Shopify setup required';
     document.getElementById('cart-mode-copy').textContent=live?'Only sampled and approved Shopify products are visible. Sign in to continue to the shopping bag.':'Product specifications are visible, but cart and checkout are unavailable.';
     document.querySelectorAll('[data-cart-open]').forEach(button=>button.hidden=!live);
-    document.querySelectorAll('[data-kit-add]').forEach(button=>{button.disabled=!live;button.textContent=live?'Choose kit products':'Shopify setup required';});
     if(!live){cart=[];saveCart();closeCart();}
-    render(); renderKits(); renderCart();
+    render(); renderKits(catalogueSource === 'shopify'); renderCart();
   }).catch(()=>{
     grid.innerHTML='<div class="empty-state"><strong>The collection is not loading right now.</strong><p>This is a temporary problem on our side. The range is still there — get in touch and the team can talk you through it.</p><a class="btn btn-blue btn-small" href="enquire.html">Talk to the team <span aria-hidden="true">&rarr;</span></a></div>';
     document.getElementById('shop-result-count').textContent='Catalogue temporarily unavailable';
     document.getElementById('shop-source').innerHTML='<span class="status closed">Catalogue unavailable</span>';
     document.getElementById('shop-load-more').hidden=true;
+    const kitWrap=document.getElementById('kit-grid');
+    if(kitWrap) kitWrap.innerHTML='<div class="empty-state"><strong>Kit plans need the product list.</strong><p>The kits are built from the live range, so they cannot be shown while the collection is unavailable. Get in touch and the team can talk you through what each kit includes.</p><a class="btn btn-blue btn-small" href="enquire.html">Talk to the team <span aria-hidden="true">&rarr;</span></a></div>';
   }).finally(()=>grid.setAttribute('aria-busy','false'));
 })();
