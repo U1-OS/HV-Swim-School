@@ -51,6 +51,9 @@ CREATE TABLE IF NOT EXISTS swimmers (
   level TEXT NOT NULL,
   emergency_contact TEXT,
   medical_notes TEXT,
+  allergies TEXT,
+  medications TEXT,
+  support_notes TEXT,
   photo_consent INTEGER NOT NULL DEFAULT 0,
   active INTEGER NOT NULL DEFAULT 1,
   created_at TEXT NOT NULL
@@ -528,6 +531,14 @@ def initialise_database() -> None:
         }.items():
             if column not in user_columns:
                 db.execute(f"ALTER TABLE users ADD COLUMN {column} {definition}")
+        swimmer_columns = {row[1] for row in db.execute("PRAGMA table_info(swimmers)")}
+        for column, definition in {
+            "allergies": "TEXT",
+            "medications": "TEXT",
+            "support_notes": "TEXT",
+        }.items():
+            if column not in swimmer_columns:
+                db.execute(f"ALTER TABLE swimmers ADD COLUMN {column} {definition}")
         attendance_columns = {row[1] for row in db.execute("PRAGMA table_info(lesson_attendance)")}
         if "term_id" not in attendance_columns:
             # V5.7 preview databases created during development may have register rows
@@ -576,9 +587,10 @@ def initialise_database() -> None:
             ("HV-SWIMWEAR", "HV Swim Team Swimwear", "Swimwear", "Logo-branded training swimwear for children and adults.", 5995, '["Kids 4-14","Adult XS-XL"]', "planned", "🩱"),
             ("HV-RASHIE", "HV Swim Kids Rashie", "Swimwear", "Chlorine-resistant long-sleeve swimming shirt for lessons and outdoor pool days.", 4495, '["Kids 2","Kids 4","Kids 6","Kids 8","Kids 10","Kids 12","Kids 14"]', "planned", "◊"),
             ("HV-SWIM-SHORTS", "HV Swim Kids Swim Shorts", "Swimwear", "Comfortable lesson-ready swim shorts with an adjustable waist and approved HV Swim branding.", 3995, '["Kids 2","Kids 4","Kids 6","Kids 8","Kids 10","Kids 12","Kids 14"]', "planned", "▱"),
-            ("HV-TOWEL", "HV Swim Logo Towel", "Towels", "Soft pool towel with embroidered HV Swim branding.", 3495, '["One size"]', "planned", "▤"),
-            ("HV-HOODED-TOWEL", "HV Swim Kids Hooded Towel", "Towels", "Warm hooded pool towel sized for children, with a supplier-approved HV Swim decoration.", 5495, '["Toddler","Junior"]', "planned", "▥"),
-            ("HV-BOTTLE", "HV Swim Drink Bottle", "Bottles", "Named pool-deck bottle with HV Swim branding.", 1995, '["650ml"]', "planned", "🥤"),
+            ("HV-TOWEL", "HV Swim Premium Embroidered Towel", "Towels", "Plush pool towel with a stitched HV Swim crest and an optional embroidered swimmer name.", 3995, '["Pool 75 × 150cm","Bath sheet 90 × 170cm"]', "planned", "▤"),
+            ("HV-HOODED-TOWEL", "HV Swim Embroidered Hooded Towel Poncho", "Towels", "Warm pull-on hooded towel for quick poolside changes, finished with a supplier-approved embroidered HV Swim crest.", 5995, '["Toddler 2-4","Junior 5-8","Youth 9-12"]', "planned", "▥"),
+            ("HV-MINI-HOODED-TOWEL", "HV Swim Mini Hooded Towel", "Towels", "Soft wrap-style hooded towel for little swimmers, with comfortable embroidery backing and optional first-name stitching.", 4995, '["Little swimmer 1-3","Little swimmer 3-5"]', "planned", "▥"),
+            ("HV-BOTTLE", "HV Swim Named Insulated Bottle", "Bottles", "Premium pool-deck bottle with a leak-resistant lid, HV Swim branding and an optional swimmer name.", 2995, '["500ml junior","750ml family"]', "planned", "🥤"),
             ("HV-INSULATED-TUMBLER", "HV Swim Insulated Coffee Cup", "Drinkware", "Premium reusable insulated cup for adults, with a proofed HV Swim decoration.", 3495, '["350ml","470ml"]', "planned", "◉"),
             ("HV-JUNIOR-WARM-CUP", "HV Swim Junior Warm-Drink Cup", "Drinkware", "Spill-resistant junior cup intended for parent-supervised warm, never hot, drinks.", 2995, '["300ml"]', "planned", "◎"),
             ("HV-GOGGLES", "HV Swim Goggles", "Equipment", "Comfortable training goggles for regular lessons.", 2495, '["Junior","Adult"]', "planned", "🥽"),
@@ -594,14 +606,31 @@ def initialise_database() -> None:
             ("HV-STAFF-PUFFER-JACKET", "HV Swim Staff Puffer Jacket", "Uniforms", "Warm staff outer layer with controlled logo placement and a supplier-approved size range.", 11995, '["XS","S","M","L","XL","2XL"]', "planned", "◑"),
             ("HV-STAFF-TRACKPANTS", "HV Swim Staff Track Pants", "Uniforms", "Comfortable staff track pants for travel, setup and cooler pool-deck shifts.", 6995, '["XS","S","M","L","XL","2XL"]', "planned", "▢"),
             ("HV-INSTRUCTOR-CAP", "HV Swim Instructor Cap", "Uniforms", "Lightweight branded cap for outdoor and seasonal pool work.", 2495, '["Adjustable"]', "planned", "◌"),
+            ("HV-FAMILY-TEE", "HV Swim Family Club Tee", "Lifestyle", "Soft premium club tee for families, events and lesson-day arrivals, prepared for approved Printify-to-Shopify fulfilment.", 3495, '["Kids 6-14","Adult XS-3XL"]', "planned", "◇"),
+            ("HV-FAMILY-CREW", "HV Swim Family Club Crew", "Lifestyle", "Premium embroidered-look crew layer for cool Bendigo mornings, families and team events.", 6495, '["Kids 8-14","Adult XS-3XL"]', "planned", "◇"),
         ]
         db.executemany("INSERT OR IGNORE INTO products(sku,title,category,description,price_cents,sizes,status,emoji) VALUES(?,?,?,?,?,?,?,?)", base_products)
+        # Untouched preview records receive the clearer premium copy and options. Once
+        # management has sampled, mapped or otherwise progressed a product, their exact
+        # commercial record is preserved on later starts.
+        canonical_product_copy = {
+            row[0]: row[1:7]
+            for row in base_products
+        }
+        db.executemany(
+            """UPDATE products
+               SET title=?,category=?,description=?,price_cents=?,sizes=?,status=?
+               WHERE sku=? AND status='planned' AND sample_status='not_ordered'
+                 AND supplier_reference IS NULL AND shopify_gid IS NULL""",
+            [(*values, sku) for sku, values in canonical_product_copy.items()],
+        )
         production_defaults = {
             "HV-SWIMWEAR": ("family", "specialist_swim", "specialist_purchase_order", "HV Swim identity; name placement under review"),
             "HV-RASHIE": ("kids", "specialist_swim", "specialist_purchase_order", "HV Swim identity; optional swimmer name after chlorine testing"),
             "HV-SWIM-SHORTS": ("kids", "specialist_swim", "specialist_purchase_order", "HV Swim identity; no name placement until a wear test is approved"),
             "HV-TOWEL": ("family", "vistaprint_or_specialist", "supplier_comparison", "Embroidered identity; optional swimmer name"),
             "HV-HOODED-TOWEL": ("kids", "vistaprint_or_specialist", "supplier_comparison", "Embroidered or transfer identity; optional swimmer name"),
+            "HV-MINI-HOODED-TOWEL": ("kids", "vistaprint_or_specialist", "supplier_comparison", "Comfort-backed embroidery; optional first-name stitching"),
             "HV-BOTTLE": ("family", "vistaprint", "manual_bulk_order", "Named bottle after wash and rub testing"),
             "HV-INSULATED-TUMBLER": ("family", "vistaprint_or_specialist", "supplier_comparison", "Proofed HV Swim decoration; optional name after wash and heat-cycle testing"),
             "HV-JUNIOR-WARM-CUP": ("kids", "vistaprint_or_specialist", "supplier_comparison", "Optional name after lid, wash and rub testing; parent-supervised warm drinks only"),
@@ -613,11 +642,13 @@ def initialise_database() -> None:
             "HV-STAFF-POLO": ("staff", "vistaprint", "manual_bulk_order", "Embroidered identity; role or staff name optional"),
             "HV-STAFF-TEE": ("staff", "printify", "printify_shopify", "HV Swim decoration; staff name optional after a sample is approved"),
             "HV-STAFF-SHORTS": ("staff", "vistaprint_or_specialist", "supplier_comparison", "Small HV Swim mark; individual names not recommended"),
-            "HV-TEAM-HOODIE": ("family", "printify", "printify_shopify", "HV Swim decoration; individual name optional"),
+            "HV-TEAM-HOODIE": ("staff", "printify", "printify_shopify", "HV Swim decoration; staff name optional after sample approval"),
             "HV-STAFF-PUFFER-VEST": ("staff", "vistaprint_or_specialist", "manual_bulk_order", "Embroidered HV Swim identity; role optional"),
             "HV-STAFF-PUFFER-JACKET": ("staff", "vistaprint_or_specialist", "manual_bulk_order", "Embroidered HV Swim identity; role optional"),
             "HV-STAFF-TRACKPANTS": ("staff", "vistaprint_or_specialist", "manual_bulk_order", "Small HV Swim mark; no individual name planned"),
             "HV-INSTRUCTOR-CAP": ("staff", "printify_or_vistaprint", "supplier_comparison", "Embroidered identity and instructor label"),
+            "HV-FAMILY-TEE": ("family", "printify", "printify_shopify", "HV Swim front mark; optional family surname only after sample approval"),
+            "HV-FAMILY-CREW": ("family", "printify", "printify_shopify", "Premium HV Swim chest decoration; no individual name by default"),
         }
         fulfilment_by_route = {
             "specialist_swim": "specialist_purchase_order",
@@ -755,12 +786,12 @@ def initialise_database() -> None:
         user_ids = {row["email"]: row["id"] for row in db.execute("SELECT id,email FROM users")}
         location_ids = {row["slug"]: row["id"] for row in db.execute("SELECT id,slug FROM locations")}
         db.execute(
-            "INSERT INTO swimmers(customer_id,first_name,last_name,date_of_birth,level,emergency_contact,medical_notes,photo_consent,created_at) VALUES(?,?,?,?,?,?,?,?,?)",
-            (user_ids["parent@hvswim.demo"], "Mia", "Smith", "2018-05-14", "Learn to Swim 3", "Jordan Smith · 0413 000 101", "No medical alerts in demo record", 1, created),
+            "INSERT INTO swimmers(customer_id,first_name,last_name,date_of_birth,level,emergency_contact,medical_notes,allergies,medications,support_notes,photo_consent,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+            (user_ids["parent@hvswim.demo"], "Mia", "Smith", "2018-05-14", "Learn to Swim 3", "Jordan Smith · 0413 000 101", "No medical conditions recorded in this demo profile", "No known allergies", "No medications recorded", "Responds well to calm, step-by-step instructions", 1, created),
         )
         db.execute(
-            "INSERT INTO swimmers(customer_id,first_name,last_name,date_of_birth,level,emergency_contact,medical_notes,photo_consent,created_at) VALUES(?,?,?,?,?,?,?,?,?)",
-            (user_ids["parent@hvswim.demo"], "Noah", "Smith", "2024-01-22", "Infant Aquatics", "Jordan Smith · 0413 000 101", "No medical alerts in demo record", 0, created),
+            "INSERT INTO swimmers(customer_id,first_name,last_name,date_of_birth,level,emergency_contact,medical_notes,allergies,medications,support_notes,photo_consent,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+            (user_ids["parent@hvswim.demo"], "Noah", "Smith", "2024-01-22", "Infant Aquatics", "Jordan Smith · 0413 000 101", "No medical conditions recorded in this demo profile", "No known allergies", "No medications recorded", "Parent participates in every infant lesson", 0, created),
         )
         classes = [
             ("INF-A-MON", "Infant Aquatics", "Infant Aquatics", location_ids["wood-street"], user_ids["staff@hvswim.demo"], 0, "09:00", 30, 5, 2250),

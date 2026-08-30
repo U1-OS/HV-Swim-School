@@ -37,7 +37,7 @@ def expect(label, condition):
 def main():
     public = urllib.request.build_opener()
     status, health = request(public, "/api/health")
-    expect("health endpoint", status == 200 and health.get("version") == "5.7.0")
+    expect("health endpoint", status == 200 and health.get("version") == "5.8.0")
     home_page = public.open(BASE + "/index.html", timeout=30).read().decode("utf-8")
     expect("live homepage day view", "Today at HV Swim" in home_page and "today-grid" in home_page and "staff reading" in home_page)
     about_page = public.open(BASE + "/about.html", timeout=30).read().decode("utf-8")
@@ -45,12 +45,13 @@ def main():
     programs_page = public.open(BASE + "/programs.html", timeout=30).read().decode("utf-8")
     expect("premium programs and pricing page", "Every swimmer has" in programs_page and "Guided lesson matcher" in programs_page and "program-availability" in programs_page)
     shop_page = public.open(BASE + "/shop.html", timeout=30).read().decode("utf-8")
-    expect("premium commerce storefront", "Saved collection" in shop_page and "The right supplier for each product" in shop_page and "cart-drawer" in shop_page)
+    expect("premium commerce storefront", "Saved collection" in shop_page and "The right maker for every item" in shop_page and "cart-drawer" in shop_page)
+    expect("embroidered towels and POD shop", "The towel edit" in shop_page and "POD family wear" in shop_page and "Printify → Shopify" in shop_page)
     expect("guided merchandise kit builder", "First Splash Kit" in shop_page and "Lesson Day Kit" in shop_page and "data-kit-add" in shop_page and "Size it, care for it" in shop_page)
     enquire_page = public.open(BASE + "/enquire.html", timeout=30).read().decode("utf-8")
     expect("guided enrolment concierge", "Four clear steps" in enquire_page and "wizard-class-grid" in enquire_page and "enrolment-success" in enquire_page)
     mobile_shell = public.open(BASE + "/mobile-shell.html", timeout=30).read().decode("utf-8")
-    expect("native mobile launch shell", "Open connected app" in mobile_shell and "V5.7.0" in mobile_shell)
+    expect("native mobile launch shell", "Open connected app" in mobile_shell and "V5.8.0" in mobile_shell)
     manifest = json.loads(public.open(BASE + "/manifest.webmanifest", timeout=30).read().decode("utf-8"))
     expect("installable app manifest", manifest.get("display") == "standalone" and len(manifest.get("icons", [])) >= 3)
     for path, key in (("/api/public/locations", "locations"), ("/api/classes", "classes")):
@@ -62,6 +63,13 @@ def main():
     expect("public website settings", status == 200 and site.get("settings", {}).get("hero_heading"))
     status, badges = request(public, "/api/public/association-badges")
     expect("association marks fail closed", status == 200 and badges == {"badges": [], "published": False})
+    status, public_products = request(public, "/api/products")
+    expect(
+        "public shop excludes staff merchandise",
+        status == 200
+        and public_products.get("products")
+        and all(item.get("audience") != "staff" for item in public_products["products"]),
+    )
 
     roles = {
         "customer": ("parent@hvswim.demo", "FamilyDemo!26", "/api/customer/swimmers", "swimmers"),
@@ -77,6 +85,14 @@ def main():
         status, payload = request(opener, protected_path)
         expect(f"{role} protected data", status == 200 and result_key in payload)
         if role == "customer":
+            expect(
+                "family child safety profiles",
+                bool(payload.get("swimmers"))
+                and all(
+                    field in payload["swimmers"][0]
+                    for field in ("emergency_contact", "allergies", "medications", "medical_notes", "support_notes")
+                ),
+            )
             status, absences = request(opener, "/api/customer/absences")
             expect("family absence-credit workspace", status == 200 and absences.get("policy", {}).get("make_up_classes") is False and isinstance(absences.get("usage"), list))
             status, messages = request(opener, "/api/support-tickets")
@@ -84,6 +100,14 @@ def main():
             status, achievements = request(opener, "/api/customer/achievements")
             expect("family achievement certificates", status == 200 and achievements.get("certificate_rendering") == "html_print")
         if role == "staff":
+            status, staff_merch = request(opener, "/api/staff/merchandise")
+            expect(
+                "private staff merchandise",
+                status == 200
+                and staff_merch.get("audience") == "staff_only"
+                and staff_merch.get("products")
+                and all(item.get("audience") == "staff" for item in staff_merch["products"]),
+            )
             status, register = request(opener, "/api/staff/lesson-register")
             expect("staff lesson register", status == 200 and register.get("policy", {}).get("photo_clearance") and isinstance(register.get("classes"), list))
             status, tickets = request(opener, "/api/staff/support-tickets")
@@ -103,7 +127,7 @@ def main():
             status, locations = request(opener, "/api/admin/locations")
             expect("admin location manager", status == 200 and len(locations.get("locations", [])) >= 2)
             status, merch = request(opener, "/api/admin/merch-production")
-            expect("admin merchandise workspace", status == 200 and len(merch.get("catalogue", [])) >= 21 and merch.get("launch_readiness", {}).get("total_products") >= 21)
+            expect("admin merchandise workspace", status == 200 and len(merch.get("catalogue", [])) >= 24 and merch.get("launch_readiness", {}).get("total_products") >= 24)
             status, tickets = request(opener, "/api/staff/support-tickets")
             expect("management support ticket queue", status == 200 and isinstance(tickets.get("tickets"), list))
             status, alerts = request(opener, "/api/admin/alerts")

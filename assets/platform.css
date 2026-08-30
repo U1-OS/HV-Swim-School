@@ -1237,3 +1237,44 @@ body[data-login-role] .auth-form .input:focus { border-color:var(--login-role-ac
   .register-date-toolbar form{width:100%;align-items:stretch;flex-direction:column}.register-date-toolbar>div:last-child{text-align:left}
 }
 @keyframes auth-water-drift { from { transform:rotate(-8deg) translate3d(-1.5%,0,0) scale(1.1); } to { transform:rotate(-5deg) translate3d(1.5%,1%,0) scale(1.14); } }
+
+/* V5.8 child safety profiles and private staff merchandise */
+.child-profile-intro,.staff-merch-intro{display:flex;align-items:center;justify-content:space-between;gap:28px;padding:27px 30px;border:1px solid rgba(7,117,164,.16);border-radius:24px;background:linear-gradient(135deg,#eefaff,#fff 58%,#fff7dd);box-shadow:0 17px 45px rgba(5,32,65,.08)}
+.child-profile-intro h2,.staff-merch-intro h2{margin:6px 0 8px;color:var(--navy);font-size:clamp(1.35rem,2.4vw,2rem)}
+.child-profile-intro p,.staff-merch-intro p{max-width:760px;margin:0;color:var(--muted);line-height:1.6}
+.child-profile-card{overflow:hidden}
+.child-profile-head{display:grid;grid-template-columns:54px minmax(0,1fr) auto;align-items:center;gap:14px;padding-bottom:19px;border-bottom:1px solid rgba(7,117,164,.12)}
+.child-avatar{width:54px;height:54px;display:grid;place-items:center;border-radius:17px;color:#fff;background:linear-gradient(145deg,#087eaa,#0ab6ce);font-size:1.45rem;font-weight:900;box-shadow:0 11px 25px rgba(7,133,176,.23)}
+.child-profile-head>div:nth-child(2)>span{color:var(--blue);font-size:.66rem;font-weight:900;letter-spacing:.06em;text-transform:uppercase}
+.child-profile-head h2{margin:3px 0;color:var(--navy)}
+.child-profile-head p{margin:0;color:var(--muted);font-size:.74rem}
+.child-safety-summary{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:18px 0}
+.child-safety-summary>div{min-height:84px;padding:13px;border:1px solid #dbe8ee;border-radius:14px;background:#f8fbfc}
+.child-safety-summary>div.attention{border-color:#edd698;background:#fffaf0}
+.child-safety-summary strong,.child-safety-summary span{display:block}
+.child-safety-summary strong{color:#264b64;font-size:.67rem}
+.child-safety-summary span{margin-top:5px;color:#657d8f;font-size:.65rem;line-height:1.5;white-space:pre-line}
+.family-swimmer-profile-form{padding-top:18px;border-top:1px solid rgba(7,117,164,.12)}
+.child-consent-row{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:15px;padding:14px 15px;border:1px solid #d8e7ed;border-radius:14px;background:#f7fbfc}
+.child-consent-row strong,.child-consent-row span{display:block}
+.child-consent-row strong{color:var(--navy);font-size:.7rem}.child-consent-row div>span{margin-top:3px;color:var(--muted);font-size:.63rem}
+.register-safety-notes{display:grid;gap:5px;margin-top:8px}
+.register-safety-notes>span{display:block;padding:7px 8px;border:1px solid #dce8ed;border-radius:9px;color:#61798c;background:#f7fafb;font-size:.67rem;line-height:1.4;text-transform:none;letter-spacing:0}
+.register-safety-notes>span.safety-alert{border-color:#ebce7c;color:#78570e;background:#fff8e6}
+.register-safety-notes strong{display:block;margin-bottom:2px;color:inherit;font-size:.58rem;letter-spacing:.05em;text-transform:uppercase}
+.staff-merch-intro{color:white;border-color:rgba(255,255,255,.13);background:linear-gradient(135deg,#041934,#073f6e 60%,#087d99)}
+.staff-merch-intro h2{color:white}.staff-merch-intro p{color:#c7dce8}.staff-merch-intro .role-action-kicker{color:#6ee0f1}
+.staff-product-grid{margin-top:18px}
+.staff-merch-card{display:flex;flex-direction:column;min-width:0}
+.staff-merch-art{min-height:170px;display:grid;place-items:center;margin:-18px -18px 18px;border-radius:16px 16px 6px 6px;background:linear-gradient(145deg,#041936,#0a527b);overflow:hidden}
+.staff-merch-art span{width:88px;height:88px;display:grid;place-items:center;border:1px solid rgba(255,255,255,.22);border-radius:24px;background:linear-gradient(145deg,rgba(255,255,255,.2),rgba(255,255,255,.07));box-shadow:0 18px 34px rgba(0,0,0,.2),inset 0 1px rgba(255,255,255,.22);font-size:3.15rem;filter:drop-shadow(0 9px 16px rgba(0,0,0,.22))}
+.staff-merch-route{width:max-content;max-width:100%;padding:5px 9px;border:1px solid #d9e5eb;border-radius:999px;color:#5f7182;background:#f6f9fa;font-size:.56rem;font-weight:850}
+.staff-merch-card>small{display:block;min-height:42px;margin-top:11px;color:var(--muted);line-height:1.45}
+.staff-merch-card .class-card-foot{margin-top:auto;padding-top:15px}
+
+@media(max-width:700px){
+  .child-profile-intro,.staff-merch-intro{align-items:flex-start;flex-direction:column;padding:23px 20px}
+  .child-profile-head{grid-template-columns:48px minmax(0,1fr)}.child-profile-head>.status{grid-column:2;justify-self:start}.child-avatar{width:48px;height:48px}
+  .child-safety-summary{grid-template-columns:1fr}
+  .child-consent-row{align-items:flex-start;flex-direction:column}
+}

@@ -70,10 +70,12 @@ with HV Swim before production deployment.
 
 ## 4. Merchandise and Shopify
 
-- Treat all 21 premium catalogue records as planned until each product passes the release gates below; a public concept card or saved-list entry is not inventory or an offer to supply.
+- Treat all 24 premium catalogue records as planned until each product passes the release gates below; a public concept card or saved-list entry is not inventory or an offer to supply.
 - Use Shopify as the customer-facing source of truth for products, variants, stock, checkout, GST and refunds.
-- Keep Shopify Checkout scoped to approved merchandise and staff uniforms. Lesson and term
-  payments stay in the Xero invoicing route.
+- Keep public Shopify Checkout scoped to approved family merchandise. Staff uniforms must
+  remain in the role-protected Staff and Management workspaces and must not be published in
+  public Shopify collections or the public product API. Lesson and term payments stay in the
+  Xero invoicing route.
 - Connect Printify to Shopify for suitable on-demand garments and accessories. Keep Printify order approval manual during sampling and launch.
 - Use VistaPrint/manual ordering for selected embroidered uniforms, bottles and bulk promotional products where it wins on quality or price.
 - Use a specialist swim supplier for chlorine-resistant swimwear, silicone caps, goggles and any item whose safety or durability cannot be assured by generic POD.

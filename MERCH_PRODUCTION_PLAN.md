@@ -1,16 +1,21 @@
 # HV Swim premium merchandise production plan
 
-The V5.7.0 collection contains 21 planned products and a Management → Merchandise control
+The V5.8.0 collection contains 24 planned products and a Management → Merchandise control
 workspace. It is premium-only: no product becomes sellable until its materials, decoration,
 fit, landed cost and physical sample are approved. The public saved collection is a demand-
 planning preview; no real checkout, stock reservation or supplier order is fabricated.
+
+The public shop and public product API expose family merchandise only. Staff uniform records
+are available exclusively to authenticated staff and management through their role-protected
+workspaces. Preserve this audience rule in the final Shopify customer tags, collections and
+storefront visibility settings before enabling any staff ordering flow.
 
 ## Premium collection and primary route
 
 | Product family | Products | Primary route | Mandatory approval |
 |---|---|---|---|
 | Kids aquatic apparel | Team swimwear, rashie, swim shorts | Specialist aquatic supplier | Chlorine resistance, seams, fit, movement and decoration durability |
-| Towels | Embroidered pool towel, kids hooded towel | Premium textile / VistaPrint comparison | Absorbency, hood comfort, colourfastness and stitch-back comfort |
+| Towels | Premium embroidered pool towel, junior hooded towel poncho, mini hooded towel | Premium textile / VistaPrint comparison | Absorbency, hood comfort, colourfastness, stitch-back comfort and fibre shedding |
 | Cold-drink gear | Named pool bottle | VistaPrint or approved bulk supplier | Food-contact evidence, lid, drop, wash and rub testing |
 | Warm drinkware | Adult insulated coffee cup, junior warm-drink cup | Approved drinkware supplier | Food-contact evidence, insulation, lid and heat-cycle testing; junior cup must be spill-resistant and labelled parent-supervised, warm—not hot |
 | Aquatic equipment | Goggles, silicone training mitts, silicone swim cap | Specialist aquatic supplier | Fit, materials, hygiene/returns, coach-directed use and chlorine durability; mitts are not a flotation or safety device |
@@ -18,6 +23,7 @@ planning preview; no real checkout, stock reservation or supplier order is fabri
 | Staff core uniform | Embroidered polo, performance shirt, quick-dry shorts | Approved uniform supplier; Printify only for eligible mapped shirt | Movement, opacity, pockets, repeatable sizing, wear/wash and stitched-logo sample |
 | Staff warm uniform | Hoodie, puffer vest, puffer jacket, tracksuit pants | Printify/VistaPrint/authorised teamwear comparison | Embroidery/transfer quality, warmth, weather performance, movement, sizing, landed cost and Australian lead time |
 | Staff headwear | Instructor cap | Printify/VistaPrint comparison | Embroidery, fit, sun coverage and outdoor durability |
+| POD family wear | Premium family club tee and crew | Printify → Shopify after sample approval | Exact blank, Australian fulfilment, print/embroidery quality, fit, wash, pilling and shrinkage |
 
 ## Premium brand and logo rule
 
