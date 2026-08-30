@@ -1,4 +1,4 @@
-# HV Swim Bendigo V5.5 Premium Platform
+# HV Swim Bendigo V5.6 Premium Platform
 
 Premium public website, installable Progressive Web App and connected operations platform for HV Swim Bendigo. The build combines a polished responsive front end with a FastAPI service, role-based accounts and a SQLite preview database. SQLite is not approved for the final production deployment that will store customer, child or payroll data.
 
@@ -23,7 +23,7 @@ The launcher creates its own Python environment and installs the pinned dependen
 - `MOBILE_APP_README.md` — Mac, Xcode, Android Studio and store-build guide
 - `BRAND_GUIDE.md` — logo, colour, typography and merchandise usage guide
 - `ASSOCIATION_BADGE_REQUIREMENTS.md` — evidence and authorised-artwork gate for third-party member/provider badges
-- `IMAGE_ASSET_PROVENANCE.md` — exact V5.4/V5.5 image prompts, modes, masters and web outputs
+- `IMAGE_ASSET_PROVENANCE.md` — exact V5.4/V5.6 image prompts, modes, masters and web outputs
 - `prepare-mobile-app.command` — creates and synchronises the Capacitor iOS/Android projects
 - `capacitor.config.json` / `package.json` — Capacitor 8 native project foundation
 - `backend/` — API, security, database and third-party integration boundaries
@@ -42,7 +42,7 @@ Demo credentials only work while `HV_APP_ENV=development`. Production mode disab
 - PBKDF2 password hashing, HttpOnly sessions, CSRF protection, rate limiting and role permissions
 - Family swimmers, class availability, bookings, cancellations, waitlists and notices
 - Filtered family class finder with live capacity meters and visible waitlist positions
-- Staff rosters, clock-in/out, pool-deck location, timesheets and qualification tracking
+- Staff rosters, reviewed timesheets, pool checks, achievements and qualification tracking without clock-in tracking
 - Source-labelled management dashboard with class utilisation, enquiry workload, hours pipeline and pool readiness
 - Management enrolment desk with today's run sheet, weekly capacity board and audited waitlist promotion
 - App-style mobile tab navigation tailored to family, staff and management roles

@@ -3,95 +3,88 @@
 Andrew swaps between Claude and Codex. Read this first and rewrite it last.
 
 **Wheel:** Unassigned
-**Last updated:** 2026-08-29 by Codex — V5.5 complete and ready to push
+**Last updated:** 2026-08-30 by Codex — V5.6 production upgrade complete
 
 ## Current state
 
-V5.5 is the current premium production foundation. The public website, family/staff/
-management workspaces, installable PWA, Capacitor mobile shell, 21-product merchandise
-studio and FastAPI service have completed a design, workflow, security, accessibility,
-responsive and production-readiness pass. Former-owner content remains removed.
+V5.6 is the verified production foundation for the public website, family/staff/
+management workspaces, installable PWA, Capacitor mobile shell, merchandise studio and
+FastAPI service. It preserves the working V5 architecture while substantially tightening
+public truthfulness, responsive polish, operational workflows, legal/business copy,
+commerce gates, service-worker performance and production documentation.
 
-The repository is intentionally honest about external boundaries. The app is a working PWA
-and Capacitor-ready foundation, not a signed App Store or Google Play release. Public alerts
-reach open website/app pages and family in-app notices; background Web Push/APNs/FCM, email
-and SMS are not simulated. Water temperature is staff-verified until a compatible sensor
-feed is selected. Xero readiness is present, but live payroll transmission remains locked.
-SQLite and demo accounts are preview-only and must not hold real customer, child or payroll
-data.
+The repository remains deliberately honest about external boundaries. The app is a
+working PWA and Capacitor-ready foundation, not a signed App Store/Google Play release.
+Active pages receive public alerts, but background Web Push/APNs/FCM, email and SMS need
+real providers. Pool temperatures are staff-verified until a compatible sensor feed is
+selected. Xero OAuth/readiness exists, but payroll transmission remains locked. SQLite
+and demo accounts are preview-only and must not hold real customer, child or payroll data.
 
-## Delivered in V5.5
+## Delivered in V5.6
 
-- A premium 21-product catalogue covering kids' swimwear, rashies, shorts, hooded and regular
-  towels, cap, goggles, training mitts, bag, bottle, adult insulated cup, child warm-drink cup,
-  sun hat and a complete staff uniform capsule.
-- Product audience, production method, supplier route, fulfilment state, sample gate,
-  Printify mapping and Shopify publication controls; VistaPrint remains a truthful manual/
-  bulk route and unapproved premium brands are never presented as partners.
-- New premium children and staff merchandise campaign concept images. Exact built-in image-
-  generation prompts, masters and web outputs are in `IMAGE_ASSET_PROVENANCE.md`.
-- Asynchronous support messaging from every public page and the family app into the secure
-  Staff/Management Tickets queue, with reference numbers, thread replies, ownership,
-  priority, status, private notes, rate limiting, honeypot protection and audit records.
-- Management public-alert publishing plus automatic pool closure/change/reopening notices.
-  Active pages poll the public feed; family accounts receive in-app notices.
-- Eight swimmer achievement templates with family-visible evidence, staff-private notes,
-  audited issue/revocation and eight printable certificate styles. Certificates are
-  recognition items, not qualifications or accreditation.
-- Refined app, shop, role dashboards, mobile copy, service-worker cache and V5.5 metadata.
-- Source-linked association records and an issued-badge requirements guide. No corporate
-  badge is scraped, redrawn or shown until HV Swim supplies the current authorised file and
-  confirms usage rights.
-- Updated brand, privacy, terms, mobile, production and merchandise documentation.
+- Confirmed HVS BENDIGO PTY LTD identity, ABN, business/postal details and primary email
+  are carried through the footer, structured data, privacy, terms and handoff material.
+- Confirmed operating rules are consistent across programs, enquiry, FAQ and legal pages:
+  $22.50 per lesson billed by term and due on enrolment; two absence credits per term; no
+  make-up classes; no mid-term refund subject to ACL; parent onsite except Stroke
+  Development; and no photos without class/swimmer clearance.
+- Paul and Laura Smith are named as complaint/question contacts. Public enquiries are
+  purged after six months. Staff-record retention is documented to the end of the relevant
+  financial year, pending final legal/payroll confirmation.
+- Clock-in controls and geolocation capture are removed. The legacy clock API returns 410;
+  the staff workflow is published roster plus reviewed shift start/finish timesheets.
+- Public homepage, cards, motion, spacing, mobile layouts and support launcher received a
+  child-friendly premium polish while retaining restrained animation and reduced-motion
+  support. Duplicate homepage content was removed and calls to action were simplified.
+- Pool conditions never fabricate a temperature: only a staff/sensor-verified reading
+  newer than 24 hours is presented as current. Weather remains separate from water data.
+- Public prototype/association/merch blocks fail closed behind explicit server flags.
+  Management → Staff compliance now records the AUSTSWIM, SWIM Schools Australia and
+  Autism Swim publication rules and official links. No third-party mark is shown without
+  current issued artwork and usage evidence.
+- The 21-product premium catalogue now has enforceable launch blockers for a physical
+  sample, costs, variants, supplier route/reference and Shopify/Printify mapping. Supplier
+  costs and private mapping IDs no longer leak through public product responses.
+- Shopify-connected public products must also pass the local approval gates. Concept
+  images and non-live saved lists are labelled honestly; provider implementation details
+  stay preview-only.
+- Service-worker installation is smaller and safer: 14 core assets instead of the former
+  full-site precache, runtime caching for pages/assets, network-only authenticated APIs,
+  fresh/no-store public alerts and cached public-data fallbacks.
+- V5.6 metadata, mobile/store guides, brand/merch plans, production handoff and automated
+  regression checks are aligned.
 
-## Preserved from the V5.4/V5.3 foundation
+## Verification — 30 August 2026
 
-- Premium public design system, responsive navigation, local Manrope typography, accessible
-  controls, calm water-inspired depth and restrained animation.
-- Refined HV Swim logo/mark, social artwork and mask-safe app icon family.
-- Programs, guided enquiry, teaching approach, optional Facebook timeline, local SEO,
-  Acknowledgement of Country and venue-specific Locations & Pool Conditions experience.
-- Live Bendigo outdoor weather with a truthful fallback, venue maps, parking/accessibility,
-  today's-lesson placeholders and staff-verified pool readings.
-- Family bookings/swimmers/notices; staff roster/clock/location/timesheets/pool checks; and
-  management enrolments/accounts/content/locations/reporting/merch/Xero readiness.
-- Installable PWA, offline shell, iOS/Android Capacitor handoff and release-gate documents.
-
-## Verified 2026-08-29
-
-- Full Python suite: **87 passed, 1 intentionally skipped**.
-- Running-server smoke suite: **37 checks passed**, including V5.5 health, 21 products,
-  support tickets, alerts and achievements.
-- Static site checker: **19 pages, 50 service-worker cache entries and 8 scripts passed**.
-- JavaScript syntax and `git diff --check`: passed.
-- Capacitor web shell: built successfully for the approved localhost simulator origin;
-  production build correctly requires a real HTTPS app origin.
-- Real-browser desktop/mobile walkthrough covered public pages and the new public-message,
-  family-message, staff-ticket, achievement and management-alert flows. No horizontal
-  overflow, broken loaded images or application console errors were found. A final repeat
-  was unavailable only because the in-app browser's admin security-policy check temporarily
-  refused localhost; no security control was bypassed.
+- Python API/security suite: **88 passed, 1 intentionally skipped**.
+- Running-server smoke suite: **37 checks passed**.
+- Static site checker: **19 pages, 14 precached files and 8 scripts passed**.
+- JavaScript syntax, whitespace/error checks and Capacitor mobile web-shell build passed.
+- Real-browser desktop and 390×844 mobile walkthrough covered all public pages, shop,
+  sign-in, management command centre and staff-compliance/badge gates. No horizontal
+  overflow, broken visible images or browser console warnings/errors were found.
 
 ## External work before production
 
-Follow `PRODUCTION_HANDOFF.md`. Priorities are managed PostgreSQL and Australian hosting,
-approved real-data migration, final business/contact/term/class data, production auth/MFA/
-recovery, legal and WCAG review, backups/monitoring and an independent penetration test.
+Follow `PRODUCTION_HANDOFF.md`. Main dependencies are managed PostgreSQL/Australian
+hosting, final legal/WCAG/security review, production auth/MFA/recovery, approved real data,
+backups/monitoring, term dates and an independent penetration test.
 
-HV Swim must provide and configure:
+HV Swim must provide/configure:
 
-- Shopify and Printify accounts/credentials, supplier mapping, fulfilment policy, product
-  pricing, approved samples and returns/shipping settings; VistaPrint is a manual quote and
-  bulk-order workflow unless it supplies a supported integration.
-- Xero organisation OAuth plus approved pay-period and idempotent payroll export rules.
-- Email/SMS and Web Push/APNs/FCM providers, consent, token retention and opt-out behaviour.
-- The final HTTPS domain, Apple/Google developer accounts, signing, store declarations,
-  screenshots and device beta testing.
-- A commercial weather key if required and a compatible pool sensor only if automatic water
-  temperatures are wanted; otherwise staff continue publishing verified daily readings.
-- Current issued association badge files and written usage rights. Correct the external
-  Autism Swim listing that still names Andrea, and confirm all directory details.
-- A manually checked vector SVG/EPS/PDF logo, CMYK/spot colours and physical print/stitch
-  samples before bulk merchandise or embroidery.
+- Shopify and Printify credentials, supplier mappings, approved physical samples,
+  supplier-authorised imagery, variants, pricing, shipping/returns and a full test order.
+- Xero organisation OAuth, staff/pay-calendar mappings and approved idempotent payroll
+  export rules; the current system never sends payroll.
+- Email/SMS and Web Push/APNs/FCM providers, sender verification, consent, token retention,
+  delivery/opt-out behaviour and Apple/Google developer/signing accounts.
+- A production HTTPS domain, commercial weather arrangement if required and a compatible
+  pool sensor only if automatic water temperatures are wanted.
+- Current issued AUSTSWIM/SWIM/Autism Swim badge files plus membership/renewal/usage-right
+  evidence. Correct external directory details that still disagree with HV Swim's current
+  records, including the outdated Autism Swim person listing.
+- A manually checked vector logo, CMYK/spot colours, authorised blank-brand suppliers and
+  physical print/embroidery samples before bulk merchandise production.
 
-Do not commit `.env`, databases, generated native `ios/`/`android/` folders or delivery ZIPs.
+Do not commit `.env`, databases, generated `www/`, native `ios/`/`android/` folders or
+delivery ZIPs.

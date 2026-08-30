@@ -16,7 +16,7 @@ Stay ready for every swim day. Families can view lessons and availability, staff
 
 The HV Swim Bendigo app connects the swim-school experience in one place.
 
-Families can review swimmer profiles, find available classes, manage confirmed lessons and follow waitlist positions. Staff can see rosters, clock in and out, complete daily pool checks and submit hours. Authorised management users can review enrolments, pool readiness, enquiries, timesheets, website content and merchandise planning.
+Families can review swimmer profiles, find available classes, manage confirmed lessons and follow waitlist positions. Staff can see rosters, complete daily pool checks, manage tickets and submit reviewed hours without clock-in tracking. Authorised management users can review enrolments, pool readiness, enquiries, timesheets, website content and merchandise planning.
 
 Live information depends on the HV Swim connected service. Some functionality is available only to authorised staff or management accounts.
 

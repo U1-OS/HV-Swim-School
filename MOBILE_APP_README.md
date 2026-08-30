@@ -1,4 +1,4 @@
-# HV Swim Bendigo mobile app · V5.5
+# HV Swim Bendigo mobile app · V5.6
 
 This release contains two related mobile products:
 
@@ -32,7 +32,7 @@ The launcher detects missing Node.js. Xcode and Android Studio still need to be 
 - Bookings, live class capacity and waitlists
 - Family messages with staff-visible ticket threads and replies
 - Swimmer achievements with family-visible evidence and printable certificates
-- Rosters, clock-in/out, optional location capture and pool readings
+- Rosters, reviewed timesheets and pool readings without clock-in or continuous location tracking
 - Staff ticket triage plus management alerts for closures, changes and reopenings
 - Management enrolment desk, approvals, website controls and 21-product merchandise workflow
 - Installable icons, standalone display mode and offline app shell
@@ -43,7 +43,7 @@ The launcher detects missing Node.js. Xcode and Android Studio still need to be 
 
 - Replace demo accounts and migrate approved production data.
 - Complete privacy, child-safeguarding, retention and account-deletion policies.
-- Configure production email/SMS/Web Push/APNs/FCM providers and notification consent. V5.5 browser alerts update while the site is open; background native delivery is not claimed yet.
+- Configure production email/SMS/Web Push/APNs/FCM providers and notification consent. V5.6 browser alerts update while the site is open; background native delivery is not claimed yet.
 - Test denied geolocation, offline mode, expired sessions and password recovery.
 - Add native screenshots, store copy, support contact and privacy disclosures.
 - Test iPhone, iPad and Android physical devices before beta distribution.

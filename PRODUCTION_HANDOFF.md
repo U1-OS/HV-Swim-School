@@ -24,14 +24,34 @@ This build is a production foundation, not a substitute for the final deployment
 - Use the management Accounts workspace to provision families, staff and swimmers; every new account must replace its temporary password at first sign-in.
 - Implement verified password recovery, account deletion, active-session management and manager MFA before public/app-store launch.
 - Have an Australian privacy professional review consent, retention and child-safeguarding language.
-- Add the approved privacy policy, terms, cancellation policy and photo/media consent wording.
+- Have the included privacy, terms, cancellation and photo/media consent wording reviewed
+  by an Australian legal professional before launch. The build now records the confirmed
+  operating rules: $22.50 per lesson billed by term and due on enrolment; two absence
+  credits per term; no make-up lessons; no mid-term cancellation refund subject to the
+  Australian Consumer Law; a parent/guardian onsite except for Stroke Development; and no
+  photos without class/swimmer clearance.
 - Confirm accessibility against WCAG 2.2 AA with keyboard and assistive-technology testing.
-- Set enquiry ownership, response targets and deletion/retention rules before the public form goes live.
+- Paul and Laura Smith are the complaint/question contacts at
+  `bendigo@hvswimschool.com`. Set an internal response target and escalation procedure
+  before the public form goes live. Public enquiries are automatically deleted after six
+  months; verify that production backups and exports follow the same approved schedule.
+- Staff records are retained to the end of the relevant financial year unless law,
+  safeguarding or an active dispute requires longer. Confirm the exact deletion job with
+  legal/payroll advisers before automating deletion in production.
 - Assign the asynchronous support-ticket queue to a staffed role, publish a response target and retention period, and train staff that it is not monitored as live chat or an emergency service. The current build creates an internal queue item and reference only; it does not send an external support email.
 - Approve who may issue or revoke swimmer achievements. Families see the achievement and evidence note, while the staff note remains private; issue and revocation events are audited. Treat printable HTML certificates as HV Swim progress records, never as qualifications, licences or industry accreditation.
 - Confirm enrolment authority, waitlist priority rules, payment collection and signed-terms requirements before managers promote real families into classes.
 - Decide whether a released class place should notify the next family automatically or remain a manager-approved action; the current build defaults to audited manager approval.
 - Train managers to use Website content only for approved public wording and to verify every published change on mobile.
+- HV Swim does not use clock-ins. The former clock endpoint is disabled and the platform
+  uses published rosters plus reviewed timesheets with shift start/finish records. Do not
+  re-enable background location or clock tracking without a new approved business,
+  privacy and employment process.
+
+Confirmed legal identity in this release: **HVS BENDIGO PTY LTD**, ABN
+**46 687 937 962**, 76 Wood Street, California Gully VIC 3556; postal address PO Box
+154, Wallan VIC 3756. Verify the ASIC/ABR extract and final public address presentation
+with HV Swim before production deployment.
 
 ## 3. Existing Xero organisation
 
@@ -82,13 +102,28 @@ This build is a production foundation, not a substitute for the final deployment
 
 ## 8. Associations, public directories and third-party marks
 
-The public website links to source records rather than claiming school or instructor accreditation. Verification completed 29 August 2026 found:
+The public website does not claim school or instructor accreditation. Verification reviewed
+30 August 2026 found the following public records and official publication rules:
 
 - SWIM Coaches & Teachers Australia publishes an HV Swim Bendigo swim-school finder record.
-- AUSTSWIM lists HV Swim School Bendigo as a Swim School Network member. AUSTSWIM describes that Network as membership, not an audit or accreditation program.
-- Autism Swim publishes an HV Swim provider-directory record. Confirm the organisation's current renewal and expiry directly before describing HV Swim as an Approved Provider.
+- AUSTSWIM describes its Swim School Network as membership and says a digital badge is
+  issued after membership confirmation. Confirm HV Swim's current membership and use only
+  the issued badge file.
+- SWIM Schools Australia says current members receive the right to display its member logo.
+  Confirm current membership before enabling the mark.
+- Autism Swim says approved aquatic providers receive approved logos/marketing resources
+  and that certification requires ongoing training and renewal. Confirm HV Swim's active
+  certification and use only the current provider artwork.
 
-Before displaying organisation logos or badges, complete `ASSOCIATION_BADGE_REQUIREMENTS.md`: obtain the exact current member/provider artwork issued through HV Swim's own account, record the renewal/expiry evidence and confirm the applicable usage rights. Do not scrape, redraw, recolour or use generic corporate logos as substitute membership badges. Do not publish personal AUSTSWIM, SWIM or Autism Swim qualifications for Laura or another instructor without a current certificate/licence type, issuing body and expiry date.
+Before displaying organisation logos or badges, complete
+`ASSOCIATION_BADGE_REQUIREMENTS.md`: obtain the exact current member/provider artwork
+issued through HV Swim's own account, record the renewal/expiry evidence and confirm the
+applicable usage rights. The public badge block is deliberately disabled by default, and
+the Management → Staff compliance screen records the publication gate and official
+requirement links. Do not scrape, redraw, recolour or use generic corporate logos as
+substitute membership badges. Do not publish personal AUSTSWIM, SWIM or Autism Swim
+qualifications for Laura or another instructor without a current certificate/licence type,
+issuing body and expiry date.
 
 HV Swim must nominate the canonical public business details, then correct every external directory. Current records disagree with this repository on `76` versus `76B` Wood Street, postcode `3550` versus `3556`, phone `0413 462 112` versus `0458 733 323`, Hotmail versus `bendigo@hvswimschool.com`, and `31` versus `33` Lansell Street. The Autism Swim page also still names Andrea; Andrea has been removed from this repository and that external record needs an owner-requested update.
 
