@@ -57,6 +57,9 @@ class Settings:
     xero_redirect_uri: str = os.getenv("XERO_REDIRECT_URI", "http://localhost:8765/api/integrations/xero/callback")
     xero_sync_enabled: bool = os.getenv("XERO_SYNC_ENABLED", "false").lower() == "true"
     xero_earnings_rate_id: str = os.getenv("XERO_EARNINGS_RATE_ID", "")
+    xero_lesson_account_code: str = os.getenv("XERO_LESSON_ACCOUNT_CODE", "").strip()
+    xero_lesson_tax_type: str = os.getenv("XERO_LESSON_TAX_TYPE", "").strip()
+    xero_line_amount_type: str = os.getenv("XERO_LINE_AMOUNT_TYPE", "").strip()
     google_client_id: str = os.getenv("GOOGLE_CLIENT_ID", "").strip()
     google_client_secret: str = os.getenv("GOOGLE_CLIENT_SECRET", "").strip()
     google_redirect_uri: str = os.getenv("GOOGLE_REDIRECT_URI", "").strip()

@@ -3,41 +3,51 @@
 Andrew swaps between Claude and Codex. Read this first and rewrite it last.
 
 **Wheel:** Unassigned
-**Last updated:** 2026-08-31 by Codex — V5.10.1 professional refinement complete
+**Last updated:** 2026-08-31 by Codex — V5.11.0 finance and portal upgrade complete
 
 ## Current state
 
-V5.10.1 is the verified production foundation for the premium public website and secure
-family, staff and management platform. The native-app phase remains paused and both app
-source routes return 404; current work should stay focused on the website and browser
-platform.
+V5.11.0 is the verified website and browser-platform release for HV Swim Bendigo. It
+preserves the premium public website, real HV business rules, Laura-led identity, family,
+staff and management workflows, Wood Street/Bendigo East locations, outdoor Bendigo
+weather, staff-verified pool readings, Shopify-only merchandise route and Xero-only lesson
+payment route. The native-app phase remains paused and its public routes stay blocked.
 
-The release preserves the real HV Swim business rules, Laura-led identity, Wood Street and
-Bendigo East content, live Bendigo weather, staff-verified water readings, Xero-only lesson
-payment route and Shopify-only merchandise route. It does not fabricate payments, stock,
-provider connections, pool sensors, accreditation or background push delivery.
+The major new capability is an accountable lesson-invoice ledger. It creates local drafts
+from real pending lesson charges, requires management approval and can create only a Xero
+**DRAFT** invoice after every connection/configuration gate passes. It does not fabricate a
+Xero invoice, payment, credit note, refund, contact, tax treatment or Shopify order.
 
-## Delivered through V5.10.1
+## Delivered in V5.11.0
 
-- Preserved the V5.10.0 premium visual system, responsive public journey and protected
-  family/staff/management workflows without rebuilding or removing working functionality.
-- Added an accessible **Find a section** search to every role-specific workspace. It filters
-  grouped navigation, reports an empty result, participates in the mobile focus trap and
-  supports Escape-to-clear without closing the drawer.
-- Improved the 24-product public merchandise experience with progressive rendering: six
-  products initially on mobile and nine on wider screens, followed by keyboard-friendly
-  **Show more products** loading. Filtering, searching and sorting reset the result window.
-- Removed stale “saved collection” and preview-cart language. Planned products and kits are
-  explicitly non-orderable; cart, stock and checkout remain hidden until approved products
-  are connected to the live Shopify catalogue. Staff uniforms remain role-protected.
-- Disabled browser geolocation in the Permissions Policy because staff time records use a
-  selected workplace and timestamps, not GPS. Camera and microphone remain disabled too.
-- Fixed the management class-availability singular/plural copy and refreshed the entire
-  website/PWA asset cache line to V5.10.1 / `5.10.1-ui6`.
-- Retained permanent family (`HVS-…`), student (`HVS-S-…`) and worker (`HVS-W-…`) numbers;
-  automatic lesson-purchase assignment; encrypted child safety profiles; staff clock/break
-  records; incident reports; lesson registers; achievements; eight certificate styles;
-  qualification uploads and expiry reminders; tickets; rosters; alerts and pool conditions.
+- Added `billing_invoices`, immutable invoice lines and invoice-event history. A unique
+  lesson-charge constraint prevents one charge being placed on two invoices.
+- Added the Management → Billing & invoices workspace: unbilled charges grouped by family
+  and term, local draft creation, review/approval, Xero readiness, Xero draft creation,
+  status/payment refresh, manual-review warnings and a visible Shopify separation.
+- Added the Family → Billing & invoices workspace. Families see only management-approved
+  invoices and Xero-confirmed payment status; local drafts, internal notes, sync errors and
+  idempotency keys are excluded.
+- Added Xero Accounting API invoice support with tenant headers, stable idempotency keys,
+  reviewed account/tax/line-amount settings, DRAFT-only creation and payment/status
+  reconciliation. Rotated OAuth refresh tokens are persisted before the accounting call.
+- Added production fail-closed validation: `XERO_SYNC_ENABLED=true` cannot start without
+  complete Xero OAuth plus lesson account code, tax type and valid line-amount type.
+- Kept payroll transmission separately hard-locked. Existing approved-hours readiness is
+  still a read-only preview until real AU Payroll periods and duplicate-export tracking exist.
+- Upgraded People & accounts with family number, student identities, active bookings,
+  invoice count, outstanding/unbilled amounts, Xero Contact ID and Shopify Customer GID in
+  one protected management view.
+- Added lesson-billing work to the management command-centre attention queue and reorganised
+  the sidebar into clearer Finance & sales and Website & communications groups.
+- Encrypted private invoice management notes at rest. No card data is stored by the portal.
+- Refined responsive billing cards, readiness panels, timelines, mobile controls and visual
+  hierarchy across management and family portals. No horizontal overflow was found at
+  390×844 or 1120px desktop.
+- Updated API/static release identifiers, asset cache keys and service-worker caches to
+  V5.11.0 / `5.11.0-ui7`.
+- Updated README, production handoff, environment template and automated smoke coverage for
+  the reviewed Xero invoice workflow.
 
 ## Confirmed operating rules represented in the build
 
@@ -46,44 +56,44 @@ provider connections, pool sensors, accreditation or background push delivery.
 - Two absence credits per swimmer per term; no make-up lessons and no mid-term refund,
   subject to Australian Consumer Law.
 - A parent/guardian stays onsite except for Stroke Development.
-- No photos without the required class/swimmer clearance.
+- No photos without required class/swimmer clearance.
 - Public enquiries are retained for six months. Staff records are retained to the end of
   the relevant financial year unless a legal, safeguarding or dispute hold applies.
-- Confirmed entity details are HVS BENDIGO PTY LTD, ABN 46 687 937 962. Business/postal
-  details remain in `PRODUCTION_HANDOFF.md` for final verification.
+- Confirmed entity: HVS BENDIGO PTY LTD, ABN 46 687 937 962.
 
 ## Verification — 31 August 2026
 
-- Full Python API/security suite: **114 passed, 1 intentionally skipped**.
-- Running-server read-only smoke suite: **49/49 checks passed**.
+- Full Python API/security suite: **117 passed, 1 intentionally skipped**.
+- Live read-only smoke suite: **51/51 checks passed**, including family/admin billing.
 - Static checker: **19 pages, 14 precached files and 8 scripts passed**.
 - Live HTTP security baseline: **20/20 checks passed**.
 - JavaScript syntax, Python compilation and Git whitespace checks passed.
-- In-app browser QA at 390×844 verified six-to-twelve progressive shop loading, keyboard
-  focus transfer, all 20 management routes, grouped navigation search/reset and zero
-  horizontal overflow. Browser diagnostics contained zero console errors or warnings.
-- Security limits remain honest: these checks are a baseline, not an “unhackable” claim or
-  a replacement for a penetration test against final production hosting/configuration.
+- In-app browser QA covered Management Billing, People & accounts and Family Billing on
+  desktop and 390×844 mobile. Zero horizontal overflow and zero console errors were found.
+- Security language remains honest: this is a tested baseline, not an “unhackable” claim or
+  a replacement for an independent penetration test on final hosting/configuration.
 
 ## External work before production
 
-Follow `PRODUCTION_HANDOFF.md` and `SECURITY_AUDIT_V5.10.md`. Source code alone cannot make
-the following services live:
+Follow `PRODUCTION_HANDOFF.md` and `SECURITY_AUDIT_V5.10.md`. Source code cannot complete
+account-owned or regulated setup:
 
-- Managed PostgreSQL on Australian-region HTTPS hosting, private secrets, encrypted
-  backups/restore drill, monitoring, management MFA, recovery/deletion/session controls,
-  legal/privacy/WCAG review and an independent penetration test.
-- Existing Xero OAuth app, family/student reference mapping, invoice/payment/credit
-  reconciliation, payroll mappings, real pay periods and idempotent exports.
+- Existing Xero OAuth app, verified Xero Contact IDs for each family, accountant-approved
+  lesson account code/tax/line-amount type and an end-to-end draft/status/payment test in the
+  intended organisation. Leave `XERO_SYNC_ENABLED=false` until that review is signed off.
+- Xero credit-note handling remains unimplemented; absence eligibility never changes an
+  invoice automatically. Payroll still needs real pay periods and idempotent exports.
 - Shopify Storefront/customer configuration, family-number metafields, approved products,
-  variants, stock, checkout/refunds and tested staff-uniform access boundaries.
-- Approved Printify, VistaPrint/manual embroidery and specialist swim suppliers, written
-  blank-brand/artwork rights and passed physical samples for every product family.
-- Google and Apple family sign-in credentials and production callback/domain verification.
+  variants, stock, checkout/refunds and authorised order/customer reconciliation.
+- Managed PostgreSQL on Australian-region HTTPS hosting, private secrets, encrypted backups
+  and restore drill, monitoring, management MFA, recovery/deletion/session controls,
+  legal/privacy/WCAG review and an independent penetration test.
+- Google and Apple family sign-in credentials and callback/domain verification.
 - Email/SMS/Web Push providers, consent, quiet hours, receipts and opt-outs.
-- Current AUSTSWIM/SWIM/Autism Swim evidence and issued artwork. Never substitute scraped or
-  generic organisation logos. Current external directories still need Andrea removed.
-- Commercial weather entitlement for production and a pool sensor only if a venue provides
-  a reliable authenticated feed. Until then, water temperature remains staff verified.
+- Current AUSTSWIM/SWIM/Autism Swim evidence and issued artwork; never use scraped logos.
+- Approved Printify, embroidery/manual and specialist swim suppliers plus passed physical
+  samples and written artwork/brand rights.
+- Commercial weather entitlement and an authenticated pool sensor only if a venue supplies
+  a reliable feed. Pool water temperature remains staff verified until then.
 
-Do not commit `.env`, databases, generated `www/`, native `ios/`/`android/` folders or delivery ZIPs.
+Do not commit `.env`, databases, generated `www/`, native `ios/`/`android/` folders or ZIPs.

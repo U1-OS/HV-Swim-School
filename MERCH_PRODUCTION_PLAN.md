@@ -1,6 +1,6 @@
 # HV Swim premium merchandise production plan
 
-The V5.10.1 collection contains 24 planned products and a Management → Merchandise control
+The V5.11.0 collection contains 24 planned products and a Management → Merchandise control
 workspace. It is premium-only: no product becomes sellable until its materials, decoration,
 fit, landed cost and physical sample are approved. The public catalogue is an explicitly
 non-orderable production plan; no cart, checkout, stock reservation or supplier order is

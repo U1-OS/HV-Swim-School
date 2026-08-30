@@ -16,6 +16,7 @@ from .config import settings
 XERO_AUTHORIZE = "https://login.xero.com/identity/connect/authorize"
 XERO_TOKEN = "https://identity.xero.com/connect/token"
 XERO_CONNECTIONS = "https://api.xero.com/connections"
+XERO_INVOICES = "https://api.xero.com/api.xro/2.0/Invoices"
 XERO_SCOPES = "openid profile email offline_access accounting.transactions payroll.employees payroll.timesheets"
 OPEN_METEO = "https://api.open-meteo.com/v1/forecast"
 OPEN_METEO_CUSTOMER = "https://customer-api.open-meteo.com/v1/forecast"
@@ -47,6 +48,14 @@ def decrypt_json(value: bytes | None) -> dict[str, Any]:
 
 def xero_ready() -> bool:
     return bool(settings.xero_client_id and settings.xero_client_secret and settings.xero_redirect_uri)
+
+
+def xero_invoice_configuration_ready() -> bool:
+    return bool(
+        settings.xero_lesson_account_code
+        and settings.xero_lesson_tax_type
+        and settings.xero_line_amount_type in {"Exclusive", "Inclusive", "NoTax"}
+    )
 
 
 def xero_authorization_url(state: str) -> str:
@@ -97,6 +106,101 @@ async def xero_token_valid(token: dict[str, Any]) -> dict[str, Any]:
     if not expires or datetime.fromisoformat(expires) <= datetime.now(timezone.utc) + timedelta(minutes=2):
         return await xero_refresh(token)
     return token
+
+
+def _xero_headers(token: dict[str, Any], *, idempotency_key: str | None = None) -> dict[str, str]:
+    if not token.get("access_token") or not token.get("tenant_id"):
+        raise RuntimeError("The Xero connection is missing its access token or organisation tenant.")
+    headers = {
+        "Authorization": f"Bearer {token['access_token']}",
+        "Xero-tenant-id": str(token["tenant_id"]),
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+    }
+    if idempotency_key:
+        headers["Idempotency-Key"] = idempotency_key
+    return headers
+
+
+def _xero_invoice_result(payload: dict[str, Any]) -> dict[str, Any]:
+    invoices = payload.get("Invoices") or []
+    if not invoices:
+        raise RuntimeError("Xero returned no invoice record.")
+    invoice = invoices[0]
+    errors = invoice.get("ValidationErrors") or []
+    if errors:
+        message = "; ".join(str(item.get("Message") or "Invoice validation failed") for item in errors[:5])
+        raise RuntimeError(message[:500])
+    if not invoice.get("InvoiceID"):
+        raise RuntimeError("Xero did not return an invoice identifier.")
+    return invoice
+
+
+async def xero_create_draft_invoice(
+    token: dict[str, Any],
+    *,
+    invoice: dict[str, Any],
+    lines: list[dict[str, Any]],
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Create one reviewed DRAFT sales invoice in the connected Xero organisation."""
+    if not xero_invoice_configuration_ready():
+        raise RuntimeError("Confirm the Xero lesson account code, tax type and line-amount setting first.")
+    current_token = await xero_token_valid(token)
+    line_items = [
+        {
+            "Description": line["description"],
+            "Quantity": line["quantity"],
+            "UnitAmount": round(int(line["unit_amount_cents"]) / 100, 2),
+            "AccountCode": settings.xero_lesson_account_code,
+            "TaxType": settings.xero_lesson_tax_type,
+        }
+        for line in lines
+    ]
+    xero_invoice = {
+        "Type": "ACCREC",
+        "Contact": {"ContactID": invoice["xero_contact_id"]},
+        "Date": invoice["issue_date"],
+        "DueDate": invoice["due_date"],
+        "LineAmountTypes": settings.xero_line_amount_type,
+        "InvoiceNumber": invoice["invoice_number"],
+        "Reference": invoice["customer_number"],
+        "LineItems": line_items,
+        "Status": "DRAFT",
+    }
+    if settings.public_url.startswith("https://"):
+        xero_invoice["Url"] = f"{settings.public_url}/platform.html#billing"
+    async with httpx.AsyncClient(timeout=25) as client:
+        response = await client.post(
+            XERO_INVOICES,
+            json={"Invoices": [xero_invoice]},
+            headers=_xero_headers(current_token, idempotency_key=invoice["idempotency_key"]),
+        )
+        response.raise_for_status()
+        result = _xero_invoice_result(response.json())
+    return current_token, result
+
+
+async def xero_get_invoice(
+    token: dict[str, Any], invoice_id: str
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    current_token = await xero_token_valid(token)
+    async with httpx.AsyncClient(timeout=20) as client:
+        response = await client.get(
+            f"{XERO_INVOICES}/{invoice_id}",
+            headers=_xero_headers(current_token),
+        )
+        response.raise_for_status()
+        result = _xero_invoice_result(response.json())
+        if result.get("Status") in {"AUTHORISED", "PAID"}:
+            online = await client.get(
+                f"{XERO_INVOICES}/{invoice_id}/OnlineInvoice",
+                headers=_xero_headers(current_token),
+            )
+            if online.is_success:
+                links = online.json().get("OnlineInvoices") or []
+                if links:
+                    result["OnlineInvoiceUrl"] = links[0].get("OnlineInvoiceUrl")
+    return current_token, result
 
 
 def shopify_ready() -> bool:

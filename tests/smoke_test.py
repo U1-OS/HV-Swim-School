@@ -37,7 +37,7 @@ def expect(label, condition):
 def main():
     public = urllib.request.build_opener()
     status, health = request(public, "/api/health")
-    expect("health endpoint", status == 200 and health.get("version") == "5.10.1")
+    expect("health endpoint", status == 200 and health.get("version") == "5.11.0")
     status, account_providers = request(public, "/api/auth/oauth/providers")
     expect(
         "family Google and Apple account boundary",
@@ -112,6 +112,8 @@ def main():
             expect("family secure messages", status == 200 and isinstance(messages.get("tickets"), list))
             status, achievements = request(opener, "/api/customer/achievements")
             expect("family achievement certificates", status == 200 and achievements.get("certificate_rendering") == "html_print")
+            status, billing = request(opener, "/api/customer/billing")
+            expect("family Xero invoice ledger", status == 200 and billing.get("lesson_provider") == "Xero" and billing.get("merchandise_provider") == "Shopify" and billing.get("card_data_stored") is False)
         if role == "staff":
             status, staff_merch = request(opener, "/api/staff/merchandise")
             expect(
@@ -133,6 +135,8 @@ def main():
             status, integrations = request(opener, "/api/admin/integrations")
             providers = {item.get("provider") for item in integrations.get("payment_routing", [])}
             expect("Xero and Shopify payment routing", status == 200 and providers == {"Xero", "Shopify"})
+            status, billing = request(opener, "/api/admin/billing")
+            expect("management invoice ledger", status == 200 and isinstance(billing.get("invoices"), list) and billing.get("xero", {}).get("sync_mode") == "draft_invoices_only")
             status, dashboard = request(opener, "/api/admin/dashboard")
             expect("admin command-centre metrics", status == 200 and dashboard.get("source", {}).get("mode") == "Local SQLite preview")
             status, enrolments = request(opener, "/api/admin/enrolments")
