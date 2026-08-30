@@ -135,7 +135,7 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(
     title="HV Swim Bendigo Platform API",
-    version="5.6.2",
+    version="5.7.0",
     docs_url="/api/docs" if not settings.production else None,
     openapi_url="/openapi.json" if not settings.production else None,
     redoc_url=None,
@@ -233,6 +233,46 @@ class ChangePasswordInput(BaseModel):
 class BookingInput(BaseModel):
     class_id: int
     swimmer_id: int
+
+
+class AbsenceReportInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    booking_id: int = Field(ge=1)
+    occurrence_date: date
+    reason_category: Literal["illness", "family", "school", "other"]
+
+
+class LessonAttendanceInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    booking_id: int = Field(ge=1)
+    occurrence_date: date
+    attendance_status: Literal["present", "absent", "late", "excused"]
+    parent_onsite_confirmed: bool | None = None
+    private_note: str = Field(default="", max_length=600)
+
+    @model_validator(mode="after")
+    def clean_attendance_note(self) -> "LessonAttendanceInput":
+        self.private_note = self.private_note.strip()
+        return self
+
+
+class SchoolTermInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(min_length=3, max_length=100)
+    start_date: date
+    end_date: date
+    absence_credit_limit: int = Field(default=2, ge=0, le=10)
+    activate: bool = False
+
+    @model_validator(mode="after")
+    def validate_term(self) -> "SchoolTermInput":
+        self.name = self.name.strip()
+        if self.end_date < self.start_date:
+            raise ValueError("Term end date must be on or after its start date")
+        return self
 
 
 class AchievementAwardInput(BaseModel):
@@ -614,6 +654,62 @@ def location_by_slug(db: sqlite3.Connection, slug: str) -> sqlite3.Row:
     if not row:
         raise HTTPException(status_code=404, detail="Location not found")
     return row
+
+
+def term_for_date(db: sqlite3.Connection, occurrence: date) -> sqlite3.Row | None:
+    """Return the single configured term covering a business date.
+
+    Closed terms remain valid for historical registers. Draft terms never drive family or
+    staff operations, and the partial unique index ensures only one active term exists.
+    """
+    return db.execute(
+        """SELECT * FROM school_terms
+           WHERE status IN ('active','closed') AND start_date<=? AND end_date>=?
+           ORDER BY CASE status WHEN 'active' THEN 0 ELSE 1 END,id DESC LIMIT 1""",
+        (occurrence.isoformat(), occurrence.isoformat()),
+    ).fetchone()
+
+
+def active_term(db: sqlite3.Connection) -> sqlite3.Row | None:
+    return db.execute("SELECT * FROM school_terms WHERE status='active' LIMIT 1").fetchone()
+
+
+def public_term_context(db: sqlite3.Connection) -> dict[str, Any]:
+    term = active_term(db)
+    if not term:
+        return {
+            "configured": False,
+            "in_session": False,
+            "message": "Management term dates have not been published yet.",
+        }
+    today = business_today()
+    data = dict(term)
+    data["configured"] = True
+    data["in_session"] = term["start_date"] <= today.isoformat() <= term["end_date"]
+    data["is_preview"] = term["source"] == "preview"
+    # Never expose internal user references or imply a preview range is an official date.
+    for field in ("created_by", "created_at", "updated_at"):
+        data.pop(field, None)
+    data["message"] = (
+        "Preview calendar for local testing only."
+        if data["is_preview"]
+        else ("Lessons are operating within the published term." if data["in_session"] else "The published term is outside today's date.")
+    )
+    return data
+
+
+def next_class_occurrence(weekday: int, start: date, term_end: date) -> date | None:
+    candidate = start + timedelta(days=(weekday - start.weekday()) % 7)
+    return candidate if candidate <= term_end else None
+
+
+def validate_class_occurrence(db: sqlite3.Connection, class_row: sqlite3.Row, occurrence: date) -> sqlite3.Row:
+    term = term_for_date(db, occurrence)
+    if not term:
+        raise HTTPException(status_code=409, detail="This date is not inside a published school term")
+    if occurrence.weekday() != class_row["weekday"]:
+        raise HTTPException(status_code=422, detail="The selected date does not match this class day")
+    return term
 
 
 def certificate_reference(db: sqlite3.Connection) -> str:
@@ -1085,7 +1181,7 @@ def renumber_waitlist(db: sqlite3.Connection, class_id: int) -> None:
 
 @app.get("/api/health")
 def health() -> dict[str, Any]:
-    return {"ok": True, "service": "HV Swim Bendigo", "version": "5.6.2", "environment": settings.app_env, "time": now_iso()}
+    return {"ok": True, "service": "HV Swim Bendigo", "version": "5.7.0", "environment": settings.app_env, "time": now_iso()}
 
 
 @app.get("/api/public/site-settings")
@@ -1220,6 +1316,8 @@ def change_password(payload: ChangePasswordInput, request: Request, user: dict[s
 @app.get("/api/public/locations")
 def public_locations() -> dict[str, Any]:
     with db_session() as db:
+        term = public_term_context(db)
+        today_weekday = business_today().weekday()
         output = []
         for location in db.execute("SELECT * FROM locations ORDER BY id"):
             reading = db.execute(
@@ -1234,8 +1332,13 @@ def public_locations() -> dict[str, Any]:
                 item["reading_stale"] = datetime.now(timezone.utc) - created > timedelta(hours=24)
             else:
                 item["reading_stale"] = True
+            item["today_classes"] = rows(db.execute(
+                """SELECT code,title,start_time,duration_minutes FROM classes
+                   WHERE active=1 AND location_id=? AND weekday=? ORDER BY start_time""",
+                (location["id"], today_weekday),
+            )) if term["in_session"] and "closed" not in location["public_status"].lower() else []
             output.append(item)
-        return {"locations": output}
+        return {"locations": output, "term_calendar": term}
 
 
 @app.get("/api/public/weather")
@@ -1271,7 +1374,15 @@ def list_classes() -> dict[str, Any]:
             item["available"] = max(0, item["capacity"] - item["enrolled"])
             item["price"] = item["price_cents"] / 100
             output.append(item)
-        return {"classes": output}
+        return {
+            "classes": output,
+            "term_calendar": public_term_context(db),
+            "payment": {
+                "route": "xero_invoice_workflow",
+                "status": "configuration_required",
+                "message": "Term lesson charges are handled through the approved Xero invoicing workflow; no payment is taken by this class finder.",
+            },
+        }
 
 
 @app.get("/api/customer/swimmers")
@@ -1804,6 +1915,123 @@ def customer_bookings(user: dict[str, Any] = Depends(require_roles("customer", "
         return {"bookings": bookings, "waitlist": rows(db.execute(waitlist_query, params))}
 
 
+@app.get("/api/customer/absences")
+def customer_absences(user: dict[str, Any] = Depends(require_roles("customer"))) -> dict[str, Any]:
+    with db_session() as db:
+        term = active_term(db)
+        term_data = public_term_context(db)
+        bookings = rows(db.execute(
+            """SELECT b.id booking_id,s.id swimmer_id,s.first_name swimmer_first,s.last_name swimmer_last,
+                      c.id class_id,c.code,c.title,c.weekday,c.start_time,c.duration_minutes,l.name location_name
+               FROM bookings b JOIN swimmers s ON s.id=b.swimmer_id JOIN classes c ON c.id=b.class_id
+               JOIN locations l ON l.id=c.location_id
+               WHERE s.customer_id=? AND b.status='confirmed' AND c.active=1
+               ORDER BY s.first_name,c.weekday,c.start_time""",
+            (user["id"],),
+        ))
+        today = business_today()
+        if term:
+            term_end = date.fromisoformat(term["end_date"])
+            for booking in bookings:
+                occurrence = next_class_occurrence(booking["weekday"], today, term_end)
+                booking["next_occurrence"] = occurrence.isoformat() if occurrence else None
+        else:
+            for booking in bookings:
+                booking["next_occurrence"] = None
+        history = rows(db.execute(
+            """SELECT a.id,a.occurrence_date,a.reason_category,a.credit_status,a.reported_at,
+                      b.id booking_id,s.id swimmer_id,s.first_name swimmer_first,c.title,c.code,c.start_time,l.name location_name,
+                      t.name term_name,t.absence_credit_limit
+               FROM absence_reports a JOIN bookings b ON b.id=a.booking_id JOIN swimmers s ON s.id=b.swimmer_id
+               JOIN classes c ON c.id=b.class_id JOIN locations l ON l.id=c.location_id
+               JOIN school_terms t ON t.id=a.term_id
+               WHERE s.customer_id=? ORDER BY a.occurrence_date DESC,a.id DESC""",
+            (user["id"],),
+        ))
+        usage: list[dict[str, Any]] = []
+        if term:
+            usage = rows(db.execute(
+                """SELECT s.id swimmer_id,s.first_name swimmer_first,s.last_name swimmer_last,
+                          SUM(CASE WHEN a.credit_status='credited' THEN 1 ELSE 0 END) credits_used
+                   FROM swimmers s LEFT JOIN bookings b ON b.swimmer_id=s.id
+                   LEFT JOIN absence_reports a ON a.booking_id=b.id AND a.term_id=?
+                   WHERE s.customer_id=? AND s.active=1 GROUP BY s.id ORDER BY s.first_name""",
+                (term["id"], user["id"]),
+            ))
+            for item in usage:
+                item["credit_limit"] = term["absence_credit_limit"]
+                item["credits_remaining"] = max(0, term["absence_credit_limit"] - int(item["credits_used"] or 0))
+        return {
+            "term": term_data,
+            "bookings": bookings,
+            "usage": usage,
+            "history": history,
+            "policy": {
+                "lesson_price_cents": 2250,
+                "payment_due": "on_enrolment",
+                "make_up_classes": False,
+                "mid_term_refunds": False,
+                "financial_boundary": "An eligible absence credit is recorded here; no Xero, bank or payment adjustment is made automatically.",
+            },
+        }
+
+
+@app.post("/api/customer/absences")
+def report_customer_absence(payload: AbsenceReportInput, request: Request, user: dict[str, Any] = Depends(require_roles("customer")), x_csrf_token: str | None = Header(default=None)) -> dict[str, Any]:
+    csrf_guard(request, user, x_csrf_token)
+    if payload.occurrence_date < business_today():
+        raise HTTPException(status_code=422, detail="Absences must be reported for today or a future lesson")
+    with db_session() as db:
+        db.execute("BEGIN IMMEDIATE")
+        booking = db.execute(
+            """SELECT b.id,b.status,b.swimmer_id,s.customer_id,s.first_name swimmer_first,
+                      c.id class_id,c.title,c.weekday,c.start_time
+               FROM bookings b JOIN swimmers s ON s.id=b.swimmer_id JOIN classes c ON c.id=b.class_id
+               WHERE b.id=?""",
+            (payload.booking_id,),
+        ).fetchone()
+        if not booking or booking["customer_id"] != user["id"] or booking["status"] != "confirmed":
+            raise HTTPException(status_code=404, detail="Confirmed lesson booking not found")
+        term = validate_class_occurrence(db, booking, payload.occurrence_date)
+        if term["status"] != "active":
+            raise HTTPException(status_code=409, detail="Absences can only be reported within the active school term")
+        existing = db.execute(
+            "SELECT id,credit_status FROM absence_reports WHERE booking_id=? AND occurrence_date=?",
+            (payload.booking_id, payload.occurrence_date.isoformat()),
+        ).fetchone()
+        if existing:
+            raise HTTPException(status_code=409, detail="This absence has already been reported")
+        credits_used = db.execute(
+            """SELECT COUNT(*) FROM absence_reports a JOIN bookings b ON b.id=a.booking_id
+               WHERE b.swimmer_id=? AND a.term_id=? AND a.credit_status='credited'""",
+            (booking["swimmer_id"], term["id"]),
+        ).fetchone()[0]
+        credit_status = "credited" if credits_used < term["absence_credit_limit"] else "recorded_no_credit"
+        cursor = db.execute(
+            """INSERT INTO absence_reports(
+                   booking_id,term_id,occurrence_date,reason_category,credit_status,reported_by,reported_at
+               ) VALUES(?,?,?,?,?,?,?)""",
+            (payload.booking_id, term["id"], payload.occurrence_date.isoformat(), payload.reason_category, credit_status, user["id"], now_iso()),
+        )
+        audit(
+            db, user["id"], "report_lesson_absence", "absence_report", cursor.lastrowid,
+            {"booking_id": payload.booking_id, "occurrence_date": payload.occurrence_date.isoformat(), "credit_status": credit_status},
+            client_ip(request),
+        )
+        return {
+            "id": cursor.lastrowid,
+            "credit_status": credit_status,
+            "credits_used": credits_used + (1 if credit_status == "credited" else 0),
+            "credit_limit": term["absence_credit_limit"],
+            "message": (
+                "Absence recorded and one term credit marked as eligible."
+                if credit_status == "credited"
+                else "Absence recorded. The term credit limit has already been reached."
+            ),
+            "financial_adjustment": "not_automatic",
+        }
+
+
 @app.post("/api/customer/bookings")
 def create_booking(payload: BookingInput, request: Request, user: dict[str, Any] = Depends(require_roles("customer", "admin")), x_csrf_token: str | None = Header(default=None)) -> dict[str, Any]:
     csrf_guard(request, user, x_csrf_token)
@@ -1812,6 +2040,9 @@ def create_booking(payload: BookingInput, request: Request, user: dict[str, Any]
         # arriving together can both see the last place free and both take it, putting the
         # class over its instructor-to-swimmer ratio.
         db.execute("BEGIN IMMEDIATE")
+        term = active_term(db)
+        if not term:
+            raise HTTPException(status_code=409, detail="Management must publish an active school term before accepting lesson bookings")
         swimmer = db.execute("SELECT * FROM swimmers WHERE id=?", (payload.swimmer_id,)).fetchone()
         swim_class = db.execute("SELECT * FROM classes WHERE id=? AND active=1", (payload.class_id,)).fetchone()
         if not swimmer or (user["role"] == "customer" and swimmer["customer_id"] != user["id"]):
@@ -1856,6 +2087,149 @@ def staff_roster(user: dict[str, Any] = Depends(require_roles("staff", "admin"))
                     FROM rosters r JOIN locations l ON l.id=r.location_id JOIN users u ON u.id=r.staff_id
                     WHERE {where} AND r.shift_date>=? ORDER BY r.shift_date,r.start_time"""
         return {"roster": rows(db.execute(query, params + (business_today().isoformat(),)))}
+
+
+@app.get("/api/staff/lesson-register")
+def staff_lesson_register(occurrence_date: date | None = None, user: dict[str, Any] = Depends(require_roles("staff", "admin"))) -> dict[str, Any]:
+    selected = occurrence_date or business_today()
+    with db_session() as db:
+        term = term_for_date(db, selected)
+        if not term:
+            return {
+                "occurrence_date": selected.isoformat(),
+                "term": None,
+                "classes": [],
+                "message": "This date is outside every published school term.",
+            }
+        owner_clause = " AND c.instructor_id=?" if user["role"] == "staff" else ""
+        params: tuple[Any, ...] = (selected.weekday(), user["id"]) if user["role"] == "staff" else (selected.weekday(),)
+        classes = rows(db.execute(
+            f"""SELECT c.id,c.code,c.title,c.level,c.start_time,c.duration_minutes,c.capacity,
+                       l.id location_id,l.name location_name,l.slug location_slug,
+                       u.first_name instructor_first,u.last_name instructor_last
+                FROM classes c JOIN locations l ON l.id=c.location_id LEFT JOIN users u ON u.id=c.instructor_id
+                WHERE c.active=1 AND c.weekday=?{owner_clause} ORDER BY c.start_time,c.id""",
+            params,
+        ))
+        for class_item in classes:
+            register = rows(db.execute(
+                """SELECT b.id booking_id,s.id swimmer_id,s.first_name swimmer_first,s.last_name swimmer_last,
+                          s.level,s.medical_notes,s.photo_consent,
+                          la.id attendance_id,la.attendance_status,la.parent_onsite_confirmed,
+                          la.photo_clearance_snapshot,la.private_note,la.updated_at,
+                          ar.id absence_report_id,ar.credit_status absence_credit_status
+                   FROM bookings b JOIN swimmers s ON s.id=b.swimmer_id
+                   LEFT JOIN lesson_attendance la ON la.booking_id=b.id AND la.occurrence_date=?
+                   LEFT JOIN absence_reports ar ON ar.booking_id=b.id AND ar.occurrence_date=?
+                   WHERE b.class_id=? AND b.status='confirmed' AND s.active=1
+                   ORDER BY s.first_name,s.last_name""",
+                (selected.isoformat(), selected.isoformat(), class_item["id"]),
+            ))
+            for record in register:
+                record["photo_consent"] = bool(record["photo_consent"])
+                record["parent_onsite_confirmed"] = None if record["parent_onsite_confirmed"] is None else bool(record["parent_onsite_confirmed"])
+                record["reported_absence"] = bool(record["absence_report_id"])
+                if record["reported_absence"] and not record["attendance_status"]:
+                    record["suggested_status"] = "excused"
+            class_item["parent_onsite_required"] = "stroke development" not in class_item["title"].lower()
+            class_item["register"] = register
+            class_item["completed"] = sum(1 for record in register if record["attendance_status"])
+        return {
+            "occurrence_date": selected.isoformat(),
+            "term": {**dict(term), "is_preview": term["source"] == "preview"},
+            "classes": classes,
+            "policy": {
+                "parent_onsite": "Required while a swimmer is present, except Stroke Development classes.",
+                "photo_clearance": "The register snapshots the swimmer's recorded consent; staff must not take photos when clearance is absent.",
+                "medical_privacy": "Only record lesson-safety information in the private note.",
+            },
+        }
+
+
+@app.post("/api/staff/lesson-register")
+def save_lesson_attendance(payload: LessonAttendanceInput, request: Request, user: dict[str, Any] = Depends(require_roles("staff", "admin")), x_csrf_token: str | None = Header(default=None)) -> dict[str, Any]:
+    csrf_guard(request, user, x_csrf_token)
+    if payload.occurrence_date > business_today():
+        raise HTTPException(status_code=422, detail="Attendance cannot be recorded before the lesson date")
+    with db_session() as db:
+        booking = db.execute(
+            """SELECT b.id,b.status,c.id class_id,c.title,c.weekday,c.instructor_id,
+                      s.id swimmer_id,s.photo_consent
+               FROM bookings b JOIN classes c ON c.id=b.class_id JOIN swimmers s ON s.id=b.swimmer_id
+               WHERE b.id=?""",
+            (payload.booking_id,),
+        ).fetchone()
+        if not booking or booking["status"] != "confirmed":
+            raise HTTPException(status_code=404, detail="Confirmed lesson booking not found")
+        if user["role"] == "staff" and booking["instructor_id"] != user["id"]:
+            raise HTTPException(status_code=403, detail="Staff can update only their assigned lesson register")
+        term = validate_class_occurrence(db, booking, payload.occurrence_date)
+        parent_required = "stroke development" not in booking["title"].lower()
+        if parent_required and payload.attendance_status in {"present", "late"} and payload.parent_onsite_confirmed is not True:
+            raise HTTPException(status_code=422, detail="Confirm that a parent or guardian is on site for this swimmer")
+        recorded_at = now_iso()
+        existing = db.execute(
+            "SELECT id FROM lesson_attendance WHERE booking_id=? AND occurrence_date=?",
+            (payload.booking_id, payload.occurrence_date.isoformat()),
+        ).fetchone()
+        if existing:
+            db.execute(
+                """UPDATE lesson_attendance SET attendance_status=?,parent_onsite_confirmed=?,
+                          photo_clearance_snapshot=?,private_note=?,recorded_by=?,term_id=?,updated_at=? WHERE id=?""",
+                (
+                    payload.attendance_status,
+                    None if payload.parent_onsite_confirmed is None else int(payload.parent_onsite_confirmed),
+                    int(bool(booking["photo_consent"])),
+                    payload.private_note or None,
+                    user["id"],
+                    term["id"],
+                    recorded_at,
+                    existing["id"],
+                ),
+            )
+            attendance_id = existing["id"]
+            action = "update_lesson_attendance"
+        else:
+            attendance_id = db.execute(
+                """INSERT INTO lesson_attendance(
+                       booking_id,term_id,occurrence_date,attendance_status,parent_onsite_confirmed,
+                       photo_clearance_snapshot,private_note,recorded_by,recorded_at,updated_at
+                   ) VALUES(?,?,?,?,?,?,?,?,?,?)""",
+                (
+                    payload.booking_id,
+                    term["id"],
+                    payload.occurrence_date.isoformat(),
+                    payload.attendance_status,
+                    None if payload.parent_onsite_confirmed is None else int(payload.parent_onsite_confirmed),
+                    int(bool(booking["photo_consent"])),
+                    payload.private_note or None,
+                    user["id"],
+                    recorded_at,
+                    recorded_at,
+                ),
+            ).lastrowid
+            action = "record_lesson_attendance"
+        audit(
+            db, user["id"], action, "lesson_attendance", attendance_id,
+            {
+                "booking_id": payload.booking_id,
+                "class_id": booking["class_id"],
+                "occurrence_date": payload.occurrence_date.isoformat(),
+                "attendance_status": payload.attendance_status,
+                "parent_onsite_required": parent_required,
+                "parent_onsite_confirmed": payload.parent_onsite_confirmed,
+                "photo_clearance_snapshot": bool(booking["photo_consent"]),
+                "term_id": term["id"],
+            },
+            client_ip(request),
+        )
+        return {
+            "id": attendance_id,
+            "saved": True,
+            "photo_clearance": bool(booking["photo_consent"]),
+            "parent_onsite_required": parent_required,
+            "updated_at": recorded_at,
+        }
 
 
 @app.post("/api/staff/clock")
@@ -1992,6 +2366,7 @@ def admin_metrics(user: dict[str, Any] = Depends(require_roles("admin"))) -> dic
 @app.get("/api/admin/dashboard")
 def admin_dashboard(user: dict[str, Any] = Depends(require_roles("admin"))) -> dict[str, Any]:
     with db_session() as db:
+        term_context = public_term_context(db)
         active_swimmers = db.execute("SELECT COUNT(*) FROM swimmers WHERE active=1").fetchone()[0]
         confirmed_bookings = db.execute("SELECT COUNT(*) FROM bookings WHERE status='confirmed'").fetchone()[0]
         waitlist = db.execute("SELECT COUNT(*) FROM waitlist WHERE status='waiting'").fetchone()[0]
@@ -2024,7 +2399,7 @@ def admin_dashboard(user: dict[str, Any] = Depends(require_roles("admin"))) -> d
             checklist = db.execute("SELECT created_at,deck_safe,first_aid_ready,equipment_ready,water_checked FROM pool_checklists WHERE location_id=? ORDER BY created_at DESC LIMIT 1", (location["id"],)).fetchone()
             reading_fresh = bool(reading and now - datetime.fromisoformat(reading["created_at"]) <= timedelta(hours=24))
             checklist_fresh = bool(checklist and now - datetime.fromisoformat(checklist["created_at"]) <= timedelta(hours=24))
-            today_classes = db.execute("SELECT COUNT(*) FROM classes WHERE active=1 AND location_id=? AND weekday=?", (location["id"], today_weekday)).fetchone()[0]
+            today_classes = db.execute("SELECT COUNT(*) FROM classes WHERE active=1 AND location_id=? AND weekday=?", (location["id"], today_weekday)).fetchone()[0] if term_context["in_session"] else 0
             locations.append({**dict(location), "latest_reading": dict(reading) if reading else None, "latest_checklist": dict(checklist) if checklist else None, "reading_fresh": reading_fresh, "checklist_fresh": checklist_fresh, "today_classes": today_classes})
         metrics = {
             "active_swimmers": active_swimmers,
@@ -2052,6 +2427,7 @@ def admin_dashboard(user: dict[str, Any] = Depends(require_roles("admin"))) -> d
                 "pool_readings_current": "Locations whose latest water reading is no more than 24 hours old.",
                 "enquiry_mix": "Current workflow status for every public lesson enquiry in the database.",
             },
+            "term_calendar": term_context,
         }
 
 
@@ -2060,6 +2436,7 @@ def admin_locations(user: dict[str, Any] = Depends(require_roles("admin"))) -> d
     with db_session() as db:
         locations = []
         today_weekday = business_today().weekday()
+        term_context = public_term_context(db)
         for location in db.execute("SELECT * FROM locations ORDER BY name"):
             reading = db.execute(
                 "SELECT temperature,status,note,source,created_at FROM pool_readings WHERE location_id=? ORDER BY created_at DESC LIMIT 1",
@@ -2072,14 +2449,14 @@ def admin_locations(user: dict[str, Any] = Depends(require_roles("admin"))) -> d
             today_classes = rows(db.execute(
                 "SELECT code,title,start_time,duration_minutes FROM classes WHERE active=1 AND location_id=? AND weekday=? ORDER BY start_time",
                 (location["id"], today_weekday),
-            ))
+            )) if term_context["in_session"] else []
             locations.append({
                 **dict(location),
                 "latest_reading": dict(reading) if reading else None,
                 "latest_checklist": dict(checklist) if checklist else None,
                 "today_classes": today_classes,
             })
-        return {"locations": locations, "source": "HV Swim operational database", "generated_at": now_iso()}
+        return {"locations": locations, "term_calendar": term_context, "source": "HV Swim operational database", "generated_at": now_iso()}
 
 
 @app.patch("/api/admin/locations/{location_id}")
@@ -2513,6 +2890,7 @@ def update_xero_staff_mapping(staff_id: int, payload: XeroStaffMappingInput, req
 @app.get("/api/admin/enrolments")
 def admin_enrolments(user: dict[str, Any] = Depends(require_roles("admin"))) -> dict[str, Any]:
     with db_session() as db:
+        term_context = public_term_context(db)
         class_query = """SELECT c.id,c.code,c.title,c.level,c.weekday,c.start_time,c.duration_minutes,c.capacity,c.price_cents,
                          l.name location_name,l.slug location_slug,u.first_name instructor_first,u.last_name instructor_last,
                          (SELECT COUNT(*) FROM bookings b WHERE b.class_id=c.id AND b.status='confirmed') enrolled,
@@ -2524,7 +2902,7 @@ def admin_enrolments(user: dict[str, Any] = Depends(require_roles("admin"))) -> 
             item = dict(row)
             item["available"] = max(0, item["capacity"] - item["enrolled"])
             item["utilisation"] = round(100 * item["enrolled"] / max(1, item["capacity"]), 1)
-            item["is_today"] = item["weekday"] == business_today().weekday()
+            item["is_today"] = term_context["in_session"] and item["weekday"] == business_today().weekday()
             classes.append(item)
         waitlist_query = """SELECT w.id,w.position,w.status,w.created_at,c.id class_id,c.code,c.title,c.weekday,c.start_time,c.capacity,
                             s.id swimmer_id,s.first_name swimmer_first,s.last_name swimmer_last,u.id customer_id,
@@ -2547,7 +2925,99 @@ def admin_enrolments(user: dict[str, Any] = Depends(require_roles("admin"))) -> 
             },
             "classes": classes,
             "waitlist": waiting,
+            "term_calendar": term_context,
         }
+
+
+@app.get("/api/admin/term-operations")
+def admin_term_operations(user: dict[str, Any] = Depends(require_roles("admin"))) -> dict[str, Any]:
+    with db_session() as db:
+        terms = rows(db.execute(
+            """SELECT t.*,TRIM(COALESCE(u.first_name,'') || ' ' || COALESCE(u.last_name,'')) created_by_name,
+                      (SELECT COUNT(*) FROM absence_reports a WHERE a.term_id=t.id) absence_reports,
+                      (SELECT COUNT(*) FROM absence_reports a WHERE a.term_id=t.id AND a.credit_status='credited') credits_recorded
+               FROM school_terms t LEFT JOIN users u ON u.id=t.created_by
+               ORDER BY t.start_date DESC,t.id DESC"""
+        ))
+        absences = rows(db.execute(
+            """SELECT a.id,a.occurrence_date,a.reason_category,a.credit_status,a.reported_at,
+                      s.first_name swimmer_first,s.last_name swimmer_last,c.title,c.code,c.start_time,
+                      l.name location_name,t.name term_name,u.first_name customer_first,u.last_name customer_last
+               FROM absence_reports a JOIN bookings b ON b.id=a.booking_id JOIN swimmers s ON s.id=b.swimmer_id
+               JOIN users u ON u.id=s.customer_id JOIN classes c ON c.id=b.class_id JOIN locations l ON l.id=c.location_id
+               JOIN school_terms t ON t.id=a.term_id ORDER BY a.occurrence_date DESC,a.id DESC LIMIT 250"""
+        ))
+        attendance = rows(db.execute(
+            """SELECT la.occurrence_date,la.attendance_status,COUNT(*) count
+               FROM lesson_attendance la GROUP BY la.occurrence_date,la.attendance_status
+               ORDER BY la.occurrence_date DESC"""
+        ))
+        current = public_term_context(db)
+        return {
+            "terms": terms,
+            "active_term": current,
+            "absences": absences,
+            "attendance_summary": attendance,
+            "policy": {
+                "lesson_price_cents": 2250,
+                "absence_credit_default": 2,
+                "make_up_classes": False,
+                "mid_term_refunds": False,
+                "parent_onsite_exception": "Stroke Development",
+                "payment_route": "xero_invoice_workflow",
+            },
+        }
+
+
+@app.post("/api/admin/terms")
+def create_school_term(payload: SchoolTermInput, request: Request, user: dict[str, Any] = Depends(require_roles("admin")), x_csrf_token: str | None = Header(default=None)) -> dict[str, Any]:
+    csrf_guard(request, user, x_csrf_token)
+    with db_session() as db:
+        db.execute("BEGIN IMMEDIATE")
+        if payload.activate:
+            db.execute("UPDATE school_terms SET status='closed',updated_at=? WHERE status='active'", (now_iso(),))
+        status_value = "active" if payload.activate else "draft"
+        cursor = db.execute(
+            """INSERT INTO school_terms(
+                   name,start_date,end_date,absence_credit_limit,status,source,created_by,created_at,updated_at
+               ) VALUES(?,?,?,?,?,'management',?,?,?)""",
+            (
+                payload.name,
+                payload.start_date.isoformat(),
+                payload.end_date.isoformat(),
+                payload.absence_credit_limit,
+                status_value,
+                user["id"],
+                now_iso(),
+                now_iso(),
+            ),
+        )
+        audit(
+            db, user["id"], "create_school_term", "school_term", cursor.lastrowid,
+            {**payload.model_dump(mode="json"), "status": status_value}, client_ip(request),
+        )
+        return {"id": cursor.lastrowid, "created": True, "status": status_value}
+
+
+@app.post("/api/admin/terms/{term_id}/activate")
+def activate_school_term(term_id: int, request: Request, user: dict[str, Any] = Depends(require_roles("admin")), x_csrf_token: str | None = Header(default=None)) -> dict[str, Any]:
+    csrf_guard(request, user, x_csrf_token)
+    with db_session() as db:
+        db.execute("BEGIN IMMEDIATE")
+        term = db.execute("SELECT * FROM school_terms WHERE id=?", (term_id,)).fetchone()
+        if not term:
+            raise HTTPException(status_code=404, detail="School term not found")
+        if term["status"] == "active":
+            return {"id": term_id, "status": "active", "changed": False}
+        changed_at = now_iso()
+        db.execute("UPDATE school_terms SET status='closed',updated_at=? WHERE status='active'", (changed_at,))
+        db.execute("UPDATE school_terms SET status='active',source='management',updated_at=? WHERE id=?", (changed_at, term_id))
+        audit(
+            db, user["id"], "activate_school_term", "school_term", term_id,
+            {"name": term["name"], "start_date": term["start_date"], "end_date": term["end_date"]},
+            client_ip(request),
+        )
+        return {"id": term_id, "status": "active", "changed": True}
 
 
 @app.post("/api/admin/waitlist/{waitlist_id}/action")
@@ -2651,12 +3121,43 @@ def create_notification(payload: NotificationInput, request: Request, user: dict
 @app.get("/api/admin/integrations")
 def integrations(user: dict[str, Any] = Depends(require_roles("admin"))) -> dict[str, Any]:
     with db_session() as db:
+        connection_status = {
+            row["provider"]: row["status"] for row in db.execute(
+                "SELECT provider,status FROM integration_connections WHERE provider IN ('xero','shopify')"
+            )
+        }
         return {
             "integrations": integration_summary(db),
             "safe_mode": {
                 "xero_sync_requested": settings.xero_sync_enabled,
                 "xero_transmission_locked": True,
             },
+            "payment_routing": [
+                {
+                    "category": "Lesson enrolments & term fees",
+                    "provider": "Xero",
+                    "route": "xero_invoice_workflow",
+                    "connection_status": connection_status.get("xero", "not_connected"),
+                    "transaction_status": "locked",
+                    "boundary": "Invoice creation, contact matching, online-payment settings and credit-note handling require the authorised Xero organisation and a reviewed test invoice.",
+                },
+                {
+                    "category": "Absence credits",
+                    "provider": "Xero",
+                    "route": "xero_credit_note_workflow",
+                    "connection_status": connection_status.get("xero", "not_connected"),
+                    "transaction_status": "record_only",
+                    "boundary": "The platform records eligibility; it does not create a Xero credit note or change an invoice automatically.",
+                },
+                {
+                    "category": "Merchandise & staff uniforms",
+                    "provider": "Shopify",
+                    "route": "shopify_checkout",
+                    "connection_status": connection_status.get("shopify", "not_connected"),
+                    "transaction_status": "gated",
+                    "boundary": "Checkout is available only for sampled, approved and mapped products after Shopify credentials and a successful test order are confirmed.",
+                },
+            ],
         }
 
 
@@ -2823,15 +3324,16 @@ async def products() -> dict[str, Any]:
             return {
                 "source": "shopify",
                 "products": approved_live,
+                "payment_route": "shopify_checkout",
                 "publication_boundary": "Only locally approved, sampled, costed and mapped products are shown from Shopify.",
             }
         except Exception as exc:
             with db_session() as db:
                 fallback = rows(db.execute(public_product_query))
-            return {"source": "local_fallback", "products": [public_product_view(item) for item in fallback], "warning": f"Shopify unavailable: {type(exc).__name__}"}
+            return {"source": "local_fallback", "products": [public_product_view(item) for item in fallback], "payment_route": "shopify_checkout_unavailable", "warning": f"Shopify unavailable: {type(exc).__name__}"}
     with db_session() as db:
         local_products = rows(db.execute(public_product_query))
-        return {"source": "planned_catalogue", "products": [public_product_view(item) for item in local_products]}
+        return {"source": "planned_catalogue", "products": [public_product_view(item) for item in local_products], "payment_route": "shopify_checkout_configuration_required"}
 
 
 @app.get("/api/admin/merch-production")

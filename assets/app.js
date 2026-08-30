@@ -342,6 +342,18 @@
       payload.locations.forEach(locationItem => {
         const reading = locationItem.latest_reading;
         if (!conditions[locationItem.slug]) return;
+        const card=[...document.querySelectorAll('[data-location]')].find(item=>item.dataset.location===locationItem.slug);
+        const lessonList=card?.querySelector('[data-today-lessons]');
+        const termStatus=card?.querySelector('[data-term-status]');
+        const term=payload.term_calendar||{};
+        if(lessonList){
+          const todayClasses=Array.isArray(locationItem.today_classes)?locationItem.today_classes:[];
+          lessonList.innerHTML=todayClasses.length?todayClasses.map(item=>`<div class="lesson-row"><time>${escapePublic(formatClassTime(item.start_time))}</time><span>${escapePublic(item.title)}</span><strong>${escapePublic(`${item.duration_minutes} min`)}</strong></div>`).join(''):`<div class="lesson-row muted"><time>—</time><span>${escapePublic(term.configured?(term.in_session?'No lessons scheduled at this venue today.':'No lessons — today is outside the published term.'):'Term dates have not been published yet.')}</span><strong>${term.is_preview?'Preview':'Update'}</strong></div>`;
+        }
+        if(termStatus){
+          termStatus.textContent=term.is_preview?'Preview calendar':term.in_session?'Published term':'Calendar update';
+          termStatus.className=`status ${term.in_session?'open':'changed'}`;
+        }
         if (!reading) {
           conditions[locationItem.slug].statusText = locationItem.public_status || conditions[locationItem.slug].statusText;
           return;

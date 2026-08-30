@@ -18,7 +18,7 @@ import base64
 import binascii
 import struct
 import zlib
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -1623,6 +1623,113 @@ def test_clock_in_tracking_is_disabled_by_business_policy(client):
     response = client.post("/api/staff/clock", json={"action": "in", "location_slug": "wood-street"}, headers=headers)
     assert response.status_code == 410
     assert "does not use clock-in tracking" in response.json()["detail"]
+
+
+def test_family_absence_credit_limit_and_financial_boundary(client):
+    client.cookies.clear()
+    csrf = sign_in(client, FAMILY)
+    data = client.get("/api/customer/absences")
+    assert data.status_code == 200, data.text
+    payload = data.json()
+    assert payload["term"]["configured"] is True
+    assert payload["term"]["is_preview"] is True
+    assert payload["policy"]["financial_boundary"].startswith("An eligible absence credit")
+    booking = next(item for item in payload["bookings"] if item["title"] == "Learn to Swim 3")
+    first_date = date.fromisoformat(booking["next_occurrence"])
+    statuses = []
+    for week in range(3):
+        response = client.post(
+            "/api/customer/absences",
+            json={
+                "booking_id": booking["booking_id"],
+                "occurrence_date": (first_date + timedelta(days=7 * week)).isoformat(),
+                "reason_category": "family",
+            },
+            headers={"X-CSRF-Token": csrf},
+        )
+        assert response.status_code == 200, response.text
+        assert response.json()["financial_adjustment"] == "not_automatic"
+        statuses.append(response.json()["credit_status"])
+    assert statuses == ["credited", "credited", "recorded_no_credit"]
+
+    duplicate = client.post(
+        "/api/customer/absences",
+        json={"booking_id": booking["booking_id"], "occurrence_date": first_date.isoformat(), "reason_category": "other"},
+        headers={"X-CSRF-Token": csrf},
+    )
+    assert duplicate.status_code == 409
+
+
+def test_lesson_register_enforces_assignment_parent_and_photo_rules(client):
+    client.cookies.clear()
+    sign_in(client, FAMILY)
+    absence_data = client.get("/api/customer/absences").json()
+    booking = next(item for item in absence_data["bookings"] if item["title"] == "Learn to Swim 3")
+    term_start = date.fromisoformat(absence_data["term"]["start_date"])
+    occurrence = (term_start + timedelta(days=(3 - term_start.weekday()) % 7)).isoformat()
+
+    client.cookies.clear()
+    csrf = sign_in(client, STAFF)
+    register = client.get(f"/api/staff/lesson-register?occurrence_date={occurrence}")
+    assert register.status_code == 200, register.text
+    class_item = next(item for item in register.json()["classes"] if item["title"] == "Learn to Swim 3")
+    swimmer = next(item for item in class_item["register"] if item["booking_id"] == booking["booking_id"])
+    assert class_item["parent_onsite_required"] is True
+    assert swimmer["reported_absence"] is False
+    assert swimmer["photo_consent"] is True
+
+    future = client.post(
+        "/api/staff/lesson-register",
+        json={"booking_id": booking["booking_id"], "occurrence_date": booking["next_occurrence"], "attendance_status": "excused", "parent_onsite_confirmed": None, "private_note": ""},
+        headers={"X-CSRF-Token": csrf},
+    )
+    assert future.status_code == 422
+
+    missing_parent = client.post(
+        "/api/staff/lesson-register",
+        json={"booking_id": booking["booking_id"], "occurrence_date": occurrence, "attendance_status": "present", "parent_onsite_confirmed": None, "private_note": ""},
+        headers={"X-CSRF-Token": csrf},
+    )
+    assert missing_parent.status_code == 422
+    saved = client.post(
+        "/api/staff/lesson-register",
+        json={"booking_id": booking["booking_id"], "occurrence_date": occurrence, "attendance_status": "present", "parent_onsite_confirmed": True, "private_note": "Test-only safe lesson note"},
+        headers={"X-CSRF-Token": csrf},
+    )
+    assert saved.status_code == 200, saved.text
+    assert saved.json()["photo_clearance"] is True
+
+    client.cookies.clear()
+    sign_in(client, FAMILY)
+    assert client.get(f"/api/staff/lesson-register?occurrence_date={occurrence}").status_code == 403
+
+
+def test_management_term_and_payment_routes_are_explicit(client):
+    client.cookies.clear()
+    csrf = sign_in(client, ADMIN)
+    terms = client.get("/api/admin/term-operations")
+    assert terms.status_code == 200
+    assert terms.json()["policy"]["payment_route"] == "xero_invoice_workflow"
+    draft = client.post(
+        "/api/admin/terms",
+        json={"name": "Test future term", "start_date": "2030-01-01", "end_date": "2030-03-31", "absence_credit_limit": 2, "activate": False},
+        headers={"X-CSRF-Token": csrf},
+    )
+    assert draft.status_code == 200, draft.text
+    assert draft.json()["status"] == "draft"
+    activated = client.post(
+        f"/api/admin/terms/{draft.json()['id']}/activate",
+        headers={"X-CSRF-Token": csrf},
+    )
+    assert activated.status_code == 200, activated.text
+    assert activated.json()["status"] == "active"
+    assert client.get("/api/classes").json()["term_calendar"]["name"] == "Test future term"
+    routes = client.get("/api/admin/integrations").json()["payment_routing"]
+    assert {(item["category"], item["provider"]) for item in routes} == {
+        ("Lesson enrolments & term fees", "Xero"),
+        ("Absence credits", "Xero"),
+        ("Merchandise & staff uniforms", "Shopify"),
+    }
 
 
 # --- input validation ----------------------------------------------------------------

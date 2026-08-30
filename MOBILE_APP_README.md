@@ -1,4 +1,4 @@
-# HV Swim Bendigo mobile app · V5.6.2
+# HV Swim Bendigo mobile app · V5.7.0
 
 This release contains two related mobile products:
 
@@ -43,7 +43,7 @@ The launcher detects missing Node.js. Xcode and Android Studio still need to be 
 
 - Replace demo accounts and migrate approved production data.
 - Complete privacy, child-safeguarding, retention and account-deletion policies.
-- Configure production email/SMS/Web Push/APNs/FCM providers and notification consent. V5.6.2 browser alerts update while the site is open; background native delivery is not claimed yet.
+- Configure production email/SMS/Web Push/APNs/FCM providers and notification consent. V5.7.0 browser alerts update while the site is open; background native delivery is not claimed yet.
 - Test denied geolocation, offline mode, expired sessions and password recovery.
 - Add native screenshots, store copy, support contact and privacy disclosures.
 - Test iPhone, iPad and Android physical devices before beta distribution.

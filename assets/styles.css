@@ -1811,6 +1811,12 @@ body:not([data-platform-page]) .program-card:nth-child(4)::before { background:r
 .footer-business-identity { padding:18px 0 0; border-top:1px solid rgba(255,255,255,.1); color:#9fb5c8; font-size:.58rem; line-height:1.5; }
 [hidden] { display:none !important; }
 @media(max-width:700px) {
+  body:not([data-platform-page]) .location-detail .location-visual { min-width:0; min-height:320px; display:block; padding:22px; }
+  body:not([data-platform-page]) .location-detail .condition-fallback { position:absolute; top:104px; left:22px; right:22px; width:auto; max-width:none; }
+  body:not([data-platform-page]) .location-detail .temp-bubble { position:absolute; top:22px; right:22px; max-width:calc(100% - 100px); }
+  body:not([data-platform-page]) .location-detail .location-visual-note { left:22px; right:22px; bottom:24px; max-width:none; }
+  body:not([data-platform-page]) .location-detail .lesson-row { align-items:flex-start; flex-wrap:wrap; gap:7px 12px; }
+  body:not([data-platform-page]) .location-detail .lesson-row span { flex:1 1 150px; }
   .country-acknowledgement { padding-block:38px; }
   .country-symbol { display:none; }
   .facebook-section-compact { padding-block:48px; }
