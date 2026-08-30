@@ -12,6 +12,7 @@ drives the app in-process against a throwaway database.
 from __future__ import annotations
 
 import importlib
+import hashlib
 import os
 import sys
 import base64
@@ -20,6 +21,7 @@ import struct
 import zlib
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
+from urllib.parse import parse_qs, urlparse
 
 import pytest
 from fastapi.testclient import TestClient
@@ -81,6 +83,155 @@ def make_test_png_base64(width=64, height=64):
 
 def test_health_is_public(client):
     assert client.get("/api/health").status_code == 200
+
+
+def test_family_account_provider_status_is_public_and_secret_free(client):
+    response = client.get("/api/auth/oauth/providers")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["signup_role"] == "customer"
+    assert payload["team_accounts"] == "invitation_only"
+    assert payload["configured_count"] == 0
+    assert payload["providers"] == [
+        {"id": "google", "label": "Google", "configured": False, "account_role": "customer"},
+        {"id": "apple", "label": "Apple", "configured": False, "account_role": "customer"},
+    ]
+    assert "secret" not in response.text.lower()
+    assert client.get("/api/auth/oauth/google/start").status_code == 503
+
+
+def _oauth_start(client, monkeypatch, server, provider):
+    monkeypatch.setattr(server, "oauth_provider_ready", lambda selected: selected == provider)
+    monkeypatch.setattr(
+        server,
+        "oauth_authorization_url",
+        lambda selected, **values: f"https://accounts.example.test/authorize?state={values['state']}&provider={selected}",
+    )
+    response = client.get(f"/api/auth/oauth/{provider}/start", follow_redirects=False)
+    assert response.status_code == 302
+    state = parse_qs(urlparse(response.headers["location"]).query)["state"][0]
+    return state
+
+
+def test_google_signup_creates_only_a_family_identity_and_session(client, monkeypatch):
+    from backend import server
+    from backend.database import db_session
+
+    client.cookies.clear()
+    state = _oauth_start(client, monkeypatch, server, "google")
+    state_hash = hashlib.sha256(state.encode("utf-8")).hexdigest()
+    with db_session() as db:
+        attempt = db.execute("SELECT state_hash,ip_address FROM oauth_login_attempts WHERE state_hash=?", (state_hash,)).fetchone()
+    assert attempt["state_hash"] == state_hash
+    assert attempt["state_hash"] != state
+    assert attempt["ip_address"]
+
+    async def exchange(provider, **_values):
+        assert provider == "google"
+        return {"id_token": "test-id-token", "access_token": "must-not-be-stored"}
+
+    monkeypatch.setattr(server, "oauth_exchange_code", exchange)
+    monkeypatch.setattr(
+        server,
+        "oauth_verify_identity_token",
+        lambda provider, token, **_values: {
+            "sub": "google-family-test-1",
+            "email": "new.family@example.test",
+            "email_verified": True,
+            "given_name": "New",
+            "family_name": "Family",
+        },
+    )
+    response = client.get(
+        f"/api/auth/oauth/google/callback?state={state}&code=one-use-code",
+        follow_redirects=False,
+    )
+    assert response.status_code == 303
+    assert response.headers["location"] == "/platform.html?account=connected"
+    assert client.get("/api/auth/me").json()["user"]["role"] == "customer"
+    with db_session() as db:
+        user = db.execute("SELECT * FROM users WHERE email='new.family@example.test'").fetchone()
+        identity = db.execute("SELECT * FROM oauth_identities WHERE user_id=?", (user["id"],)).fetchone()
+        audit_row = db.execute("SELECT detail FROM audit_log WHERE action='oauth_signup' ORDER BY id DESC LIMIT 1").fetchone()
+        database_dump = " ".join(str(value) for row in db.execute("SELECT * FROM oauth_identities") for value in row)
+    assert user["role"] == "customer"
+    assert identity["provider"] == "google"
+    assert identity["subject"] == "google-family-test-1"
+    assert "access_token" not in database_dump and "must-not-be-stored" not in database_dump
+    assert '"provider": "google"' in audit_row["detail"]
+
+
+def test_social_identity_cannot_self_link_to_staff(client, monkeypatch):
+    from backend import server
+
+    client.cookies.clear()
+    state = _oauth_start(client, monkeypatch, server, "google")
+
+    async def exchange(_provider, **_values):
+        return {"id_token": "test-id-token"}
+
+    monkeypatch.setattr(server, "oauth_exchange_code", exchange)
+    monkeypatch.setattr(
+        server,
+        "oauth_verify_identity_token",
+        lambda *_args, **_values: {"sub": "staff-link-attempt", "email": STAFF[0], "email_verified": True},
+    )
+    response = client.get(
+        f"/api/auth/oauth/google/callback?state={state}&code=one-use-code",
+        follow_redirects=False,
+    )
+    assert response.status_code == 303
+    assert response.headers["location"].endswith("oauth_error=team_account_requires_approval")
+
+
+def test_apple_form_post_callback_is_narrowly_allowed(client, monkeypatch):
+    from backend import server
+
+    client.cookies.clear()
+    state = _oauth_start(client, monkeypatch, server, "apple")
+
+    async def exchange(provider, **_values):
+        assert provider == "apple"
+        return {"id_token": "apple-test-id-token"}
+
+    monkeypatch.setattr(server, "oauth_exchange_code", exchange)
+    monkeypatch.setattr(
+        server,
+        "oauth_verify_identity_token",
+        lambda *_args, **_values: {"sub": "apple-family-test-1", "email": "icloud.family@example.test", "email_verified": True},
+    )
+    response = client.post(
+        "/api/auth/oauth/apple/callback",
+        data={"state": state, "code": "one-use-code", "user": '{"name":{"firstName":"iCloud","lastName":"Family"}}'},
+        follow_redirects=False,
+    )
+    assert response.status_code == 303
+    assert response.headers["location"] == "/platform.html?account=connected"
+    assert client.post("/api/auth/login", data={"email": "x"}).status_code == 415
+    assert client.post(
+        "/api/auth/oauth/apple/callback",
+        content=b"x" * 32_769,
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+        follow_redirects=False,
+    ).status_code == 413
+
+
+def test_social_signin_starts_are_rate_limited_per_ip(client, monkeypatch):
+    from backend import server
+    from backend.database import db_session
+
+    monkeypatch.setattr(server, "oauth_provider_ready", lambda provider: provider == "google")
+    monkeypatch.setattr(server, "oauth_authorization_url", lambda _provider, **_values: "https://accounts.example.test")
+    with db_session() as db:
+        db.execute("DELETE FROM oauth_login_attempts")
+    try:
+        for _ in range(30):
+            assert client.get("/api/auth/oauth/google/start", follow_redirects=False).status_code == 302
+        blocked = client.get("/api/auth/oauth/google/start", follow_redirects=False)
+        assert blocked.status_code == 429
+    finally:
+        with db_session() as db:
+            db.execute("DELETE FROM oauth_login_attempts")
 
 
 def test_public_endpoints_need_no_session(client):

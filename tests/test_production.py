@@ -64,6 +64,29 @@ def test_production_requires_https_for_public_and_xero_urls():
         )
 
 
+def test_production_rejects_incomplete_or_insecure_social_signin_configuration():
+    with pytest.raises(RuntimeError, match="GOOGLE_CLIENT_ID"):
+        server.validate_production_config(production_settings(google_client_id="client"))
+    with pytest.raises(RuntimeError, match="GOOGLE_REDIRECT_URI"):
+        server.validate_production_config(
+            production_settings(
+                google_client_id="client",
+                google_client_secret="secret",
+                google_redirect_uri="http://swim.example.test/api/auth/oauth/google/callback",
+            )
+        )
+    with pytest.raises(RuntimeError, match="APPLE_CLIENT_ID"):
+        server.validate_production_config(production_settings(apple_client_id="com.example.web"))
+    with pytest.raises(RuntimeError, match="APPLE_REDIRECT_URI"):
+        server.validate_production_config(
+            production_settings(
+                apple_client_id="com.example.web",
+                apple_client_secret="signed-client-secret",
+                apple_redirect_uri="http://swim.example.test/api/auth/oauth/apple/callback",
+            )
+        )
+
+
 def test_empty_production_database_requires_and_uses_one_time_admin_bootstrap(tmp_path, monkeypatch):
     db_path = tmp_path / "production.db"
     monkeypatch.setattr(database, "DB_PATH", db_path)

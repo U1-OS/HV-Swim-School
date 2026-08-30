@@ -42,6 +42,26 @@ CREATE TABLE IF NOT EXISTS login_attempts (
   success INTEGER NOT NULL,
   created_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS oauth_login_attempts (
+  state_hash TEXT PRIMARY KEY,
+  provider TEXT NOT NULL CHECK (provider IN ('google','apple')),
+  ip_address TEXT NOT NULL,
+  code_verifier TEXT NOT NULL,
+  nonce TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  expires_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS oauth_identities (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  provider TEXT NOT NULL CHECK (provider IN ('google','apple')),
+  subject TEXT NOT NULL,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  email TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  last_login_at TEXT NOT NULL,
+  UNIQUE(provider, subject),
+  UNIQUE(provider, user_id)
+);
 CREATE TABLE IF NOT EXISTS swimmers (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   customer_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -370,6 +390,8 @@ CREATE TABLE IF NOT EXISTS audit_log (
   created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_sessions_expiry ON sessions(expires_at);
+CREATE INDEX IF NOT EXISTS idx_oauth_attempts_expiry ON oauth_login_attempts(expires_at);
+CREATE INDEX IF NOT EXISTS idx_oauth_identity_user ON oauth_identities(user_id);
 CREATE INDEX IF NOT EXISTS idx_bookings_class ON bookings(class_id, status);
 CREATE UNIQUE INDEX IF NOT EXISTS uniq_active_school_term ON school_terms(status) WHERE status='active';
 CREATE INDEX IF NOT EXISTS idx_school_terms_dates ON school_terms(start_date,end_date,status);
@@ -531,6 +553,10 @@ def initialise_database() -> None:
         }.items():
             if column not in user_columns:
                 db.execute(f"ALTER TABLE users ADD COLUMN {column} {definition}")
+        oauth_attempt_columns = {row[1] for row in db.execute("PRAGMA table_info(oauth_login_attempts)")}
+        if "ip_address" not in oauth_attempt_columns:
+            db.execute("ALTER TABLE oauth_login_attempts ADD COLUMN ip_address TEXT NOT NULL DEFAULT 'legacy'")
+        db.execute("CREATE INDEX IF NOT EXISTS idx_oauth_attempts_ip ON oauth_login_attempts(ip_address, created_at)")
         swimmer_columns = {row[1] for row in db.execute("PRAGMA table_info(swimmers)")}
         for column, definition in {
             "allergies": "TEXT",

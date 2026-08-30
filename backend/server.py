@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import base64
 import binascii
 import csv
@@ -12,7 +13,7 @@ from contextlib import asynccontextmanager
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Annotated, Any, Literal
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, quote, urlparse
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response, status
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
@@ -38,6 +39,14 @@ from .integrations import (
     xero_authorization_url,
     xero_exchange_code,
     xero_ready,
+)
+from .oauth import (
+    OAuthProviderError,
+    authorization_url as oauth_authorization_url,
+    exchange_code as oauth_exchange_code,
+    provider_public_status as oauth_provider_public_status,
+    provider_ready as oauth_provider_ready,
+    verify_identity_token as oauth_verify_identity_token,
 )
 from .security import business_date_from_timestamp, business_today, expires_iso, new_token, now_iso, password_hash, password_needs_rehash, password_verify, public_user
 
@@ -127,6 +136,18 @@ def validate_production_config(candidate=settings) -> None:
     xero_configured = bool(candidate.xero_client_id and candidate.xero_client_secret and candidate.xero_redirect_uri)
     if xero_configured and not candidate.xero_redirect_uri.startswith("https://"):
         raise RuntimeError("XERO_REDIRECT_URI must use HTTPS in production")
+    google_fields = (candidate.google_client_id, candidate.google_client_secret)
+    if any(google_fields) and not all(google_fields):
+        raise RuntimeError("GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET must be configured together")
+    google_redirect = candidate.google_redirect_uri or f"{candidate.public_url}/api/auth/oauth/google/callback"
+    if all(google_fields) and not google_redirect.startswith("https://"):
+        raise RuntimeError("GOOGLE_REDIRECT_URI must use HTTPS in production")
+    apple_fields = (candidate.apple_client_id, candidate.apple_client_secret)
+    if any(apple_fields) and not all(apple_fields):
+        raise RuntimeError("APPLE_CLIENT_ID and APPLE_CLIENT_SECRET must be configured together")
+    apple_redirect = candidate.apple_redirect_uri or f"{candidate.public_url}/api/auth/oauth/apple/callback"
+    if all(apple_fields) and not apple_redirect.startswith("https://"):
+        raise RuntimeError("APPLE_REDIRECT_URI must use HTTPS in production")
 
 
 @asynccontextmanager
@@ -138,7 +159,7 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(
     title="HV Swim Bendigo Platform API",
-    version="5.8.0",
+    version="5.9.0",
     docs_url="/api/docs" if not settings.production else None,
     openapi_url="/openapi.json" if not settings.production else None,
     redoc_url=None,
@@ -181,7 +202,7 @@ async def security_headers(request: Request, call_next):
         response.headers["Cache-Control"] = "no-store"
         return response
     content_type = request.headers.get("content-type", "").lower()
-    if request_path.startswith("/api/") and content_type.startswith(
+    if request_path.startswith("/api/") and request_path != "/api/auth/oauth/apple/callback" and content_type.startswith(
         ("application/x-www-form-urlencoded", "multipart/form-data")
     ):
         response = JSONResponse(status_code=415, content={"detail": "API requests must use JSON"})
@@ -621,10 +642,39 @@ class CartInput(BaseModel):
 
 
 LOGIN_ATTEMPT_RETENTION_DAYS = 30
+OAUTH_ATTEMPT_MINUTES = 10
 
 
 def login_attempt_cutoff() -> str:
     return (datetime.now(timezone.utc) - timedelta(days=LOGIN_ATTEMPT_RETENTION_DAYS)).isoformat()
+
+
+def issue_session(
+    db: sqlite3.Connection,
+    user: sqlite3.Row,
+    response: Response,
+    *,
+    ip_address: str,
+    action: str,
+    audit_detail: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    session_id, csrf = new_token(32), new_token(24)
+    db.execute("DELETE FROM sessions WHERE expires_at<=?", (now_iso(),))
+    db.execute(
+        "INSERT INTO sessions(id,user_id,csrf_token,created_at,expires_at) VALUES(?,?,?,?,?)",
+        (session_id, user["id"], csrf, now_iso(), expires_iso()),
+    )
+    audit(db, user["id"], action, "session", session_id[-8:], audit_detail, ip_address)
+    response.set_cookie(
+        SESSION_COOKIE,
+        session_id,
+        max_age=14 * 24 * 60 * 60,
+        httponly=True,
+        secure=settings.production,
+        samesite="lax",
+        path="/",
+    )
+    return {"user": public_user(user), "csrf_token": csrf}
 
 
 def client_ip(request: Request) -> str:
@@ -1195,7 +1245,7 @@ def renumber_waitlist(db: sqlite3.Connection, class_id: int) -> None:
 
 @app.get("/api/health")
 def health() -> dict[str, Any]:
-    return {"ok": True, "service": "HV Swim Bendigo", "version": "5.8.0", "environment": settings.app_env, "time": now_iso()}
+    return {"ok": True, "service": "HV Swim Bendigo", "version": "5.9.0", "environment": settings.app_env, "time": now_iso()}
 
 
 @app.get("/api/public/site-settings")
@@ -1250,6 +1300,214 @@ def public_association_badge_artwork(credential_key: str) -> FileResponse:
         return FileResponse(artwork_path, media_type="image/png")
 
 
+def oauth_error_redirect(code: str) -> RedirectResponse:
+    return RedirectResponse(url=f"/login.html?oauth_error={quote(code, safe='')}", status_code=303)
+
+
+def safe_oauth_name(value: Any, fallback: str) -> str:
+    cleaned = " ".join(str(value or "").strip().split())
+    return (cleaned or fallback)[:80]
+
+
+async def complete_oauth_login(
+    provider: str,
+    *,
+    state: str,
+    code: str,
+    request: Request,
+    supplied_profile: dict[str, Any] | None = None,
+) -> RedirectResponse:
+    if provider not in {"google", "apple"} or not state or not code:
+        return oauth_error_redirect("invalid_response")
+    state_digest = hashlib.sha256(state.encode("utf-8")).hexdigest()
+    with db_session() as db:
+        db.execute("DELETE FROM oauth_login_attempts WHERE expires_at<=?", (now_iso(),))
+        attempt = db.execute(
+            "SELECT * FROM oauth_login_attempts WHERE state_hash=? AND provider=? AND expires_at>?",
+            (state_digest, provider, now_iso()),
+        ).fetchone()
+        if not attempt:
+            return oauth_error_redirect("expired_or_invalid")
+        # Consume the state before contacting the provider. A transient failure requires a
+        # fresh attempt rather than making the same authorisation code replayable.
+        db.execute("DELETE FROM oauth_login_attempts WHERE state_hash=?", (state_digest,))
+        code_verifier, nonce = attempt["code_verifier"], attempt["nonce"]
+    try:
+        token_payload = await oauth_exchange_code(provider, code=code, code_verifier=code_verifier)
+        claims = await asyncio.to_thread(
+            oauth_verify_identity_token,
+            provider,
+            token_payload["id_token"],
+            nonce=nonce,
+        )
+    except OAuthProviderError:
+        return oauth_error_redirect("provider_failed")
+
+    subject = str(claims.get("sub") or "").strip()
+    email = str(claims.get("email") or "").strip().lower()
+    if not subject or not email or len(email) > 254:
+        return oauth_error_redirect("verified_email_required")
+    provider_profile = supplied_profile or {}
+    profile_name = provider_profile.get("name") if isinstance(provider_profile.get("name"), dict) else {}
+    local_name = email.split("@", 1)[0].replace(".", " ").replace("_", " ")
+    first_name = safe_oauth_name(
+        claims.get("given_name") or profile_name.get("firstName"),
+        local_name.title() or "HV Swim Family",
+    )
+    last_name = safe_oauth_name(claims.get("family_name") or profile_name.get("lastName"), "")
+    signed_in_at = now_iso()
+    response = RedirectResponse(url="/platform.html?account=connected", status_code=303)
+    with db_session() as db:
+        identity = db.execute(
+            "SELECT * FROM oauth_identities WHERE provider=? AND subject=?",
+            (provider, subject),
+        ).fetchone()
+        created = False
+        if identity:
+            user = db.execute("SELECT * FROM users WHERE id=? AND active=1", (identity["user_id"],)).fetchone()
+            if not user:
+                return oauth_error_redirect("account_unavailable")
+        else:
+            user = db.execute("SELECT * FROM users WHERE email=?", (email,)).fetchone()
+            if user and not user["active"]:
+                return oauth_error_redirect("account_unavailable")
+            if user and user["role"] != "customer":
+                return oauth_error_redirect("team_account_requires_approval")
+            if not user:
+                cursor = db.execute(
+                    """INSERT INTO users(
+                           email,password_hash,role,first_name,last_name,must_change_password,created_at
+                       ) VALUES(?,?,'customer',?,?,0,?)""",
+                    (email, password_hash(new_token(48)), first_name, last_name, signed_in_at),
+                )
+                user = db.execute("SELECT * FROM users WHERE id=?", (cursor.lastrowid,)).fetchone()
+                created = True
+            elif user["must_change_password"]:
+                db.execute("UPDATE users SET must_change_password=0 WHERE id=?", (user["id"],))
+                user = db.execute("SELECT * FROM users WHERE id=?", (user["id"],)).fetchone()
+            try:
+                db.execute(
+                    """INSERT INTO oauth_identities(
+                           provider,subject,user_id,email,created_at,last_login_at
+                       ) VALUES(?,?,?,?,?,?)""",
+                    (provider, subject, user["id"], email, signed_in_at, signed_in_at),
+                )
+            except sqlite3.IntegrityError:
+                return oauth_error_redirect("account_already_linked")
+        db.execute(
+            "UPDATE oauth_identities SET email=?,last_login_at=? WHERE provider=? AND subject=?",
+            (email, signed_in_at, provider, subject),
+        )
+        action = "oauth_signup" if created else "oauth_login"
+        issue_session(
+            db,
+            user,
+            response,
+            ip_address=client_ip(request),
+            action=action,
+            audit_detail={"provider": provider, "new_family_account": created},
+        )
+    return response
+
+
+@app.get("/api/auth/oauth/providers")
+def oauth_providers() -> dict[str, Any]:
+    providers = oauth_provider_public_status()
+    return {
+        "providers": providers,
+        "signup_role": "customer",
+        "team_accounts": "invitation_only",
+        "configured_count": sum(1 for item in providers if item["configured"]),
+    }
+
+
+@app.get("/api/auth/oauth/{provider}/start")
+def start_oauth(provider: str, request: Request) -> RedirectResponse:
+    if provider not in {"google", "apple"}:
+        raise HTTPException(status_code=404, detail="Account provider not found")
+    if not oauth_provider_ready(provider):
+        raise HTTPException(status_code=503, detail=f"{provider.title()} account access is awaiting HV Swim configuration")
+    state, nonce, code_verifier = new_token(32), new_token(32), new_token(48)
+    created_at = datetime.now(timezone.utc)
+    expires_at = (created_at + timedelta(minutes=OAUTH_ATTEMPT_MINUTES)).isoformat()
+    ip_address = client_ip(request)
+    with db_session() as db:
+        db.execute("DELETE FROM oauth_login_attempts WHERE expires_at<=?", (created_at.isoformat(),))
+        attempts = db.execute(
+            "SELECT COUNT(*) FROM oauth_login_attempts WHERE ip_address=? AND created_at>?",
+            (ip_address, (created_at - timedelta(minutes=OAUTH_ATTEMPT_MINUTES)).isoformat()),
+        ).fetchone()[0]
+        if attempts >= 30:
+            raise HTTPException(status_code=429, detail="Too many account sign-in attempts. Try again shortly.")
+        db.execute(
+            """INSERT INTO oauth_login_attempts(
+                   state_hash,provider,ip_address,code_verifier,nonce,created_at,expires_at
+               ) VALUES(?,?,?,?,?,?,?)""",
+            (
+                hashlib.sha256(state.encode("utf-8")).hexdigest(),
+                provider,
+                ip_address,
+                code_verifier,
+                nonce,
+                created_at.isoformat(),
+                expires_at,
+            ),
+        )
+    try:
+        destination = oauth_authorization_url(
+            provider,
+            state=state,
+            nonce=nonce,
+            code_verifier=code_verifier,
+        )
+    except OAuthProviderError:
+        raise HTTPException(status_code=503, detail="Account provider is not ready")
+    return RedirectResponse(url=destination, status_code=302)
+
+
+@app.get("/api/auth/oauth/google/callback")
+async def google_oauth_callback(
+    request: Request,
+    state: str = "",
+    code: str = "",
+    error: str = "",
+) -> RedirectResponse:
+    if error:
+        return oauth_error_redirect("cancelled" if error == "access_denied" else "provider_failed")
+    return await complete_oauth_login("google", state=state, code=code, request=request)
+
+
+@app.post("/api/auth/oauth/apple/callback")
+async def apple_oauth_callback(request: Request) -> RedirectResponse:
+    content_type = request.headers.get("content-type", "").lower()
+    if not content_type.startswith("application/x-www-form-urlencoded"):
+        raise HTTPException(status_code=415, detail="Apple callback must use form-encoded data")
+    body = await request.body()
+    if len(body) > 32_768:
+        raise HTTPException(status_code=413, detail="Apple callback is too large")
+    try:
+        parsed = {key: values[0] for key, values in parse_qs(body.decode("utf-8"), keep_blank_values=True).items()}
+    except UnicodeDecodeError:
+        return oauth_error_redirect("invalid_response")
+    if parsed.get("error"):
+        return oauth_error_redirect("cancelled" if parsed["error"] == "user_cancelled_authorize" else "provider_failed")
+    supplied_profile: dict[str, Any] = {}
+    if parsed.get("user"):
+        try:
+            candidate = json.loads(parsed["user"])
+            if isinstance(candidate, dict):
+                supplied_profile = candidate
+        except (TypeError, ValueError):
+            supplied_profile = {}
+    return await complete_oauth_login(
+        "apple",
+        state=parsed.get("state", ""),
+        code=parsed.get("code", ""),
+        request=request,
+        supplied_profile=supplied_profile,
+    )
+
+
 @app.get("/api/demo-accounts")
 def demo_accounts() -> dict[str, Any]:
     if settings.production:
@@ -1286,12 +1544,7 @@ def login(payload: LoginInput, request: Request, response: Response) -> dict[str
         if password_needs_rehash(user["password_hash"]):
             refreshed_hash = password_hash(payload.password)
             db.execute("UPDATE users SET password_hash=? WHERE id=?", (refreshed_hash, user["id"]))
-        session_id, csrf = new_token(32), new_token(24)
-        db.execute("DELETE FROM sessions WHERE expires_at<=?", (now_iso(),))
-        db.execute("INSERT INTO sessions(id,user_id,csrf_token,created_at,expires_at) VALUES(?,?,?,?,?)", (session_id, user["id"], csrf, now_iso(), expires_iso()))
-        audit(db, user["id"], "login", "session", session_id[-8:], ip_address=ip)
-        response.set_cookie(SESSION_COOKIE, session_id, max_age=14*24*60*60, httponly=True, secure=settings.production, samesite="lax", path="/")
-        return {"user": public_user(user), "csrf_token": csrf}
+        return issue_session(db, user, response, ip_address=ip, action="login")
 
 
 @app.get("/api/auth/me")

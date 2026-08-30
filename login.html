@@ -5,7 +5,7 @@
   <meta name="description" content="Secure sign in for the HV Swim Bendigo family, staff and management platform.">
   <title>Sign in | HV Swim Bendigo</title>
   <link rel="icon" href="assets/app-icon-v3-64.png"><link rel="apple-touch-icon" href="assets/app-icon-v3-180.png"><link rel="manifest" href="manifest.webmanifest">
-  <link rel="stylesheet" href="assets/styles.css?v=5.8.0"><link rel="stylesheet" href="assets/platform.css?v=5.8.0"><link rel="stylesheet" href="assets/support.css?v=5.8.0"><script defer src="assets/platform.js?v=5.8.0"></script><script defer src="assets/support.js?v=5.8.0"></script>
+  <link rel="stylesheet" href="assets/styles.css?v=5.9.0"><link rel="stylesheet" href="assets/platform.css?v=5.9.0"><link rel="stylesheet" href="assets/support.css?v=5.9.0"><script defer src="assets/platform.js?v=5.9.0"></script><script defer src="assets/support.js?v=5.9.0"></script>
 </head>
 <body data-platform-page="login">
   <a class="skip-link" href="#main-content">Skip to main content</a>
@@ -18,8 +18,23 @@
     <section class="auth-panel">
       <div class="auth-card" aria-labelledby="login-context-heading">
         <div class="eyebrow" id="login-context-eyebrow">Welcome back</div><h2 id="login-context-heading">Sign in to HV Swim.</h2><p class="fine" id="login-context-copy" style="margin-top:11px">Families, staff and managers all sign in here. You will only see what your own account covers.</p>
+        <div class="auth-error" id="login-error" role="alert"></div>
+        <section class="social-signin" id="social-signin" aria-labelledby="social-signin-heading">
+          <div class="social-signin-head"><strong id="social-signin-heading">Family sign up or sign in</strong><span>New</span></div>
+          <p>Use a Gmail/Google account or an Apple/iCloud account. New sign-ups create a secure family account.</p>
+          <div class="social-buttons">
+            <button class="social-button" type="button" data-oauth-provider="google" disabled aria-describedby="social-status-google">
+              <span class="provider-mark provider-google" aria-hidden="true">G</span><span>Continue with Google</span><small id="social-status-google">Checking…</small>
+            </button>
+            <button class="social-button" type="button" data-oauth-provider="apple" disabled aria-describedby="social-status-apple">
+              <svg class="provider-mark provider-apple" viewBox="0 0 24 24" aria-hidden="true"><path d="M17.1 12.6c0-2.5 2-3.7 2.1-3.8-1.2-1.7-3-1.9-3.7-1.9-1.6-.2-3 .9-3.8.9-.8 0-2-1-3.3-.9-1.7 0-3.3 1-4.2 2.6-1.8 3.1-.5 7.8 1.3 10.3.9 1.2 1.9 2.6 3.3 2.5 1.3-.1 1.8-.8 3.5-.8 1.6 0 2.1.8 3.5.8 1.5 0 2.4-1.3 3.2-2.5 1-1.4 1.4-2.9 1.4-3-.1 0-3.3-1.3-3.3-4.2ZM14.5 5.3c.7-.9 1.2-2.1 1.1-3.3-1 .1-2.3.7-3.1 1.6-.7.8-1.3 2-1.2 3.2 1.2.1 2.4-.6 3.2-1.5Z"/></svg><span>Continue with Apple</span><small id="social-status-apple">Checking…</small>
+            </button>
+          </div>
+          <p class="social-account-note"><strong>Staff and management:</strong> use your invited HV Swim work account below.</p>
+          <p class="social-legal">By continuing, you agree to the <a href="terms.html">terms</a> and acknowledge the <a href="privacy.html">privacy policy</a>.</p>
+        </section>
+        <div class="signin-divider" id="signin-divider"><span>or use email and password</span></div>
         <form class="auth-form" id="login-form">
-          <div class="auth-error" id="login-error" role="alert"></div>
           <div class="field"><label for="login-email">Email</label><input class="input" id="login-email" name="email" type="email" autocomplete="username" required></div>
           <div class="field"><label for="login-password">Password</label><div class="password-wrap"><input class="input" id="login-password" name="password" type="password" autocomplete="current-password" required minlength="8"><button class="password-toggle" type="button" id="password-toggle">Show</button></div></div>
           <button class="btn btn-blue" type="submit" id="login-submit">Sign in securely</button>

@@ -100,7 +100,18 @@
     const password = document.getElementById('login-password');
     const error = document.getElementById('login-error');
     const submit = document.getElementById('login-submit');
-    const requestedRole = new URLSearchParams(location.search).get('role');
+    const search = new URLSearchParams(location.search);
+    const requestedRole = search.get('role');
+    const oauthErrors = {
+      cancelled: 'Account sign-in was cancelled. Nothing was changed.',
+      expired_or_invalid: 'That secure sign-in link expired or was already used. Please try again.',
+      provider_failed: 'Google or Apple could not complete sign-in. Please try again shortly.',
+      verified_email_required: 'A verified email address is required to create a family account.',
+      account_unavailable: 'This account is not currently available. Please contact HV Swim.',
+      team_account_requires_approval: 'Staff and management accounts must be connected by HV Swim management.',
+      account_already_linked: 'That provider account is already connected elsewhere. Please contact HV Swim.',
+      invalid_response: 'The account provider returned an incomplete response. Please try again.'
+    };
     const loginContexts = {
       customer: {
         eyebrow: 'Family account',
@@ -133,6 +144,39 @@
       document.getElementById('login-context-copy').textContent = context.copy;
       submit.textContent = submitLabel;
       document.title = context.title;
+    }
+    const oauthError = oauthErrors[search.get('oauth_error')];
+    if (oauthError) { error.textContent = oauthError; error.classList.add('show'); }
+    const social = document.getElementById('social-signin');
+    const divider = document.getElementById('signin-divider');
+    if (requestedRole === 'staff' || requestedRole === 'admin') {
+      social?.remove(); divider?.remove();
+    } else {
+      try {
+        const providerStatus = await api('/api/auth/oauth/providers');
+        providerStatus.providers.forEach(provider => {
+          const button = document.querySelector(`[data-oauth-provider="${provider.id}"]`);
+          const status = document.getElementById(`social-status-${provider.id}`);
+          if (!button || !status) return;
+          if (provider.configured) {
+            button.disabled = false;
+            status.textContent = 'Family account';
+            button.addEventListener('click', () => {
+              button.disabled = true;
+              status.textContent = 'Opening…';
+              location.href = `/api/auth/oauth/${provider.id}/start`;
+            }, { once:true });
+          } else {
+            status.textContent = 'Setup required';
+            button.title = `${provider.label} sign-in requires production credentials`;
+          }
+        });
+      } catch (_) {
+        document.querySelectorAll('[data-oauth-provider]').forEach(button => {
+          const status = document.getElementById(`social-status-${button.dataset.oauthProvider}`);
+          if (status) status.textContent = 'Temporarily unavailable';
+        });
+      }
     }
     try {
       const demo=await api('/api/demo-accounts');

@@ -1,4 +1,4 @@
-# HV Swim Bendigo V5.8.0 Premium Platform
+# HV Swim Bendigo V5.9.0 Premium Platform
 
 Premium public website, installable Progressive Web App and connected operations platform for HV Swim Bendigo. The build combines a polished responsive front end with a FastAPI service, role-based accounts and a SQLite preview database. SQLite is not approved for the final production deployment that will store customer, child or payroll data.
 
@@ -40,6 +40,9 @@ Demo credentials only work while `HV_APP_ENV=development`. Production mode disab
 ## Working in this build
 
 - PBKDF2 password hashing, HttpOnly sessions, CSRF protection, rate limiting and role permissions
+- Real Google and Apple OpenID Connect foundation for family sign-up/sign-in, with
+  PKCE/state/nonce protection, verified server-side identity tokens and provider tokens
+  deliberately excluded from storage; staff and management identities remain invitation-only
 - Family swimmers, editable emergency/allergy/medication/support profiles, class availability, bookings, cancellations, waitlists and notices
 - Family absence reporting against the active term calendar, with a visible two-credit
   allowance per swimmer and an explicit no-make-up/no-automatic-refund boundary
@@ -96,7 +99,17 @@ Demo credentials only work while `HV_APP_ENV=development`. Production mode disab
 
 ## External activation boundaries
 
-Connecting the existing Xero organisation requires an HV Swim-owned OAuth app and mappings. Shopify, Printify, VistaPrint ordering, commercial weather, email, SMS, push, pool sensors, hosting, domain and native app-store distribution likewise require credentials or accounts owned by HV Swim. Those values belong in a private `.env` file created from `.env.example`; secrets must never be placed in HTML or committed to source control. Credentials do not activate email, SMS or push by themselves—the provider adapters and consent workflows are still explicit launch work. The optional Meta Page Plugin is configured but must be tested on the approved production domain.
+Google family access requires an HV Swim-owned Google Cloud OAuth web client. Apple/iCloud
+family access requires an Apple Developer Services ID and generated, rotated client secret. Until
+those values are present, both buttons remain visible but disabled as “Setup required”; the
+preview never fabricates a provider login. Connecting the existing Xero organisation requires
+an HV Swim-owned OAuth app and mappings. Shopify, Printify, VistaPrint ordering, commercial
+weather, email, SMS, push, pool sensors, hosting, domain and native app-store distribution
+likewise require credentials or accounts owned by HV Swim. Those values belong in a private
+`.env` file created from `.env.example`; secrets must never be placed in HTML or committed to
+source control. Credentials do not activate email, SMS or push by themselves—the provider
+adapters and consent workflows are still explicit launch work. The optional Meta Page Plugin
+is configured but must be tested on the approved production domain.
 
 The website never presents directory membership as instructor accreditation. Management can upload only the current member/provider PNG issued through HV Swim's own organisation account and must record its reference, expiry and usage rights. Generic or scraped organisation logos are not included. The entire public section stays hidden until all three records pass and management separately enables it under Website content. Follow `ASSOCIATION_BADGE_REQUIREMENTS.md` and `PRODUCTION_HANDOFF.md` before activation.
 
