@@ -82,7 +82,65 @@ def make_test_png_base64(width=64, height=64):
 # --- public surface -------------------------------------------------------------------
 
 def test_health_is_public(client):
-    assert client.get("/api/health").status_code == 200
+    response = client.get("/api/health")
+    assert response.status_code == 200
+    assert response.headers.get("x-request-id")
+
+
+def test_protected_system_health_checks_database_without_exposing_paths_or_secrets(client):
+    client.cookies.clear()
+    assert client.get("/api/admin/system-health").status_code == 401
+    sign_in(client, FAMILY)
+    assert client.get("/api/admin/system-health").status_code == 403
+    client.cookies.clear()
+    sign_in(client, ADMIN)
+    response = client.get("/api/admin/system-health")
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["ok"] is True
+    assert payload["database"]["integrity"] == "ok"
+    assert payload["database"]["foreign_key_violations"] == 0
+    assert payload["database"]["billing_total_mismatches"] == 0
+    assert payload["database"]["journal_mode"] == "wal"
+    assert payload["security"]["integration_token_encryption"] == "current"
+    assert "path" not in response.text.lower()
+    assert "token" not in str(payload["integrations"]).lower()
+
+
+def test_api_body_limits_allow_certificate_uploads_but_reject_ordinary_large_requests(client):
+    client.cookies.clear()
+    csrf = sign_in(client, STAFF)
+    headers = {"X-CSRF-Token": csrf}
+    # This is deliberately over the normal 2 MB API limit. The qualification route is
+    # allowed to reach its own validator, which rejects the fake file by signature.
+    certificate_payload = {
+        "qualification_type": "Upload limit regression",
+        "expiry_date": (date.today() + timedelta(days=365)).isoformat(),
+        "original_filename": "certificate.pdf",
+        "document_media_type": "application/pdf",
+        "document_base64": "A" * 2_100_000,
+        "reminder_days": 60,
+    }
+    allowed_to_validator = client.post("/api/staff/qualifications", json=certificate_payload, headers=headers)
+    assert allowed_to_validator.status_code == 422
+    assert "selected type" in allowed_to_validator.text
+
+    client.cookies.clear()
+    admin_csrf = sign_in(client, ADMIN)
+    oversized_ordinary = client.post(
+        "/api/admin/billing/invoices",
+        content=b"x" * 2_000_001,
+        headers={"Content-Type": "application/json", "X-CSRF-Token": admin_csrf},
+    )
+    assert oversized_ordinary.status_code == 413
+    assert oversized_ordinary.headers.get("x-request-id")
+
+    chunked_ordinary = client.post(
+        "/api/auth/login",
+        content=(b"x" * 700_001 for _ in range(3)),
+        headers={"Content-Type": "application/json"},
+    )
+    assert chunked_ordinary.status_code == 413
 
 
 def test_family_account_provider_status_is_public_and_secret_free(client):

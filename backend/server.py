@@ -8,6 +8,7 @@ import hashlib
 import hmac
 import io
 import json
+import logging
 import sqlite3
 from contextlib import asynccontextmanager
 from datetime import date, datetime, timedelta, timezone
@@ -31,9 +32,11 @@ from .integrations import (
     current_bendigo_weather,
     decrypt_json,
     encrypt_json,
+    integration_token_encryption_current,
     pool_sensor_reading,
     printify_products,
     printify_ready,
+    safe_xero_online_invoice_url,
     shopify_create_cart,
     shopify_products,
     shopify_ready,
@@ -60,6 +63,10 @@ SESSION_COOKIE = "hv_session"
 MELBOURNE_TZ = ZoneInfo("Australia/Melbourne")
 SWIMMER_SENSITIVE_FIELDS = ("emergency_contact", "medical_notes", "allergies", "medications", "support_notes")
 INCIDENT_SENSITIVE_FIELDS = ("what_happened", "injury_observed", "first_aid_applied", "further_action", "witnesses")
+LOGGER = logging.getLogger("hv_swim.backend")
+DEFAULT_API_BODY_LIMIT = 2_000_000
+QUALIFICATION_API_BODY_LIMIT = 7_100_000
+APPLE_CALLBACK_BODY_LIMIT = 32_768
 
 SUPPLIER_ROUTE_DETAILS: dict[str, dict[str, str]] = {
     "specialist_swim": {
@@ -158,6 +165,19 @@ def validate_production_config(candidate=settings) -> None:
             "XERO_SYNC_ENABLED requires XERO_LESSON_ACCOUNT_CODE, XERO_LESSON_TAX_TYPE "
             "and a valid XERO_LINE_AMOUNT_TYPE"
         )
+    shopify_fields = (candidate.shopify_store_domain, candidate.shopify_storefront_token)
+    if any(shopify_fields) and not all(shopify_fields):
+        raise RuntimeError("SHOPIFY_STORE_DOMAIN and SHOPIFY_STOREFRONT_TOKEN must be configured together")
+    shopify_domain = candidate.shopify_store_domain
+    if shopify_domain and (
+        "://" in shopify_domain
+        or "/" in shopify_domain
+        or "@" in shopify_domain
+        or not urlparse(f"https://{shopify_domain}").hostname
+    ):
+        raise RuntimeError("SHOPIFY_STORE_DOMAIN must be a hostname without a scheme or path")
+    if candidate.pool_sensor_url and not candidate.pool_sensor_url.startswith("https://"):
+        raise RuntimeError("POOL_SENSOR_URL must use HTTPS in production")
     google_fields = (candidate.google_client_id, candidate.google_client_secret)
     if any(google_fields) and not all(google_fields):
         raise RuntimeError("GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET must be configured together")
@@ -172,16 +192,43 @@ def validate_production_config(candidate=settings) -> None:
         raise RuntimeError("APPLE_REDIRECT_URI must use HTTPS in production")
 
 
+def migrate_integration_token_encryption() -> int:
+    """Move legacy OAuth tokens onto the dedicated data-encryption key at startup."""
+    migrated = 0
+    with db_session() as db:
+        for record in db.execute(
+            "SELECT provider,encrypted_tokens FROM integration_connections WHERE encrypted_tokens IS NOT NULL"
+        ):
+            if integration_token_encryption_current(record["encrypted_tokens"]):
+                continue
+            token = decrypt_json(record["encrypted_tokens"])
+            db.execute(
+                "UPDATE integration_connections SET encrypted_tokens=?,updated_at=? WHERE provider=?",
+                (encrypt_json(token), now_iso(), record["provider"]),
+            )
+            audit(
+                db,
+                None,
+                "migrate_integration_token_encryption",
+                "integration",
+                record["provider"],
+                {"format": "enc:v2"},
+            )
+            migrated += 1
+    return migrated
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     validate_production_config()
     initialise_database()
+    migrate_integration_token_encryption()
     yield
 
 
 app = FastAPI(
     title="HV Swim Bendigo Platform API",
-    version="5.11.0",
+    version="5.12.0",
     docs_url="/api/docs" if not settings.production else None,
     openapi_url="/openapi.json" if not settings.production else None,
     redoc_url=None,
@@ -209,6 +256,8 @@ if settings.production:
 
 @app.middleware("http")
 async def security_headers(request: Request, call_next):
+    request_id = new_token(12)
+    request.state.request_id = request_id
     request_path = str(request.scope.get("path") or "")
     raw_path = request.scope.get("raw_path", b"")
     host = request.headers.get("host", "")
@@ -222,17 +271,39 @@ async def security_headers(request: Request, call_next):
         response = JSONResponse(status_code=400, content={"detail": "Invalid request target"})
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["Cache-Control"] = "no-store"
+        response.headers["X-Request-ID"] = request_id
         return response
     content_length = request.headers.get("content-length")
+    body_limit = (
+        QUALIFICATION_API_BODY_LIMIT
+        if request_path == "/api/staff/qualifications"
+        else APPLE_CALLBACK_BODY_LIMIT
+        if request_path == "/api/auth/oauth/apple/callback"
+        else DEFAULT_API_BODY_LIMIT
+    )
     if request_path.startswith("/api/") and content_length:
         try:
-            if int(content_length) > 2_000_000:
+            if int(content_length) < 0:
+                raise ValueError
+            if int(content_length) > body_limit:
                 response = JSONResponse(status_code=413, content={"detail": "Request body is too large"})
                 response.headers["X-Content-Type-Options"] = "nosniff"
                 response.headers["Cache-Control"] = "no-store"
+                response.headers["X-Request-ID"] = request_id
                 return response
         except ValueError:
-            return JSONResponse(status_code=400, content={"detail": "Invalid Content-Length header"})
+            response = JSONResponse(status_code=400, content={"detail": "Invalid Content-Length header"})
+            response.headers["X-Request-ID"] = request_id
+            return response
+    elif request_path.startswith("/api/"):
+        # Do not let HTTP/1.1 chunked requests bypass the Content-Length gate.
+        # Starlette replays this cached body to the route handler after the check.
+        if len(await request.body()) > body_limit:
+            response = JSONResponse(status_code=413, content={"detail": "Request body is too large"})
+            response.headers["X-Content-Type-Options"] = "nosniff"
+            response.headers["Cache-Control"] = "no-store"
+            response.headers["X-Request-ID"] = request_id
+            return response
     content_type = request.headers.get("content-type", "").lower()
     if request_path.startswith("/api/") and request_path != "/api/auth/oauth/apple/callback" and content_type.startswith(
         ("application/x-www-form-urlencoded", "multipart/form-data")
@@ -240,8 +311,19 @@ async def security_headers(request: Request, call_next):
         response = JSONResponse(status_code=415, content={"detail": "API requests must use JSON"})
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["Cache-Control"] = "no-store"
+        response.headers["X-Request-ID"] = request_id
         return response
-    response = await call_next(request)
+    try:
+        response = await call_next(request)
+    except Exception:
+        if not settings.production:
+            raise
+        LOGGER.exception("Unhandled request failure", extra={"request_id": request_id, "path": request_path})
+        response = JSONResponse(
+            status_code=500,
+            content={"detail": "The request could not be completed", "request_id": request_id},
+        )
+    response.headers["X-Request-ID"] = request_id
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "SAMEORIGIN"
     response.headers["X-Permitted-Cross-Domain-Policies"] = "none"
@@ -815,7 +897,13 @@ class WaitlistActionInput(BaseModel):
 
 
 class CartInput(BaseModel):
-    variant_id: str
+    model_config = ConfigDict(extra="forbid")
+
+    variant_id: str = Field(
+        min_length=30,
+        max_length=180,
+        pattern=r"^gid://shopify/ProductVariant/[A-Za-z0-9_-]+$",
+    )
     quantity: int = Field(default=1, ge=1, le=20)
 
 
@@ -1158,6 +1246,23 @@ def cents_from_xero(value: Any) -> int:
         return max(0, int(round(float(value or 0) * 100)))
     except (TypeError, ValueError):
         return 0
+
+
+def reconcile_xero_amounts(invoice: sqlite3.Row, xero_invoice: dict[str, Any]) -> tuple[int, int]:
+    """Reject provider amounts that cannot safely fit the reviewed local ledger."""
+    local_total = int(invoice["total_cents"])
+    if xero_invoice.get("Total") is not None:
+        provider_total = cents_from_xero(xero_invoice.get("Total"))
+        if provider_total != local_total:
+            raise RuntimeError("Xero invoice total does not match the approved local invoice")
+    amount_paid = cents_from_xero(xero_invoice.get("AmountPaid"))
+    amount_due = cents_from_xero(xero_invoice.get("AmountDue"))
+    if amount_paid > local_total or amount_due > local_total or amount_paid + amount_due > local_total:
+        raise RuntimeError("Xero payment totals exceed the approved local invoice")
+    xero_status = str(xero_invoice.get("Status") or "").upper()
+    if xero_status == "PAID" and (amount_paid != local_total or amount_due != 0):
+        raise RuntimeError("Xero marked the invoice paid without a matching paid balance")
+    return amount_paid, amount_due
 
 
 async def refresh_and_store_xero_token(token: dict[str, Any]) -> dict[str, Any]:
@@ -1520,14 +1625,18 @@ QUALIFICATION_DOCUMENT_TYPES = {
     "image/jpeg": (".jpg", b"\xff\xd8\xff"),
     "image/webp": (".webp", b"RIFF"),
 }
+MAX_QUALIFICATION_DOCUMENT_BYTES = 5_000_000
+MAX_QUALIFICATION_BASE64_LENGTH = 4 * ((MAX_QUALIFICATION_DOCUMENT_BYTES + 2) // 3)
 
 
 def validate_qualification_document(encoded: str, media_type: str) -> tuple[bytes, str, str]:
+    if len(encoded) > MAX_QUALIFICATION_BASE64_LENGTH:
+        raise HTTPException(status_code=413, detail="Certificate document must be no larger than 5 MB")
     try:
         document = base64.b64decode(encoded, validate=True)
     except (ValueError, binascii.Error) as exc:
         raise HTTPException(status_code=422, detail="Certificate document is not valid base64 data") from exc
-    if not (32 <= len(document) <= 5_000_000):
+    if not (32 <= len(document) <= MAX_QUALIFICATION_DOCUMENT_BYTES):
         raise HTTPException(status_code=413, detail="Certificate document must be between 32 bytes and 5 MB")
     extension, signature = QUALIFICATION_DOCUMENT_TYPES[media_type]
     if not document.startswith(signature):
@@ -1536,6 +1645,8 @@ def validate_qualification_document(encoded: str, media_type: str) -> tuple[byte
         raise HTTPException(status_code=422, detail="Certificate PDF appears incomplete")
     if media_type == "image/jpeg" and not document.endswith(b"\xff\xd9"):
         raise HTTPException(status_code=422, detail="Certificate JPEG appears incomplete")
+    if media_type == "image/png" and b"IEND" not in document[-32:]:
+        raise HTTPException(status_code=422, detail="Certificate PNG appears incomplete")
     if media_type == "image/webp" and (len(document) < 12 or document[8:12] != b"WEBP"):
         raise HTTPException(status_code=422, detail="Certificate WebP appears invalid")
     return document, extension, hashlib.sha256(document).hexdigest()
@@ -1762,7 +1873,62 @@ def renumber_waitlist(db: sqlite3.Connection, class_id: int) -> None:
 
 @app.get("/api/health")
 def health() -> dict[str, Any]:
-    return {"ok": True, "service": "HV Swim Bendigo", "version": "5.11.0", "environment": settings.app_env, "time": now_iso()}
+    return {"ok": True, "service": "HV Swim Bendigo", "version": "5.12.0", "environment": settings.app_env, "time": now_iso()}
+
+
+@app.get("/api/admin/system-health")
+def admin_system_health(user: dict[str, Any] = Depends(require_roles("admin"))) -> dict[str, Any]:
+    """Protected operational readiness without exposing paths, secrets or customer data."""
+    with db_session() as db:
+        quick_check = [row[0] for row in db.execute("PRAGMA quick_check")]
+        foreign_key_violations = list(db.execute("PRAGMA foreign_key_check"))
+        journal_mode = str(db.execute("PRAGMA journal_mode").fetchone()[0]).lower()
+        billing_mismatches = db.execute(
+            """SELECT COUNT(*) FROM billing_invoices bi
+               WHERE bi.total_cents != COALESCE(
+                 (SELECT SUM(bil.line_amount_cents) FROM billing_invoice_lines bil WHERE bil.invoice_id=bi.id),0
+               )"""
+        ).fetchone()[0]
+        legacy_token_count = sum(
+            not integration_token_encryption_current(row[0])
+            for row in db.execute(
+                "SELECT encrypted_tokens FROM integration_connections WHERE encrypted_tokens IS NOT NULL"
+            )
+        )
+        connections = {
+            row["provider"]: row["status"]
+            for row in db.execute("SELECT provider,status FROM integration_connections")
+        }
+    database_ok = quick_check == ["ok"] and not foreign_key_violations and billing_mismatches == 0
+    return {
+        "ok": database_ok and legacy_token_count == 0,
+        "checked_at": now_iso(),
+        "release": app.version,
+        "database": {
+            "integrity": "ok" if quick_check == ["ok"] else "review_required",
+            "foreign_key_violations": len(foreign_key_violations),
+            "billing_total_mismatches": int(billing_mismatches),
+            "journal_mode": journal_mode,
+        },
+        "security": {
+            "integration_token_encryption": "current" if legacy_token_count == 0 else "migration_required",
+            "legacy_integration_token_records": legacy_token_count,
+            "production_separate_data_key": bool(settings.production and settings.data_encryption_key),
+        },
+        "integrations": {
+            "xero": {
+                "connection": connections.get("xero", "not_connected"),
+                "invoice_configuration_ready": xero_invoice_configuration_ready(),
+                "outbound_enabled": settings.xero_sync_enabled,
+            },
+            "shopify": {
+                "connection": connections.get("shopify", "not_connected"),
+                "storefront_configured": shopify_ready(),
+            },
+            "weather": {"commercial_configuration_ready": bool(settings.weather_api_key)},
+            "pool_sensor": {"configured": bool(settings.pool_sensor_url)},
+        },
+    }
 
 
 @app.get("/api/public/site-settings")
@@ -4587,6 +4753,9 @@ def create_billing_invoice(
     csrf_guard(request, user, x_csrf_token)
     placeholders = ",".join("?" for _ in payload.charge_ids)
     with db_session() as db:
+        # Serialize the availability check with line insertion so two management clicks
+        # cannot invoice the same lesson charge concurrently.
+        db.execute("BEGIN IMMEDIATE")
         customer = db.execute(
             """SELECT id,customer_number,xero_contact_id,first_name,last_name,email
                FROM users WHERE id=? AND role='customer' AND active=1""",
@@ -4690,6 +4859,7 @@ def approve_billing_invoice(
 ) -> dict[str, Any]:
     csrf_guard(request, user, x_csrf_token)
     with db_session() as db:
+        db.execute("BEGIN IMMEDIATE")
         invoice = db.execute(
             """SELECT bi.*,u.xero_contact_id current_xero_contact_id
                FROM billing_invoices bi JOIN users u ON u.id=bi.customer_id WHERE bi.id=?""",
@@ -4708,11 +4878,13 @@ def approve_billing_invoice(
         if not line_total or int(line_total) != int(invoice["total_cents"]):
             raise HTTPException(status_code=409, detail="Invoice line totals do not match the invoice total")
         changed_at = now_iso()
-        db.execute(
+        updated = db.execute(
             """UPDATE billing_invoices SET status='approved',xero_contact_id=?,approved_by=?,
-                      approved_at=?,last_sync_error=NULL,updated_at=? WHERE id=?""",
+                      approved_at=?,last_sync_error=NULL,updated_at=? WHERE id=? AND status='draft'""",
             (invoice["current_xero_contact_id"], user["id"], changed_at, changed_at, invoice_id),
         )
+        if updated.rowcount != 1:
+            raise HTTPException(status_code=409, detail="This invoice changed before it could be approved; reload and review it again")
         record_billing_event(
             db,
             invoice_id,
@@ -4739,6 +4911,7 @@ async def sync_billing_invoice_to_xero(
     if not xero_ready() or not xero_invoice_configuration_ready():
         raise HTTPException(status_code=409, detail="Complete the Xero OAuth, account-code, tax and line-amount configuration first")
     with db_session() as db:
+        db.execute("BEGIN IMMEDIATE")
         invoice = billing_invoice_payload(db, invoice_id)
         if invoice["status"] != "approved":
             raise HTTPException(status_code=409, detail="Only an approved invoice can be sent to Xero")
@@ -4750,10 +4923,12 @@ async def sync_billing_invoice_to_xero(
         token = decrypt_json(connection["encrypted_tokens"])
         previous = invoice["status"]
         changed_at = now_iso()
-        db.execute(
-            "UPDATE billing_invoices SET status='sync_review',last_sync_error=NULL,updated_at=? WHERE id=?",
+        claimed = db.execute(
+            "UPDATE billing_invoices SET status='sync_review',last_sync_error=NULL,updated_at=? WHERE id=? AND status='approved'",
             (changed_at, invoice_id),
         )
+        if claimed.rowcount != 1:
+            raise HTTPException(status_code=409, detail="This invoice is already being handled; reload its current status")
         record_billing_event(
             db,
             invoice_id,
@@ -4849,8 +5024,33 @@ async def refresh_billing_invoice_from_xero(
     try:
         current_token = await refresh_and_store_xero_token(token)
         refreshed_token, xero_invoice = await xero_get_invoice(current_token, str(invoice["xero_invoice_id"]))
+        amount_paid, amount_due = reconcile_xero_amounts(invoice, xero_invoice)
     except Exception as exc:
-        raise HTTPException(status_code=502, detail=f"Xero status refresh failed: {type(exc).__name__}")
+        with db_session() as db:
+            safe_error = f"{type(exc).__name__}: {str(exc)}"[:500]
+            db.execute(
+                "UPDATE billing_invoices SET status='sync_review',last_sync_error=?,updated_at=? WHERE id=?",
+                (safe_error, now_iso(), invoice_id),
+            )
+            record_billing_event(
+                db,
+                invoice_id,
+                "xero_refresh_requires_review",
+                from_status=previous_status,
+                to_status="sync_review",
+                created_by=user["id"],
+                detail={"error_type": type(exc).__name__},
+            )
+            audit(
+                db,
+                user["id"],
+                "xero_invoice_refresh_requires_review",
+                "billing_invoice",
+                invoice_id,
+                {"error_type": type(exc).__name__},
+                client_ip(request),
+            )
+        raise HTTPException(status_code=502, detail="Xero status could not be safely reconciled. Review the invoice in Xero before retrying.")
     xero_status = str(xero_invoice.get("Status") or "").upper()
     local_status = {
         "DRAFT": "synced",
@@ -4860,9 +5060,8 @@ async def refresh_billing_invoice_from_xero(
         "VOIDED": "voided",
         "DELETED": "voided",
     }.get(xero_status, "sync_review")
-    amount_paid = cents_from_xero(xero_invoice.get("AmountPaid"))
-    amount_due = cents_from_xero(xero_invoice.get("AmountDue"))
     with db_session() as db:
+        db.execute("BEGIN IMMEDIATE")
         db.execute(
             "UPDATE integration_connections SET encrypted_tokens=?,updated_at=? WHERE provider='xero'",
             (encrypt_json(refreshed_token), now_iso()),
@@ -4877,7 +5076,7 @@ async def refresh_billing_invoice_from_xero(
                 xero_invoice.get("InvoiceNumber"),
                 amount_paid,
                 amount_due,
-                xero_invoice.get("OnlineInvoiceUrl"),
+                safe_xero_online_invoice_url(xero_invoice.get("OnlineInvoiceUrl")),
                 now_iso(),
                 invoice_id,
             ),

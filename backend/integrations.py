@@ -6,7 +6,7 @@ import asyncio
 from datetime import datetime, timedelta, timezone
 from time import monotonic
 from typing import Any
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlparse
 
 import httpx
 from nacl.secret import SecretBox
@@ -30,20 +30,42 @@ _shopify_cache: list[dict[str, Any]] | None = None
 _shopify_cache_expires = 0.0
 _shopify_lock = asyncio.Lock()
 
+INTEGRATION_TOKEN_PREFIX = b"enc:v2:"
 
-def _secret_box() -> SecretBox:
-    key = hashlib.sha256(settings.session_secret.encode("utf-8")).digest()
+
+def _secret_box(*, legacy: bool = False) -> SecretBox:
+    if legacy:
+        key = hashlib.sha256(settings.session_secret.encode("utf-8")).digest()
+        return SecretBox(key)
+    material = settings.data_encryption_key or settings.session_secret
+    key = hashlib.sha256(f"hv-swim-integration-tokens-v2:{material}".encode("utf-8")).digest()
     return SecretBox(key)
 
 
 def encrypt_json(value: dict[str, Any]) -> bytes:
-    return bytes(_secret_box().encrypt(json.dumps(value).encode("utf-8")))
+    payload = json.dumps(value, separators=(",", ":")).encode("utf-8")
+    return INTEGRATION_TOKEN_PREFIX + bytes(_secret_box().encrypt(payload))
 
 
 def decrypt_json(value: bytes | None) -> dict[str, Any]:
     if not value:
         return {}
-    return json.loads(_secret_box().decrypt(bytes(value)).decode("utf-8"))
+    encrypted = bytes(value)
+    if encrypted.startswith(INTEGRATION_TOKEN_PREFIX):
+        plaintext = _secret_box().decrypt(encrypted[len(INTEGRATION_TOKEN_PREFIX):])
+    else:
+        # V5.11 and earlier tied integration-token encryption to the session secret.
+        # Read that format during a controlled migration; every subsequent write uses
+        # the separate data-encryption key required in production.
+        plaintext = _secret_box(legacy=True).decrypt(encrypted)
+    payload = json.loads(plaintext.decode("utf-8"))
+    if not isinstance(payload, dict):
+        raise RuntimeError("Integration credentials have an invalid encrypted payload")
+    return payload
+
+
+def integration_token_encryption_current(value: bytes | None) -> bool:
+    return bool(value and bytes(value).startswith(INTEGRATION_TOKEN_PREFIX))
 
 
 def xero_ready() -> bool:
@@ -79,6 +101,8 @@ async def xero_exchange_code(code: str) -> dict[str, Any]:
         if token["connections"]:
             token["tenant_id"] = token["connections"][0].get("tenantId")
             token["tenant_name"] = token["connections"][0].get("tenantName")
+        if not token.get("access_token") or not token.get("refresh_token") or not token.get("tenant_id"):
+            raise RuntimeError("Xero did not return a complete organisation connection.")
         return token
 
 
@@ -94,6 +118,11 @@ async def xero_refresh(token: dict[str, Any]) -> dict[str, Any]:
         )
         response.raise_for_status()
         refreshed = response.json()
+        if not refreshed.get("access_token"):
+            raise RuntimeError("Xero did not return a refreshed access token.")
+        # Preserve the prior refresh token defensively if a provider response omits it.
+        # Xero normally rotates it and the rotated value is persisted by the caller.
+        refreshed["refresh_token"] = refreshed.get("refresh_token") or token["refresh_token"]
         refreshed["expires_at"] = (datetime.now(timezone.utc) + timedelta(seconds=int(refreshed.get("expires_in", 1800)))).isoformat()
         refreshed["tenant_id"] = token.get("tenant_id")
         refreshed["tenant_name"] = token.get("tenant_name")
@@ -103,7 +132,13 @@ async def xero_refresh(token: dict[str, Any]) -> dict[str, Any]:
 
 async def xero_token_valid(token: dict[str, Any]) -> dict[str, Any]:
     expires = token.get("expires_at")
-    if not expires or datetime.fromisoformat(expires) <= datetime.now(timezone.utc) + timedelta(minutes=2):
+    try:
+        expires_at = datetime.fromisoformat(str(expires).replace("Z", "+00:00")) if expires else None
+        if expires_at and expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=timezone.utc)
+    except (TypeError, ValueError):
+        expires_at = None
+    if not expires_at or expires_at <= datetime.now(timezone.utc) + timedelta(minutes=2):
         return await xero_refresh(token)
     return token
 
@@ -134,6 +169,25 @@ def _xero_invoice_result(payload: dict[str, Any]) -> dict[str, Any]:
     if not invoice.get("InvoiceID"):
         raise RuntimeError("Xero did not return an invoice identifier.")
     return invoice
+
+
+def safe_xero_online_invoice_url(value: Any) -> str | None:
+    """Accept only Xero's HTTPS customer invoice links, never an arbitrary API value."""
+    if not isinstance(value, str) or not value:
+        return None
+    parsed = urlparse(value)
+    if parsed.scheme != "https" or parsed.username or parsed.password:
+        return None
+    return value if (parsed.hostname or "").lower() == "in.xero.com" else None
+
+
+def safe_https_checkout_url(value: Any) -> str:
+    if not isinstance(value, str) or not value:
+        raise RuntimeError("Shopify returned no checkout URL.")
+    parsed = urlparse(value)
+    if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password:
+        raise RuntimeError("Shopify returned an invalid checkout URL.")
+    return value
 
 
 async def xero_create_draft_invoice(
@@ -177,6 +231,8 @@ async def xero_create_draft_invoice(
         )
         response.raise_for_status()
         result = _xero_invoice_result(response.json())
+        if str(result.get("Status") or "").upper() != "DRAFT":
+            raise RuntimeError("Xero did not confirm that the created invoice remained a draft.")
     return current_token, result
 
 
@@ -191,6 +247,8 @@ async def xero_get_invoice(
         )
         response.raise_for_status()
         result = _xero_invoice_result(response.json())
+        if str(result.get("InvoiceID")) != str(invoice_id):
+            raise RuntimeError("Xero returned a different invoice than the one requested.")
         if result.get("Status") in {"AUTHORISED", "PAID"}:
             online = await client.get(
                 f"{XERO_INVOICES}/{invoice_id}/OnlineInvoice",
@@ -199,7 +257,7 @@ async def xero_get_invoice(
             if online.is_success:
                 links = online.json().get("OnlineInvoices") or []
                 if links:
-                    result["OnlineInvoiceUrl"] = links[0].get("OnlineInvoiceUrl")
+                    result["OnlineInvoiceUrl"] = safe_xero_online_invoice_url(links[0].get("OnlineInvoiceUrl"))
     return current_token, result
 
 
@@ -281,10 +339,16 @@ async def shopify_create_cart(variant_id: str, quantity: int = 1) -> dict[str, A
         response = await client.post(endpoint, json={"query": mutation, "variables": {"input": {"lines": [{"merchandiseId": variant_id, "quantity": max(1, quantity)}]}}}, headers=headers)
         response.raise_for_status()
         payload = response.json()
+        if payload.get("errors"):
+            raise RuntimeError(payload["errors"][0].get("message", "Shopify cart request failed"))
         result = payload.get("data", {}).get("cartCreate", {})
         if result.get("userErrors"):
             raise RuntimeError(result["userErrors"][0]["message"])
-        return result.get("cart", {})
+        cart = result.get("cart") or {}
+        if not cart.get("id"):
+            raise RuntimeError("Shopify returned no cart.")
+        cart["checkoutUrl"] = safe_https_checkout_url(cart.get("checkoutUrl"))
+        return cart
 
 
 async def current_bendigo_weather() -> dict[str, Any]:

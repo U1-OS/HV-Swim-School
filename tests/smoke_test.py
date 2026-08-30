@@ -37,7 +37,7 @@ def expect(label, condition):
 def main():
     public = urllib.request.build_opener()
     status, health = request(public, "/api/health")
-    expect("health endpoint", status == 200 and health.get("version") == "5.11.0")
+    expect("health endpoint", status == 200 and health.get("version") == "5.12.0")
     status, account_providers = request(public, "/api/auth/oauth/providers")
     expect(
         "family Google and Apple account boundary",
@@ -130,6 +130,14 @@ def main():
             status, achievements = request(opener, "/api/staff/achievements")
             expect("staff achievement studio", status == 200 and len(achievements.get("templates", [])) == 8)
         if role == "admin":
+            status, system_health = request(opener, "/api/admin/system-health")
+            expect(
+                "management backend health",
+                status == 200
+                and system_health.get("ok") is True
+                and system_health.get("database", {}).get("integrity") == "ok"
+                and system_health.get("security", {}).get("integration_token_encryption") == "current",
+            )
             status, terms = request(opener, "/api/admin/term-operations")
             expect("management term operations", status == 200 and terms.get("policy", {}).get("payment_route") == "xero_invoice_workflow" and isinstance(terms.get("terms"), list))
             status, integrations = request(opener, "/api/admin/integrations")
