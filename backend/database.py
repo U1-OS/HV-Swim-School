@@ -561,6 +561,8 @@ def connect() -> sqlite3.Connection:
     connection = sqlite3.connect(DB_PATH, timeout=15, check_same_thread=False)
     connection.row_factory = sqlite3.Row
     connection.execute("PRAGMA foreign_keys=ON")
+    connection.execute("PRAGMA busy_timeout=15000")
+    connection.execute("PRAGMA synchronous=NORMAL")
     return connection
 
 
@@ -635,6 +637,10 @@ def migrate_legacy_bookings_table(db: sqlite3.Connection) -> None:
 
 def initialise_database() -> None:
     with db_session() as db:
+        # WAL allows readers to continue while a short management write is committed.
+        # The explicit busy timeout above turns brief write contention into a bounded wait
+        # instead of an immediate operational error.
+        db.execute("PRAGMA journal_mode=WAL")
         db.executescript(SCHEMA)
         migrate_legacy_bookings_table(db)
         # Rate-limit records carry email and IP data. Enforce the documented retention at

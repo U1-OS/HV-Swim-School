@@ -74,6 +74,24 @@ def test_production_requires_https_for_public_and_xero_urls():
         )
 
 
+def test_production_rejects_partial_shopify_and_insecure_sensor_configuration():
+    with pytest.raises(RuntimeError, match="SHOPIFY_STORE_DOMAIN"):
+        server.validate_production_config(
+            production_settings(shopify_store_domain="shop.example.test", shopify_storefront_token="")
+        )
+    with pytest.raises(RuntimeError, match="hostname"):
+        server.validate_production_config(
+            production_settings(
+                shopify_store_domain="http://shop.example.test/catalogue",
+                shopify_storefront_token="storefront-token",
+            )
+        )
+    with pytest.raises(RuntimeError, match="POOL_SENSOR_URL"):
+        server.validate_production_config(
+            production_settings(pool_sensor_url="http://pool-device.local/reading")
+        )
+
+
 def test_xero_invoice_transmission_cannot_start_with_partial_accounting_configuration():
     with pytest.raises(RuntimeError, match="complete Xero OAuth"):
         server.validate_production_config(production_settings(xero_sync_enabled=True))

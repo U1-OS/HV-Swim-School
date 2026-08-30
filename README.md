@@ -1,4 +1,4 @@
-# HV Swim Bendigo V5.11.0 Premium Platform
+# HV Swim Bendigo V5.12.0 Premium Platform
 
 Premium public website and connected operations platform for HV Swim Bendigo. The build combines a polished responsive front end with a FastAPI service, role-based accounts and a SQLite preview database. SQLite is not approved for the final production deployment that will store customer, child or payroll data.
 
@@ -38,12 +38,24 @@ Demo credentials only work while `HV_APP_ENV=development`. Production mode disab
 ## Working in this build
 
 - PBKDF2 password hashing, HttpOnly/SameSite=Strict sessions, one-way session-token storage, CSRF protection, rate limiting and role permissions
+- Correlation IDs on every HTTP response, production-safe unhandled-error responses and
+  route-aware request limits that allow verified staff certificate files up to 5 MB without
+  weakening the normal 2 MB API boundary
+- SQLite preview hardening with WAL, foreign-key enforcement, a bounded busy timeout and a
+  protected Management system-health endpoint that verifies database integrity, ledger totals
+  and integration-token encryption without exposing paths, credentials or customer records
+- Versioned authenticated encryption for OAuth/integration tokens using the separate
+  `HV_DATA_ENCRYPTION_KEY` in production, including automatic migration from the legacy
+  session-key format at startup
 - Real Google and Apple OpenID Connect foundation for family sign-up/sign-in, with
   PKCE/state/nonce protection, verified server-side identity tokens and provider tokens
   deliberately excluded from storage; staff and management identities remain invitation-only
 - Family swimmers, editable emergency/allergy/medication/support profiles encrypted at rest, class availability, bookings, cancellations, waitlists and notices
 - Automatic permanent family (`HVS-…`) and student (`HVS-S-…`) numbers, guaranteed again at lesson purchase and snapshotted into the Xero lesson-charge record so website, family, student and accounting records can be reconciled
 - Management lesson-invoice ledger with grouped unbilled charges, local draft/approval controls, duplicate-charge protection, immutable event history and a deliberately gated Xero DRAFT-invoice handoff; families see only approved invoices and confirmed payment status
+- Atomic invoice creation, approval and outbound claims plus strict Xero invoice-ID, DRAFT
+  status, total/balance and customer-link reconciliation; unsafe or ambiguous provider
+  responses move the record to manual review instead of changing the family ledger
 - Family absence reporting against the active term calendar, with a visible two-credit
   allowance per swimmer and an explicit no-make-up/no-automatic-refund boundary
 - Filtered family class finder with live capacity meters and visible waitlist positions

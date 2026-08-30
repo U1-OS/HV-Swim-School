@@ -15,6 +15,14 @@ This build is a production foundation, not a substitute for the final deployment
   then remove both values after the management account has been created.
 - Configure the real public origin in `HV_PUBLIC_URL` and restrict allowed hosts.
 - Add automated encrypted backups, uptime checks, error monitoring and a restore drill.
+- Monitor the public `/api/health` route for uptime and use the authenticated
+  `/api/admin/system-health` route after deployment, database migration and every restore.
+  It reports integrity, foreign-key, finance-ledger and encryption-format readiness without
+  exposing storage paths or secrets. Forward the `X-Request-ID` response header into the
+  production log/error-monitoring context for support correlation.
+- The SQLite preview now uses WAL and bounded lock waits, but that does not change the
+  requirement to move real customer, swimmer, billing and payroll records to managed
+  PostgreSQL before production.
 - Run an independent penetration test before collecting customer or staff information.
   The included automated and local security audits are a baseline, not an “unhackable” claim.
 
@@ -83,6 +91,11 @@ with HV Swim before production deployment.
   with the business accountant, then test the complete workflow in the intended Xero
   organisation. Credit-note creation remains unimplemented and must not be inferred from the
   absence-credit record.
+- Invoice creation, approval and the outbound claim are transactionally serialized. Xero
+  responses must confirm the requested invoice ID, draft status and a balance that matches
+  the approved local total; invalid totals, IDs or customer payment links remain in manual
+  review. Do not bypass that state in the database—compare the record in Xero and the audit
+  trail first.
 - Use the permanent HV family number as the external contact reference and include the relevant
   student number on the lesson invoice line. The platform snapshots both values and can create
   a draft against a verified, manually mapped Xero Contact ID; it does not create or merge Xero
