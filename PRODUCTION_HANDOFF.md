@@ -17,6 +17,18 @@ This build is a production foundation, not a substitute for the final deployment
 
 ## 2. Accounts, privacy and safeguarding
 
+- Create an HV Swim-owned Google Cloud OAuth web client and configure the production HTTPS
+  callback in `GOOGLE_REDIRECT_URI`. Complete the Google consent-screen/domain verification.
+- Create an Apple Developer Services ID for the website, associate and verify the production
+  domain/return URL, generate a time-limited client secret from the Apple team/key IDs and
+  private `.p8` key, then configure `APPLE_CLIENT_ID` and `APPLE_CLIENT_SECRET`. Keep the
+  `.p8` key outside this project and schedule secret rotation before it expires.
+- Test Google and Apple with new families, returning families, Apple private relay addresses,
+  cancellation, revoked consent and account deletion. Buttons deliberately show “Setup
+  required” until their complete server-side configuration is present.
+- Confirm the operating rule that provider sign-up creates customer/family accounts only.
+  Staff and management identities remain invitation-controlled and fail closed if their work
+  email is presented by Google or Apple.
 - Import only approved customer, swimmer, staff and class data.
 - Reconcile the command-centre metric definitions against the production database and assign an owner for each operational KPI.
 - Keep source mode and refresh time visible; never label seeded preview records as live business results.

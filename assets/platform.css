@@ -489,7 +489,29 @@
 .auth-card > .eyebrow { margin-bottom:10px; font-size:.65rem; }
 .auth-card h2 { color:#082c52; font-size:clamp(2rem,3.6vw,2.65rem); line-height:1.02; letter-spacing:-.052em; }
 .auth-card .fine { color:#5d7184; line-height:1.65; }
-.auth-form { gap:17px; margin-top:27px; }
+.auth-error { margin-top:18px; }
+.social-signin { margin-top:24px; }
+.social-signin-head { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.social-signin-head strong { color:#163b58; font-size:.75rem; }
+.social-signin-head > span { padding:4px 8px; border-radius:999px; color:#075d7c; background:#dff5fb; font-size:.5rem; font-weight:900; letter-spacing:.08em; text-transform:uppercase; }
+.social-signin > p { margin-top:7px; color:#6a7e8f; font-size:.65rem; line-height:1.55; }
+.social-buttons { margin-top:14px; display:grid; gap:9px; }
+.social-button { min-height:56px; width:100%; padding:8px 12px; display:grid; grid-template-columns:32px 1fr auto; align-items:center; gap:10px; border:1px solid #c9d8e3; border-radius:14px; color:#17364f; background:#fff; box-shadow:0 7px 20px rgba(9,46,76,.06); font:inherit; cursor:pointer; transition:transform .18s,border-color .18s,box-shadow .18s,background .18s; }
+.social-button:not(:disabled):hover { transform:translateY(-2px); border-color:#77b8cd; box-shadow:0 12px 26px rgba(9,46,76,.11); }
+.social-button:not(:disabled):focus-visible { outline:3px solid rgba(25,159,199,.25); outline-offset:2px; }
+.social-button:disabled { cursor:not-allowed; opacity:.64; background:#f6f9fb; box-shadow:none; }
+.social-button > span:nth-child(2) { justify-self:start; font-size:.7rem; font-weight:850; }
+.social-button small { color:#6d8191; font-size:.52rem; font-weight:800; }
+.provider-mark { width:28px; height:28px; display:grid; place-items:center; border-radius:9px; }
+.provider-google { color:#4285f4; background:linear-gradient(135deg,#fff,#f4f7fb); border:1px solid #e3e8ed; font-size:.82rem; font-weight:950; font-family:Arial,sans-serif; }
+.provider-apple { padding:5px; fill:currentColor; color:#111; background:#f2f4f6; }
+.social-account-note { padding:10px 11px; border-radius:11px; background:#eef6fa; }
+.social-legal { text-align:center; font-size:.55rem !important; }
+.social-legal a { font-weight:800; }
+.signin-divider { margin:23px 0 0; display:flex; align-items:center; gap:12px; color:#74899c; font-size:.55rem; font-weight:850; letter-spacing:.08em; text-transform:uppercase; }
+.signin-divider::before,.signin-divider::after { content:""; height:1px; flex:1; background:#dbe5ec; }
+.signin-divider span { text-align:center; }
+.auth-form { gap:17px; margin-top:20px; }
 .auth-form .field label { color:#284860; font-size:.7rem; }
 .auth-form .input { min-height:50px; padding-inline:14px; border-color:#c5d5e1; border-radius:13px; background:#fbfdff; }
 .auth-form .input:hover { border-color:#a9c4d5; }

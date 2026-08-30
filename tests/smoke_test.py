@@ -37,7 +37,15 @@ def expect(label, condition):
 def main():
     public = urllib.request.build_opener()
     status, health = request(public, "/api/health")
-    expect("health endpoint", status == 200 and health.get("version") == "5.8.0")
+    expect("health endpoint", status == 200 and health.get("version") == "5.9.0")
+    status, account_providers = request(public, "/api/auth/oauth/providers")
+    expect(
+        "family Google and Apple account boundary",
+        status == 200
+        and account_providers.get("signup_role") == "customer"
+        and account_providers.get("team_accounts") == "invitation_only"
+        and {item.get("id") for item in account_providers.get("providers", [])} == {"google", "apple"},
+    )
     home_page = public.open(BASE + "/index.html", timeout=30).read().decode("utf-8")
     expect("live homepage day view", "Today at HV Swim" in home_page and "today-grid" in home_page and "staff reading" in home_page)
     about_page = public.open(BASE + "/about.html", timeout=30).read().decode("utf-8")
@@ -51,7 +59,7 @@ def main():
     enquire_page = public.open(BASE + "/enquire.html", timeout=30).read().decode("utf-8")
     expect("guided enrolment concierge", "Four clear steps" in enquire_page and "wizard-class-grid" in enquire_page and "enrolment-success" in enquire_page)
     mobile_shell = public.open(BASE + "/mobile-shell.html", timeout=30).read().decode("utf-8")
-    expect("native mobile launch shell", "Open connected app" in mobile_shell and "V5.8.0" in mobile_shell)
+    expect("native mobile launch shell", "Open connected app" in mobile_shell and "V5.9.0" in mobile_shell)
     manifest = json.loads(public.open(BASE + "/manifest.webmanifest", timeout=30).read().decode("utf-8"))
     expect("installable app manifest", manifest.get("display") == "standalone" and len(manifest.get("icons", [])) >= 3)
     for path, key in (("/api/public/locations", "locations"), ("/api/classes", "classes")):

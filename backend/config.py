@@ -56,6 +56,12 @@ class Settings:
     xero_redirect_uri: str = os.getenv("XERO_REDIRECT_URI", "http://localhost:8765/api/integrations/xero/callback")
     xero_sync_enabled: bool = os.getenv("XERO_SYNC_ENABLED", "false").lower() == "true"
     xero_earnings_rate_id: str = os.getenv("XERO_EARNINGS_RATE_ID", "")
+    google_client_id: str = os.getenv("GOOGLE_CLIENT_ID", "").strip()
+    google_client_secret: str = os.getenv("GOOGLE_CLIENT_SECRET", "").strip()
+    google_redirect_uri: str = os.getenv("GOOGLE_REDIRECT_URI", "").strip()
+    apple_client_id: str = os.getenv("APPLE_CLIENT_ID", "").strip()
+    apple_client_secret: str = os.getenv("APPLE_CLIENT_SECRET", "").strip()
+    apple_redirect_uri: str = os.getenv("APPLE_REDIRECT_URI", "").strip()
     shopify_store_domain: str = os.getenv("SHOPIFY_STORE_DOMAIN", "").replace("https://", "").rstrip("/")
     shopify_storefront_token: str = os.getenv("SHOPIFY_STOREFRONT_TOKEN", "")
     shopify_api_version: str = os.getenv("SHOPIFY_API_VERSION", "2026-04")
