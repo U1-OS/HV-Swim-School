@@ -87,6 +87,7 @@ PRODUCT_PRODUCTION_METHODS: dict[str, str] = {
     "HV-SWIM-SHORTS": "Use a specialist aquatic-apparel supplier and approve waist, liner, movement and chlorine durability.",
     "HV-TOWEL": "Compare embroidered and printed towel samples for absorbency, colour fastness and delivered cost.",
     "HV-HOODED-TOWEL": "Sample child-sized hooded towels and verify hood fit, absorbency, decoration comfort and wash durability.",
+    "HV-MINI-HOODED-TOWEL": "Sample little-swimmer hooded wraps and verify fibre shedding, hood fit, absorbency, stitch backing and wash durability.",
     "HV-BOTTLE": "Obtain a bulk branded-bottle proof; verify food-contact documentation, lid quality and wash/rub durability.",
     "HV-INSULATED-TUMBLER": "Compare premium insulated cups and verify food-contact documentation, lid seal, heat cycles, hand comfort and wash durability.",
     "HV-JUNIOR-WARM-CUP": "Specialist sample gate: verify food-contact documentation, spill resistance and safe grip; label for parent-supervised warm, never hot, drinks.",
@@ -103,6 +104,8 @@ PRODUCT_PRODUCTION_METHODS: dict[str, str] = {
     "HV-STAFF-PUFFER-JACKET": "Obtain a controlled outerwear quote and approve embroidery, weather resistance and sizing.",
     "HV-STAFF-TRACKPANTS": "Approve a uniform sample for movement, warmth, pockets, wash performance and logo placement.",
     "HV-INSTRUCTOR-CAP": "Compare embroidered samples for fit, sun coverage and outdoor pool-deck durability.",
+    "HV-FAMILY-TEE": "Map one approved premium tee blank to Printify and Shopify after print, fit, wash and Australian fulfilment tests pass.",
+    "HV-FAMILY-CREW": "Map one approved premium crew blank to Printify and Shopify after decoration, pilling, shrinkage and wash tests pass.",
 }
 
 
@@ -135,7 +138,7 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(
     title="HV Swim Bendigo Platform API",
-    version="5.7.0",
+    version="5.8.0",
     docs_url="/api/docs" if not settings.production else None,
     openapi_url="/openapi.json" if not settings.production else None,
     redoc_url=None,
@@ -469,7 +472,18 @@ class AdminSwimmerInput(BaseModel):
     level: str = Field(default="Program match required", max_length=80)
     emergency_contact: str = Field(default="", max_length=180)
     medical_notes: str = Field(default="", max_length=800)
+    allergies: str = Field(default="", max_length=600)
+    medications: str = Field(default="", max_length=600)
+    support_notes: str = Field(default="", max_length=800)
     photo_consent: bool = False
+
+
+class FamilySwimmerProfileInput(BaseModel):
+    emergency_contact: str = Field(min_length=3, max_length=180)
+    medical_notes: str = Field(default="", max_length=800)
+    allergies: str = Field(default="", max_length=600)
+    medications: str = Field(default="", max_length=600)
+    support_notes: str = Field(default="", max_length=800)
 
 
 class AccountStatusInput(BaseModel):
@@ -1181,7 +1195,7 @@ def renumber_waitlist(db: sqlite3.Connection, class_id: int) -> None:
 
 @app.get("/api/health")
 def health() -> dict[str, Any]:
-    return {"ok": True, "service": "HV Swim Bendigo", "version": "5.7.0", "environment": settings.app_env, "time": now_iso()}
+    return {"ok": True, "service": "HV Swim Bendigo", "version": "5.8.0", "environment": settings.app_env, "time": now_iso()}
 
 
 @app.get("/api/public/site-settings")
@@ -1393,6 +1407,49 @@ def customer_swimmers(user: dict[str, Any] = Depends(require_roles("customer", "
         else:
             result = rows(db.execute("SELECT s.*,u.first_name parent_first,u.last_name parent_last FROM swimmers s JOIN users u ON u.id=s.customer_id WHERE s.active=1 ORDER BY s.first_name"))
         return {"swimmers": result}
+
+
+@app.patch("/api/customer/swimmers/{swimmer_id}")
+def update_family_swimmer_profile(
+    swimmer_id: int,
+    payload: FamilySwimmerProfileInput,
+    request: Request,
+    user: dict[str, Any] = Depends(require_roles("customer")),
+    x_csrf_token: str | None = Header(default=None),
+) -> dict[str, Any]:
+    csrf_guard(request, user, x_csrf_token)
+    with db_session() as db:
+        swimmer = db.execute(
+            "SELECT id FROM swimmers WHERE id=? AND customer_id=? AND active=1",
+            (swimmer_id, user["id"]),
+        ).fetchone()
+        if not swimmer:
+            raise HTTPException(status_code=404, detail="Active swimmer profile not found")
+        fields = {
+            "emergency_contact": payload.emergency_contact.strip(),
+            "medical_notes": payload.medical_notes.strip(),
+            "allergies": payload.allergies.strip(),
+            "medications": payload.medications.strip(),
+            "support_notes": payload.support_notes.strip(),
+        }
+        db.execute(
+            """UPDATE swimmers
+               SET emergency_contact=?,medical_notes=?,allergies=?,medications=?,support_notes=?
+               WHERE id=?""",
+            (*fields.values(), swimmer_id),
+        )
+        # Medical and allergy text is deliberately excluded from the audit detail. The
+        # event records only which profile sections changed.
+        audit(
+            db,
+            user["id"],
+            "update_family_swimmer_safety_profile",
+            "swimmer",
+            swimmer_id,
+            {"updated_fields": list(fields.keys())},
+            client_ip(request),
+        )
+        return {"saved": True, "swimmer_id": swimmer_id, "updated_fields": list(fields.keys())}
 
 
 @app.get("/api/achievements/templates")
@@ -2114,7 +2171,7 @@ def staff_lesson_register(occurrence_date: date | None = None, user: dict[str, A
         for class_item in classes:
             register = rows(db.execute(
                 """SELECT b.id booking_id,s.id swimmer_id,s.first_name swimmer_first,s.last_name swimmer_last,
-                          s.level,s.medical_notes,s.photo_consent,
+                          s.level,s.medical_notes,s.allergies,s.medications,s.support_notes,s.photo_consent,
                           la.id attendance_id,la.attendance_status,la.parent_onsite_confirmed,
                           la.photo_clearance_snapshot,la.private_note,la.updated_at,
                           ar.id absence_report_id,ar.credit_status absence_credit_status
@@ -2864,9 +2921,17 @@ def create_admin_swimmer(payload: AdminSwimmerInput, request: Request, user: dic
         if not customer:
             raise HTTPException(status_code=404, detail="Active family account not found")
         cursor = db.execute(
-            """INSERT INTO swimmers(customer_id,first_name,last_name,date_of_birth,level,emergency_contact,medical_notes,photo_consent,created_at)
-               VALUES(?,?,?,?,?,?,?,?,?)""",
-            (payload.customer_id, payload.first_name.strip(), payload.last_name.strip(), payload.date_of_birth.isoformat() if payload.date_of_birth else None, payload.level, payload.emergency_contact, payload.medical_notes, int(payload.photo_consent), now_iso()),
+            """INSERT INTO swimmers(
+                   customer_id,first_name,last_name,date_of_birth,level,emergency_contact,
+                   medical_notes,allergies,medications,support_notes,photo_consent,created_at
+               ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (
+                payload.customer_id, payload.first_name.strip(), payload.last_name.strip(),
+                payload.date_of_birth.isoformat() if payload.date_of_birth else None,
+                payload.level, payload.emergency_contact, payload.medical_notes,
+                payload.allergies, payload.medications, payload.support_notes,
+                int(payload.photo_consent), now_iso(),
+            ),
         )
         audit(db, user["id"], "create_swimmer", "swimmer", cursor.lastrowid, {"customer_id": payload.customer_id}, client_ip(request))
         return {"id": cursor.lastrowid, "created": True}
@@ -3313,14 +3378,32 @@ async def products() -> dict[str, Any]:
     if shopify_ready():
         try:
             with db_session() as db:
-                local_catalogue = rows(db.execute(public_product_query))
+                local_catalogue = [
+                    item for item in rows(db.execute(public_product_query))
+                    if item.get("audience") != "staff"
+                ]
             approved_by_gid = {
                 str(product["shopify_gid"]): product
                 for product in local_catalogue
                 if product.get("status") == "available" and not product_launch_blockers(product)
             }
             live_products = await shopify_products()
-            approved_live = [product for product in live_products if str(product.get("id")) in approved_by_gid]
+            approved_live = []
+            for product in live_products:
+                profile = approved_by_gid.get(str(product.get("id")))
+                if not profile:
+                    continue
+                # Shopify remains authoritative for public title, imagery, variants and
+                # availability. The locally approved production profile adds only the
+                # non-private route/personalisation context used by the shop experience.
+                approved_live.append({
+                    **product,
+                    "supplier_route": profile.get("supplier_route"),
+                    "fulfilment_mode": profile.get("fulfilment_mode"),
+                    "personalisation": profile.get("personalisation"),
+                    "audience": profile.get("audience"),
+                    "sample_status": profile.get("sample_status"),
+                })
             return {
                 "source": "shopify",
                 "products": approved_live,
@@ -3329,11 +3412,68 @@ async def products() -> dict[str, Any]:
             }
         except Exception as exc:
             with db_session() as db:
-                fallback = rows(db.execute(public_product_query))
+                fallback = [
+                    item for item in rows(db.execute(public_product_query))
+                    if item.get("audience") != "staff"
+                ]
             return {"source": "local_fallback", "products": [public_product_view(item) for item in fallback], "payment_route": "shopify_checkout_unavailable", "warning": f"Shopify unavailable: {type(exc).__name__}"}
     with db_session() as db:
-        local_products = rows(db.execute(public_product_query))
+        local_products = [
+            item for item in rows(db.execute(public_product_query))
+            if item.get("audience") != "staff"
+        ]
         return {"source": "planned_catalogue", "products": [public_product_view(item) for item in local_products], "payment_route": "shopify_checkout_configuration_required"}
+
+
+@app.get("/api/staff/merchandise")
+async def staff_merchandise(user: dict[str, Any] = Depends(require_roles("staff", "admin"))) -> dict[str, Any]:
+    """Staff-only uniform catalogue; never exposed by the public product endpoint."""
+    query = """SELECT id,sku,title,category,description,price_cents,sizes,status,emoji,
+                      sample_status,supplier_route,personalisation,audience,fulfilment_mode,
+                      cost_cents,shopify_gid,printify_product_id,supplier_reference
+               FROM products WHERE audience='staff' ORDER BY category,title"""
+    with db_session() as db:
+        staff_products = rows(db.execute(query))
+    if shopify_ready():
+        try:
+            approved_by_gid = {
+                str(product["shopify_gid"]): product
+                for product in staff_products
+                if product.get("status") == "available" and not product_launch_blockers(product)
+            }
+            approved_live = []
+            for product in await shopify_products():
+                profile = approved_by_gid.get(str(product.get("id")))
+                if not profile:
+                    continue
+                approved_live.append({
+                    **product,
+                    "supplier_route": profile.get("supplier_route"),
+                    "fulfilment_mode": profile.get("fulfilment_mode"),
+                    "personalisation": profile.get("personalisation"),
+                    "audience": "staff",
+                    "sample_status": profile.get("sample_status"),
+                })
+            return {
+                "source": "shopify",
+                "products": approved_live,
+                "audience": "staff_only",
+                "payment_route": "shopify_checkout",
+            }
+        except Exception as exc:
+            return {
+                "source": "local_fallback",
+                "products": [public_product_view(item) for item in staff_products],
+                "audience": "staff_only",
+                "payment_route": "shopify_checkout_unavailable",
+                "warning": f"Shopify unavailable: {type(exc).__name__}",
+            }
+    return {
+        "source": "planned_catalogue",
+        "products": [public_product_view(item) for item in staff_products],
+        "audience": "staff_only",
+        "payment_route": "shopify_checkout_configuration_required",
+    }
 
 
 @app.get("/api/admin/merch-production")

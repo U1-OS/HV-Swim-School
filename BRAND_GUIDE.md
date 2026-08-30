@@ -1,6 +1,6 @@
 # HV Swim Bendigo brand guide
 
-V5.7.0 refines the existing HV Swim identity rather than replacing it. The rising sun,
+V5.8.0 refines the existing HV Swim identity rather than replacing it. The rising sun,
 freestyle swimmer, layered wave, navy/cyan/gold palette and `HV SWIM BENDIGO` name remain
 the recognisable core.
 
@@ -60,7 +60,7 @@ EPS and print-ready PDF, define CMYK/spot colours, and obtain a physical print o
 proof. Supplier-created DST/PES embroidery files must be approved from a stitched sample;
 they cannot be reliably generated from a website preview.
 
-The premium collection contains 21 planned products. A concept image or catalogue card is
+The premium collection contains 24 planned products. A concept image or catalogue card is
 not approval to manufacture: each product must pass the artwork-rights, exact specification,
 landed-cost, physical-sample, care/returns and Shopify test-order gates in
 `MERCH_PRODUCTION_PLAN.md`. Named suppliers and blank brands are sourcing candidates only.

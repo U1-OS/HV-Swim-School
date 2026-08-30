@@ -140,7 +140,10 @@ if (read('index.html').includes('Badge-ready') && !/data-public-feature="associa
 if (allHtml.includes('sloanswimschool@hotmail.com')) fail('business identity', 'an obsolete contact email remains in public markup');
 if (!read('programs.html').includes('$22.50 per lesson')) fail('business terms', 'the confirmed lesson fee is missing from programs.html');
 if (/data-route-jump="clock"|data-action="clock"/.test(read('assets/platform.js'))) fail('business workflow', 'clock-in controls remain in the staff interface');
-if (!/data-preview-only[^>]*hidden/.test(read('shop.html'))) fail('production copy', 'supplier implementation detail is not fail-closed in shop.html');
+const shopPage = read('shop.html');
+if (!/id="production-routes"/.test(shopPage) || !/not a claim of available stock/i.test(shopPage)) {
+  fail('production copy', 'public supplier routes are missing their stock/connection boundary in shop.html');
+}
 
 if (problems.length) {
   console.error(`${problems.length} problem${problems.length === 1 ? '' : 's'} found:\n`);

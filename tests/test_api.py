@@ -498,13 +498,18 @@ def test_premium_merchandise_catalogue_is_seeded_with_safe_supplier_routes(clien
         "HV-TRAINING-MITTS", "HV-BAG", "HV-CAP", "HV-KIDS-SUN-HAT", "HV-STAFF-POLO",
         "HV-STAFF-TEE", "HV-STAFF-SHORTS", "HV-TEAM-HOODIE", "HV-STAFF-PUFFER-VEST",
         "HV-STAFF-PUFFER-JACKET", "HV-STAFF-TRACKPANTS", "HV-INSTRUCTOR-CAP",
+        "HV-MINI-HOODED-TOWEL", "HV-FAMILY-TEE", "HV-FAMILY-CREW",
     }
     assert requested_skus <= products.keys()
-    assert len(products) >= 21
+    assert len(products) >= 24
     assert products["HV-RASHIE"]["supplier_route"] == "specialist_swim"
     assert products["HV-GOGGLES"]["fulfilment_mode"] == "specialist_purchase_order"
     assert products["HV-STAFF-TEE"]["supplier_route"] == "printify"
     assert products["HV-STAFF-TEE"]["audience"] == "staff"
+    assert products["HV-FAMILY-TEE"]["supplier_route"] == "printify"
+    assert products["HV-FAMILY-CREW"]["fulfilment_mode"] == "printify_shopify"
+    assert products["HV-MINI-HOODED-TOWEL"]["category"] == "Towels"
+    assert "Hooded Towel Poncho" in products["HV-HOODED-TOWEL"]["title"]
     assert products["HV-INSULATED-TUMBLER"]["category"] == "Drinkware"
     assert "warm, never hot" in products["HV-JUNIOR-WARM-CUP"]["description"]
 
@@ -521,6 +526,24 @@ def test_public_merchandise_catalogue_does_not_expose_costs_or_supplier_referenc
         assert private_field not in product
     for public_field in ("sku", "title", "category", "audience", "supplier_route", "sample_status"):
         assert public_field in product
+    assert all(item.get("audience") != "staff" for item in response.json()["products"])
+
+
+def test_staff_merchandise_is_protected_and_staff_only(client, monkeypatch):
+    from backend import server
+
+    monkeypatch.setattr(server, "shopify_ready", lambda: False)
+    client.cookies.clear()
+    assert client.get("/api/staff/merchandise").status_code == 401
+    sign_in(client, FAMILY)
+    assert client.get("/api/staff/merchandise").status_code == 403
+    client.cookies.clear()
+    sign_in(client, STAFF)
+    response = client.get("/api/staff/merchandise")
+    assert response.status_code == 200
+    assert response.json()["audience"] == "staff_only"
+    assert response.json()["products"]
+    assert all(item["audience"] == "staff" for item in response.json()["products"])
 
 
 def test_merchandise_workspace_reports_real_sync_boundaries(client, monkeypatch):
@@ -532,7 +555,7 @@ def test_merchandise_workspace_reports_real_sync_boundaries(client, monkeypatch)
     response = client.get("/api/admin/merch-production")
     assert response.status_code == 200, response.text
     payload = response.json()
-    assert payload["launch_readiness"]["total_products"] >= 21
+    assert payload["launch_readiness"]["total_products"] >= 24
     assert payload["catalogue_summary"]["by_audience"]["staff"] >= 7
     assert payload["sync_readiness"]["printify_eligible_products"] >= 3
     assert payload["providers"]["vistaprint"]["integration_mode"] == "manual_purchase_order"
@@ -781,6 +804,40 @@ def test_family_sees_only_its_own_swimmers(client):
     mine = client.get("/api/customer/swimmers").json()["swimmers"]
     me = client.get("/api/auth/me").json()["user"]["id"]
     assert all(swimmer["customer_id"] == me for swimmer in mine)
+
+
+def test_family_can_update_owned_child_safety_profile_without_auditing_health_text(client):
+    from backend.database import db_session
+
+    client.cookies.clear()
+    csrf = sign_in(client, FAMILY)
+    swimmer_id = client.get("/api/customer/swimmers").json()["swimmers"][0]["id"]
+    allergy_text = "Test allergy profile 8421"
+    response = client.patch(
+        f"/api/customer/swimmers/{swimmer_id}",
+        json={
+            "emergency_contact": "Jordan Smith · 0413 000 101",
+            "allergies": allergy_text,
+            "medical_notes": "Lesson safety test note",
+            "medications": "Medication test record",
+            "support_notes": "Use short, calm instructions",
+        },
+        headers={"X-CSRF-Token": csrf},
+    )
+    assert response.status_code == 200, response.text
+    updated = next(item for item in client.get("/api/customer/swimmers").json()["swimmers"] if item["id"] == swimmer_id)
+    assert updated["allergies"] == allergy_text
+    assert updated["support_notes"] == "Use short, calm instructions"
+    assert client.patch(
+        "/api/customer/swimmers/999999",
+        json={"emergency_contact": "Someone · 0400 000 000"},
+        headers={"X-CSRF-Token": csrf},
+    ).status_code == 404
+    with db_session() as db:
+        audit_detail = db.execute(
+            "SELECT detail FROM audit_log WHERE action='update_family_swimmer_safety_profile' ORDER BY id DESC LIMIT 1"
+        ).fetchone()[0]
+    assert allergy_text not in audit_detail
 
 
 def test_family_cannot_book_a_swimmer_it_does_not_own(client):

@@ -1,4 +1,4 @@
-# HV Swim Bendigo V5.7.0 Premium Platform
+# HV Swim Bendigo V5.8.0 Premium Platform
 
 Premium public website, installable Progressive Web App and connected operations platform for HV Swim Bendigo. The build combines a polished responsive front end with a FastAPI service, role-based accounts and a SQLite preview database. SQLite is not approved for the final production deployment that will store customer, child or payroll data.
 
@@ -40,7 +40,7 @@ Demo credentials only work while `HV_APP_ENV=development`. Production mode disab
 ## Working in this build
 
 - PBKDF2 password hashing, HttpOnly sessions, CSRF protection, rate limiting and role permissions
-- Family swimmers, class availability, bookings, cancellations, waitlists and notices
+- Family swimmers, editable emergency/allergy/medication/support profiles, class availability, bookings, cancellations, waitlists and notices
 - Family absence reporting against the active term calendar, with a visible two-credit
   allowance per swimmer and an explicit no-make-up/no-automatic-refund boundary
 - Filtered family class finder with live capacity meters and visible waitlist positions
@@ -69,8 +69,9 @@ Demo credentials only work while `HV_APP_ENV=development`. Production mode disab
 - Asynchronous public support tickets with a returned reference and staff queue; the widget is not live chat or an emergency channel, and no external support email is sent yet
 - Family-visible swimmer achievements with evidence, staff-private notes, audited issue/revocation and printable HTML certificates that are not qualifications or accreditation
 - Urgent pool-closure and changed-condition alerts that poll while a website/app page is open; genuine off-device Web Push, APNs and FCM delivery is not active
-- Management merchandise workspace for the premium 21-product plan, with sample tracking, supplier routes, costs, projected margin and quantified launch readiness
-- Guided First Splash, Lesson Day and Pool Deck uniform kits that add coordinated products to the persistent preview cart
+- Management merchandise workspace for the premium 24-product plan, with sample tracking, supplier routes, costs, projected margin and quantified launch readiness
+- Guided First Splash, Lesson Day and Family Club kits that add coordinated public products to the persistent preview cart
+- Role-protected staff uniform catalogue available only inside the Staff and Management workspaces; staff products are excluded from the public product API
 - Product material, care and personalisation guidance with explicit sample-approval boundaries
 - Local catalogue price/status controls before products are approved for Shopify
 - Cached Bendigo outdoor weather through the server-side weather service; production requires a commercial Open-Meteo key
@@ -83,8 +84,9 @@ Demo credentials only work while `HV_APP_ENV=development`. Production mode disab
 - Cached Shopify storefront/cart and Printify catalogue boundaries
 - Xero OAuth connection, staff mapping and an audited payroll-readiness preview; outbound payroll transmission remains locked until real pay periods and idempotent export tracking are implemented
 - Explicit payment routing: lesson/term charges and approved absence-credit adjustments
-  belong to the reviewed Xero invoicing workflow; merchandise and uniforms belong to
-  Shopify Checkout. Neither route fabricates payments when credentials or launch gates are incomplete.
+  belong to the reviewed Xero invoicing workflow; approved merchandise belongs to Shopify
+  Checkout, with staff uniforms kept inside protected staff/management views. Neither route
+  fabricates payments when credentials or launch gates are incomplete.
 - VistaPrint/manual and specialist-swim supplier plans for products unsuitable for generic POD
 - PWA manifest, app icons, offline public shell and mobile-first interfaces
 - Refined transparent HV Swim logo system, simplified digital mark, refreshed social image,
@@ -98,7 +100,7 @@ Connecting the existing Xero organisation requires an HV Swim-owned OAuth app an
 
 The website never presents directory membership as instructor accreditation. Management can upload only the current member/provider PNG issued through HV Swim's own organisation account and must record its reference, expiry and usage rights. Generic or scraped organisation logos are not included. The entire public section stays hidden until all three records pass and management separately enables it under Website content. Follow `ASSOCIATION_BADGE_REQUIREMENTS.md` and `PRODUCTION_HANDOFF.md` before activation.
 
-The 21 merchandise records are a production plan, not available stock. Every product must pass artwork-rights, specification, landed-cost, physical-sample, care/returns and end-to-end Shopify release gates. Supplier and blank-brand names identify possible sourcing routes only; they do not claim a partnership, endorsement, licence or authorised-reseller relationship with HV Swim.
+The 24 merchandise records are a production plan, not available stock. The public store separates premium swimwear, embroidered towels and hooded ponchos, goggles/equipment, named drinkware and POD family wear while showing each proposed production route. Staff uniforms are excluded from the public API and appear only in role-protected Staff and Management workspaces. Every product must pass artwork-rights, specification, landed-cost, physical-sample, care/returns and end-to-end Shopify release gates. Supplier and blank-brand names identify possible sourcing routes only; they do not claim a partnership, endorsement, licence or authorised-reseller relationship with HV Swim.
 
 Support messages currently enter the protected management queue and return a reference; external email delivery is not implemented. Urgent notices refresh on active website/app pages, but reaching a device while the site or app is closed still requires a consented production provider, device-token handling and working Web Push/APNs/FCM adapter.
 
