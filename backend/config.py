@@ -5,8 +5,6 @@ from dataclasses import dataclass
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-DATA_DIR = ROOT / "data"
-DB_PATH = DATA_DIR / "hv_swim.db"
 
 
 def load_dotenv(path: Path) -> None:
@@ -21,6 +19,9 @@ def load_dotenv(path: Path) -> None:
 
 
 load_dotenv(ROOT / ".env")
+
+DATA_DIR = Path(os.getenv("HV_DATA_DIR", str(ROOT / "data"))).expanduser().resolve()
+DB_PATH = DATA_DIR / "hv_swim.db"
 
 
 def integer_env(name: str, default: int, *, minimum: int, maximum: int) -> int:

@@ -3,11 +3,11 @@
 Andrew swaps between Claude and Codex. Read this first and rewrite it last.
 
 **Wheel:** Unassigned
-**Last updated:** 2026-08-30 by Codex — V5.6.1 release-gate upgrade complete
+**Last updated:** 2026-08-30 by Codex — V5.6.2 association evidence workflow complete
 
 ## Current state
 
-V5.6.1 is the verified production foundation for the public website, family/staff/
+V5.6.2 is the verified production foundation for the public website, family/staff/
 management workspaces, installable PWA, Capacitor mobile shell, merchandise studio and
 FastAPI service. It preserves the working V5 architecture while substantially tightening
 public truthfulness, responsive polish, operational workflows, legal/business copy,
@@ -20,7 +20,26 @@ real providers. Pool temperatures are staff-verified until a compatible sensor f
 selected. Xero OAuth/readiness exists, but payroll transmission remains locked. SQLite
 and demo accounts are preview-only and must not hold real customer, child or payroll data.
 
-## Delivered in V5.6.1
+## Delivered in V5.6.2
+
+- Management → Staff compliance now contains a complete protected register for the
+  AUSTSWIM, SWIM Schools Australia and Autism Swim marks. Each record captures its
+  membership/certificate reference, valid-until date, internal evidence note, exact PNG,
+  explicit usage-right confirmation and management reviewer/time.
+- PNG uploads are JSON/base64 rather than multipart, limited to 1 MB and 64–2400 pixels,
+  structurally/CRC validated and stored under a content hash. Public and management image
+  routes re-check SHA-256 integrity before considering artwork available.
+- The public badge endpoint exposes no private evidence fields and returns nothing until
+  all three records pass and Management → Website content separately requests release.
+  Expiry, withdrawn rights, missing artwork or a changed file automatically hides the
+  complete homepage and footer section; text placeholders are no longer shown publicly.
+- The evidence manager has polished desktop and single-column mobile cards, file guidance,
+  official requirement/directory links, visible blockers and a clear ready state. Staff
+  cannot access the management register; every save is audited without logging private
+  notes or full references.
+- `HV_DATA_DIR` now works as a real environment override so SQLite preview data and private
+  runtime badge artwork can sit on an encrypted persistent volume. Production still must
+  move customer operations to managed PostgreSQL and persist or replace the artwork store.
 
 - Confirmed HVS BENDIGO PTY LTD identity, ABN, business/postal details and primary email
   are carried through the footer, structured data, privacy, terms and handoff material.
@@ -33,15 +52,14 @@ and demo accounts are preview-only and must not hold real customer, child or pay
   financial year, pending final legal/payroll confirmation.
 - Clock-in controls and geolocation capture are removed. The legacy clock API returns 410;
   the staff workflow is published roster plus reviewed shift start/finish timesheets.
-- Public homepage, cards, motion, spacing, mobile layouts and support launcher received a
+- Public homepage, cards, motion, spacing, mobile layouts and support launcher retain the
   child-friendly premium polish while retaining restrained animation and reduced-motion
   support. Duplicate homepage content was removed and calls to action were simplified.
 - Pool conditions never fabricate a temperature: only a staff/sensor-verified reading
   newer than 24 hours is presented as current. Weather remains separate from water data.
 - Public prototype/association/merch blocks fail closed behind explicit server flags.
-  Management → Staff compliance now records the AUSTSWIM, SWIM Schools Australia and
-  Autism Swim publication rules and official links. No third-party mark is shown without
-  current issued artwork and usage evidence.
+  No third-party mark is shown without current issued artwork, live renewal evidence,
+  verified usage rights, management review and the separate website release switch.
 - Management → Website content now shows polished release-gate controls for homepage
   merchandise and qualification/member marks. The server—not only the interface—blocks
   concept products without approved samples/costs/mappings and blocks association marks
@@ -58,21 +76,21 @@ and demo accounts are preview-only and must not hold real customer, child or pay
 - Service-worker installation is smaller and safer: 14 core assets instead of the former
   full-site precache, runtime caching for pages/assets, network-only authenticated APIs,
   fresh/no-store public alerts and cached public-data fallbacks.
-- V5.6.1 asset URLs and cache names force existing installed apps to receive the new
-  management code instead of retaining a cached V5.6 screen.
-- V5.6.1 metadata, mobile/store guides, brand/merch plans, production handoff and automated
+- V5.6.2 asset URLs and cache names force existing installed apps to receive the new
+  management code instead of retaining a cached V5.6.1 screen.
+- V5.6.2 metadata, mobile/store guides, brand/merch plans, production handoff and automated
   regression checks are aligned.
 
 ## Verification — 30 August 2026
 
-- Python API/security suite: **89 passed, 1 intentionally skipped**.
-- Running-server smoke suite: **37 checks passed**.
+- Python API/security suite: **90 passed, 1 intentionally skipped**.
+- Running-server smoke suite: **39 checks passed**.
 - Static site checker: **19 pages, 14 precached files and 8 scripts passed**.
 - JavaScript syntax, whitespace/error checks and Capacitor mobile web-shell build passed.
-- Real-browser desktop and 390×844 mobile walkthrough covered all public pages, shop,
-  sign-in, management command centre, staff compliance and the new Website content
-  release-gate controls. No horizontal overflow, broken visible images or browser console
-  warnings/errors were found.
+- Real-browser desktop and 390×844 mobile walkthrough covered management sign-in, the
+  complete association evidence manager and the public fail-closed state. All three forms
+  were accessible, the mobile cards stayed within the viewport, no placeholder mark leaked
+  publicly and no browser console warning/error was found.
 
 ## External work before production
 

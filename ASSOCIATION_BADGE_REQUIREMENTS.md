@@ -1,4 +1,4 @@
-# Association badge activation
+# Association badge activation — V5.6.2
 
 The public site reserves polished space for HV Swim's aquatic-industry listings, but it
 does not include copied, redrawn or generic organisation logos. That is intentional.
@@ -24,6 +24,25 @@ Ask the organisation or the HV Swim account owner for an original SVG, PDF or hi
 resolution transparent PNG. Record the supplied filename, issuing source, authorised
 wording, renewal/expiry date and reviewer in the launch register before publishing it.
 Do not scrape artwork from a website, social post or search result.
+
+## Management workflow now available
+
+V5.6.2 implements the protected register under **Management → Staff compliance**. For
+each organisation, management must enter the membership/certificate reference, valid-until
+date, an internal evidence note and an explicit confirmation that the exact supplied mark
+may currently be displayed. The register accepts PNG only (64–2400 pixels and no larger
+than 1 MB), validates the PNG structure, stores a SHA-256 integrity hash and records the
+reviewing management user and time in the audit log.
+
+The uploaded files live in the private runtime data directory, not in Git. **Management →
+Website content** remains the separate final release control. The API fails closed: unless
+all three required records are current, authorised, verified and hash-matched, the public
+endpoint returns no badges and both the homepage section and footer strip stay hidden. An
+expiry, missing file or changed file automatically disables the complete public section.
+
+For production, ensure the application data volume is encrypted, backed up and persistent,
+or replace local badge storage with private object storage while preserving the same hash,
+authorisation and public-release checks.
 
 The current Autism Swim directory page still contains former-team and older venue
 details. HV Swim should have that record corrected before its Approved Provider badge is

@@ -1,4 +1,4 @@
-# HV Swim Bendigo V5.6.1 Premium Platform
+# HV Swim Bendigo V5.6.2 Premium Platform
 
 Premium public website, installable Progressive Web App and connected operations platform for HV Swim Bendigo. The build combines a polished responsive front end with a FastAPI service, role-based accounts and a SQLite preview database. SQLite is not approved for the final production deployment that will store customer, child or payroll data.
 
@@ -56,6 +56,8 @@ Demo credentials only work while `HV_APP_ENV=development`. Production mode disab
 - Management website editor for the homepage announcement, enrolment status, hero message
   and primary call-to-action, plus server-enforced release gates for merchandise and
   third-party qualification/member marks
+- Protected association-artwork register with PNG validation, SHA-256 integrity checks,
+  evidence/expiry/usage-right tracking, audit history and automatic public fail-closed behaviour
 - Management account and swimmer provisioning with a mandatory first password change
 - Enquiry inbox with new, contacted, trial-booked and closed follow-up stages
 - Asynchronous public support tickets with a returned reference and staff queue; the widget is not live chat or an emergency channel, and no external support email is sent yet
@@ -85,7 +87,7 @@ Demo credentials only work while `HV_APP_ENV=development`. Production mode disab
 
 Connecting the existing Xero organisation requires an HV Swim-owned OAuth app and mappings. Shopify, Printify, VistaPrint ordering, commercial weather, email, SMS, push, pool sensors, hosting, domain and native app-store distribution likewise require credentials or accounts owned by HV Swim. Those values belong in a private `.env` file created from `.env.example`; secrets must never be placed in HTML or committed to source control. Credentials do not activate email, SMS or push by themselves—the provider adapters and consent workflows are still explicit launch work. The optional Meta Page Plugin is configured but must be tested on the approved production domain.
 
-The website links to public industry directory records without presenting them as instructor accreditation. Use only current member/provider badge files issued through HV Swim's own organisation accounts. Generic or scraped organisation logos are not included. Follow `ASSOCIATION_BADGE_REQUIREMENTS.md` and `PRODUCTION_HANDOFF.md` before activating any badge.
+The website never presents directory membership as instructor accreditation. Management can upload only the current member/provider PNG issued through HV Swim's own organisation account and must record its reference, expiry and usage rights. Generic or scraped organisation logos are not included. The entire public section stays hidden until all three records pass and management separately enables it under Website content. Follow `ASSOCIATION_BADGE_REQUIREMENTS.md` and `PRODUCTION_HANDOFF.md` before activation.
 
 The 21 merchandise records are a production plan, not available stock. Every product must pass artwork-rights, specification, landed-cost, physical-sample, care/returns and end-to-end Shopify release gates. Supplier and blank-brand names identify possible sourcing routes only; they do not claim a partnership, endorsement, licence or authorised-reseller relationship with HV Swim.
 

@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import base64
+import binascii
 import csv
+import hashlib
 import hmac
 import io
 import json
@@ -20,7 +23,7 @@ from starlette.middleware.gzip import GZipMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
 
-from .config import ROOT, settings
+from .config import DATA_DIR, ROOT, settings
 from .database import audit, db_session, initialise_database, rows
 from .integrations import (
     current_bendigo_weather,
@@ -132,7 +135,7 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(
     title="HV Swim Bendigo Platform API",
-    version="5.6.1",
+    version="5.6.2",
     docs_url="/api/docs" if not settings.production else None,
     openapi_url="/openapi.json" if not settings.production else None,
     redoc_url=None,
@@ -511,6 +514,20 @@ class SiteSettingsInput(BaseModel):
     primary_cta: str = Field(min_length=3, max_length=50)
     feature_merch_home: bool = False
     feature_association_badges: bool = False
+
+
+class AssociationCredentialInput(BaseModel):
+    membership_reference: str = Field(default="", max_length=160)
+    valid_until: date | None = None
+    usage_rights_confirmed: bool = False
+    internal_notes: str = Field(default="", max_length=800)
+    artwork_png_base64: str | None = Field(default=None, max_length=1_400_000)
+
+    @model_validator(mode="after")
+    def clean_evidence(self) -> "AssociationCredentialInput":
+        self.membership_reference = self.membership_reference.strip()
+        self.internal_notes = self.internal_notes.strip()
+        return self
 
 
 class ProductUpdateInput(BaseModel):
@@ -897,6 +914,110 @@ def site_settings_payload(db: sqlite3.Connection) -> dict[str, Any]:
     return settings_rows
 
 
+ASSOCIATION_BADGE_DIR = DATA_DIR / "association-badges"
+ASSOCIATION_BADGE_KEYS = {"swim_schools_australia", "austswim", "autism_swim"}
+
+
+def validate_association_png(encoded: str) -> tuple[bytes, int, int, str]:
+    """Decode and structurally validate a modest, browser-safe PNG badge file."""
+    try:
+        artwork = base64.b64decode(encoded, validate=True)
+    except (ValueError, binascii.Error) as exc:
+        raise HTTPException(status_code=422, detail="Artwork must be a valid base64-encoded PNG file") from exc
+    if len(artwork) > 1_000_000:
+        raise HTTPException(status_code=413, detail="Badge artwork must be no larger than 1 MB")
+    if len(artwork) < 45 or artwork[:8] != b"\x89PNG\r\n\x1a\n":
+        raise HTTPException(status_code=422, detail="Only genuine PNG badge artwork is accepted")
+
+    position = 8
+    width = height = 0
+    seen_idat = seen_iend = False
+    chunk_index = 0
+    while position + 12 <= len(artwork):
+        length = int.from_bytes(artwork[position:position + 4], "big")
+        chunk_type = artwork[position + 4:position + 8]
+        chunk_end = position + 12 + length
+        if length > 1_000_000 or chunk_end > len(artwork):
+            raise HTTPException(status_code=422, detail="PNG artwork is incomplete or malformed")
+        chunk_data = artwork[position + 8:position + 8 + length]
+        supplied_crc = int.from_bytes(artwork[position + 8 + length:chunk_end], "big")
+        if (binascii.crc32(chunk_type + chunk_data) & 0xFFFFFFFF) != supplied_crc:
+            raise HTTPException(status_code=422, detail="PNG artwork failed its integrity check")
+        if chunk_index == 0:
+            if chunk_type != b"IHDR" or length != 13:
+                raise HTTPException(status_code=422, detail="PNG artwork has an invalid header")
+            width = int.from_bytes(chunk_data[:4], "big")
+            height = int.from_bytes(chunk_data[4:8], "big")
+            if not (64 <= width <= 2400 and 64 <= height <= 2400) or width * height > 4_000_000:
+                raise HTTPException(status_code=422, detail="Badge artwork dimensions must be between 64 and 2400 pixels")
+            if chunk_data[10] != 0 or chunk_data[11] != 0 or chunk_data[12] not in (0, 1):
+                raise HTTPException(status_code=422, detail="PNG artwork uses unsupported encoding settings")
+        elif chunk_type == b"IHDR":
+            raise HTTPException(status_code=422, detail="PNG artwork contains more than one header")
+        if chunk_type == b"IDAT":
+            seen_idat = True
+        if chunk_type == b"IEND":
+            if length != 0 or chunk_end != len(artwork):
+                raise HTTPException(status_code=422, detail="PNG artwork has an invalid ending")
+            seen_iend = True
+            break
+        position = chunk_end
+        chunk_index += 1
+    if not seen_idat or not seen_iend:
+        raise HTTPException(status_code=422, detail="PNG artwork is missing required image data")
+    return artwork, width, height, hashlib.sha256(artwork).hexdigest()
+
+
+def association_artwork_path(filename: str | None) -> Path | None:
+    if not filename or Path(filename).name != filename:
+        return None
+    return ASSOCIATION_BADGE_DIR / filename
+
+
+def association_badge_records(db: sqlite3.Connection) -> list[dict[str, Any]]:
+    records = rows(
+        db.execute(
+            """SELECT c.*,u.first_name verifier_first,u.last_name verifier_last
+               FROM association_credentials c
+               LEFT JOIN users u ON u.id=c.verified_by
+               ORDER BY CASE c.key
+                   WHEN 'swim_schools_australia' THEN 1
+                   WHEN 'austswim' THEN 2 ELSE 3 END"""
+        )
+    )
+    today = business_today().isoformat()
+    for record in records:
+        blockers: list[str] = []
+        if not (record.get("membership_reference") or "").strip():
+            blockers.append("Membership or certification reference required")
+        if not record.get("valid_until"):
+            blockers.append("Renewal or valid-until date required")
+        elif record["valid_until"] < today:
+            blockers.append("Evidence has expired")
+        if not record.get("usage_rights_confirmed"):
+            blockers.append("Logo usage rights must be confirmed")
+        artwork_path = association_artwork_path(record.get("artwork_filename"))
+        artwork_available = False
+        if artwork_path and artwork_path.is_file() and record.get("artwork_sha256"):
+            try:
+                artwork_available = hashlib.sha256(artwork_path.read_bytes()).hexdigest() == record["artwork_sha256"]
+            except OSError:
+                artwork_available = False
+        if not artwork_available:
+            blockers.append("Current issued PNG artwork required")
+        if not record.get("verified_by") or not record.get("verified_at"):
+            blockers.append("Management verification required")
+        record["usage_rights_confirmed"] = bool(record.get("usage_rights_confirmed"))
+        record["artwork_available"] = artwork_available
+        record["ready"] = not blockers
+        record["blocking_reasons"] = blockers
+        record["artwork_url"] = (
+            f"/api/public/association-badges/{record['key']}/artwork.png?v={record['artwork_sha256'][:16]}"
+            if artwork_available else None
+        )
+    return records
+
+
 def public_feature_controls(db: sqlite3.Connection) -> dict[str, dict[str, Any]]:
     """Report requested and effective public features with their production launch gates."""
     raw = {row["key"]: row["value"] for row in db.execute("SELECT key,value FROM site_settings")}
@@ -913,6 +1034,9 @@ def public_feature_controls(db: sqlite3.Connection) -> dict[str, dict[str, Any]]
     )
     merch_requested = raw.get("feature_merch_home") == "1"
     badge_requested = raw.get("feature_association_badges") == "1"
+    badges = association_badge_records(db)
+    ready_badges = sum(1 for badge in badges if badge["ready"])
+    badges_ready = len(badges) == len(ASSOCIATION_BADGE_KEYS) and ready_badges == len(badges)
     merch_ready = public_ready_products > 0
 
     return {
@@ -929,10 +1053,14 @@ def public_feature_controls(db: sqlite3.Connection) -> dict[str, dict[str, Any]]
         },
         "association_badges": {
             "requested": badge_requested,
-            "effective_enabled": False,
-            "can_enable": False,
-            "ready_items": 0,
-            "reason": "Current issued badge files, renewal evidence and recorded usage rights are still required.",
+            "effective_enabled": badge_requested and badges_ready,
+            "can_enable": badges_ready,
+            "ready_items": ready_badges,
+            "reason": (
+                "All three issued badges have current evidence, verified usage rights and integrity-checked artwork."
+                if badges_ready
+                else f"{ready_badges} of 3 marks ready. Current issued badge files, renewal evidence and recorded usage rights are still required."
+            ),
         },
     }
 
@@ -957,7 +1085,7 @@ def renumber_waitlist(db: sqlite3.Connection, class_id: int) -> None:
 
 @app.get("/api/health")
 def health() -> dict[str, Any]:
-    return {"ok": True, "service": "HV Swim Bendigo", "version": "5.6.1", "environment": settings.app_env, "time": now_iso()}
+    return {"ok": True, "service": "HV Swim Bendigo", "version": "5.6.2", "environment": settings.app_env, "time": now_iso()}
 
 
 @app.get("/api/public/site-settings")
@@ -973,6 +1101,43 @@ def public_site_settings() -> dict[str, Any]:
             "mode": "production" if settings.production else "preview",
             "features": features,
         }
+
+
+@app.get("/api/public/association-badges")
+def public_association_badges() -> dict[str, Any]:
+    with db_session() as db:
+        controls = public_feature_controls(db)
+        if not controls["association_badges"]["effective_enabled"]:
+            return {"badges": [], "published": False}
+        badges = []
+        for record in association_badge_records(db):
+            if not record["ready"]:
+                continue
+            badges.append(
+                {
+                    "key": record["key"],
+                    "display_name": record["display_name"],
+                    "short_label": record["short_label"],
+                    "directory_url": record["directory_url"],
+                    "valid_until": record["valid_until"],
+                    "artwork_url": record["artwork_url"],
+                }
+            )
+        return {"badges": badges, "published": len(badges) == len(ASSOCIATION_BADGE_KEYS)}
+
+
+@app.get("/api/public/association-badges/{credential_key}/artwork.png")
+def public_association_badge_artwork(credential_key: str) -> FileResponse:
+    with db_session() as db:
+        if not public_feature_controls(db)["association_badges"]["effective_enabled"]:
+            raise HTTPException(status_code=404)
+        record = next((item for item in association_badge_records(db) if item["key"] == credential_key), None)
+        if not record or not record["ready"]:
+            raise HTTPException(status_code=404)
+        artwork_path = association_artwork_path(record["artwork_filename"])
+        if not artwork_path or not artwork_path.is_file():
+            raise HTTPException(status_code=404)
+        return FileResponse(artwork_path, media_type="image/png")
 
 
 @app.get("/api/demo-accounts")
@@ -2078,6 +2243,115 @@ def admin_site_settings(user: dict[str, Any] = Depends(require_roles("admin"))) 
                 "clock_tracking": "Not used",
             },
         }
+
+
+@app.get("/api/admin/association-badges")
+def admin_association_badges(user: dict[str, Any] = Depends(require_roles("admin"))) -> dict[str, Any]:
+    with db_session() as db:
+        credentials = association_badge_records(db)
+        for item in credentials:
+            item["admin_artwork_url"] = (
+                f"/api/admin/association-badges/{item['key']}/artwork.png?v={item['artwork_sha256'][:16]}"
+                if item["artwork_available"] else None
+            )
+        return {"credentials": credentials, "feature_control": public_feature_controls(db)["association_badges"]}
+
+
+@app.get("/api/admin/association-badges/{credential_key}/artwork.png")
+def admin_association_badge_artwork(credential_key: str, user: dict[str, Any] = Depends(require_roles("admin"))) -> FileResponse:
+    with db_session() as db:
+        record = next((item for item in association_badge_records(db) if item["key"] == credential_key), None)
+        if not record or not record["artwork_available"]:
+            raise HTTPException(status_code=404)
+        artwork_path = association_artwork_path(record["artwork_filename"])
+        if not artwork_path or not artwork_path.is_file():
+            raise HTTPException(status_code=404)
+        return FileResponse(artwork_path, media_type="image/png")
+
+
+@app.patch("/api/admin/association-badges/{credential_key}")
+def update_admin_association_badge(
+    credential_key: str,
+    payload: AssociationCredentialInput,
+    request: Request,
+    user: dict[str, Any] = Depends(require_roles("admin")),
+    x_csrf_token: str | None = Header(default=None),
+) -> dict[str, Any]:
+    csrf_guard(request, user, x_csrf_token)
+    if credential_key not in ASSOCIATION_BADGE_KEYS:
+        raise HTTPException(status_code=404, detail="Association credential not found")
+
+    artwork_filename = artwork_sha256 = None
+    dimensions: tuple[int, int] | None = None
+    if payload.artwork_png_base64 is not None:
+        artwork, width, height, artwork_sha256 = validate_association_png(payload.artwork_png_base64)
+        ASSOCIATION_BADGE_DIR.mkdir(parents=True, exist_ok=True)
+        artwork_filename = f"{credential_key}-{artwork_sha256[:16]}.png"
+        temporary_path = ASSOCIATION_BADGE_DIR / f".{artwork_filename}.{new_token(6)}.tmp"
+        temporary_path.write_bytes(artwork)
+        temporary_path.replace(ASSOCIATION_BADGE_DIR / artwork_filename)
+        dimensions = (width, height)
+
+    with db_session() as db:
+        existing = db.execute("SELECT key FROM association_credentials WHERE key=?", (credential_key,)).fetchone()
+        if not existing:
+            raise HTTPException(status_code=404, detail="Association credential not found")
+        if artwork_filename:
+            db.execute(
+                """UPDATE association_credentials
+                   SET membership_reference=?,valid_until=?,usage_rights_confirmed=?,internal_notes=?,
+                       artwork_filename=?,artwork_sha256=?,verified_by=?,verified_at=?,updated_at=?
+                   WHERE key=?""",
+                (
+                    payload.membership_reference or None,
+                    payload.valid_until.isoformat() if payload.valid_until else None,
+                    int(payload.usage_rights_confirmed),
+                    payload.internal_notes or None,
+                    artwork_filename,
+                    artwork_sha256,
+                    user["id"],
+                    now_iso(),
+                    now_iso(),
+                    credential_key,
+                ),
+            )
+        else:
+            db.execute(
+                """UPDATE association_credentials
+                   SET membership_reference=?,valid_until=?,usage_rights_confirmed=?,internal_notes=?,
+                       verified_by=?,verified_at=?,updated_at=? WHERE key=?""",
+                (
+                    payload.membership_reference or None,
+                    payload.valid_until.isoformat() if payload.valid_until else None,
+                    int(payload.usage_rights_confirmed),
+                    payload.internal_notes or None,
+                    user["id"],
+                    now_iso(),
+                    now_iso(),
+                    credential_key,
+                ),
+            )
+        updated = next(item for item in association_badge_records(db) if item["key"] == credential_key)
+        audit(
+            db,
+            user["id"],
+            "verify_association_credential",
+            "association_credential",
+            credential_key,
+            {
+                "ready": updated["ready"],
+                "valid_until": updated["valid_until"],
+                "usage_rights_confirmed": updated["usage_rights_confirmed"],
+                "artwork_sha256": artwork_sha256,
+                "artwork_dimensions": dimensions,
+            },
+            client_ip(request),
+        )
+        updated["admin_artwork_url"] = (
+            f"/api/admin/association-badges/{credential_key}/artwork.png?v={updated['artwork_sha256'][:16]}"
+            if updated["artwork_available"] else None
+        )
+        return {"saved": True, "credential": updated, "feature_control": public_feature_controls(db)["association_badges"]}
 
 
 @app.patch("/api/admin/site-settings")

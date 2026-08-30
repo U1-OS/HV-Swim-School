@@ -21,11 +21,11 @@
   <link rel="icon" href="assets/app-icon-v3-64.png">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="assets/app-icon-v3-180.png">
-  <link rel="stylesheet" href="assets/styles.css?v=5.6.1">
-  <link rel="stylesheet" href="assets/support.css?v=5.6.1">
-  <script defer src="assets/app.js?v=5.6.1"></script>
-  <script defer src="assets/support.js?v=5.6.1"></script>
-  <script defer src="assets/public-api.js?v=5.6.1"></script>
+  <link rel="stylesheet" href="assets/styles.css?v=5.6.2">
+  <link rel="stylesheet" href="assets/support.css?v=5.6.2">
+  <script defer src="assets/app.js?v=5.6.2"></script>
+  <script defer src="assets/support.js?v=5.6.2"></script>
+  <script defer src="assets/public-api.js?v=5.6.2"></script>
   <script type="application/ld+json">{
   "@context": "https://schema.org",
   "@type": "SportsActivityLocation",
@@ -251,23 +251,10 @@
         <div class="credential-intro">
           <div class="eyebrow">Public industry listings</div>
           <h2 id="credentials-title">Check HV Swim at the source.</h2>
-          <p>These links open HV Swim Bendigo’s public industry records. Reserved badge spaces stay neutral until HV Swim supplies the exact current member/provider artwork and renewal evidence issued to the business.</p>
+          <p>These organisation-issued marks are published only while HV Swim’s management register contains current evidence, confirmed logo permission and integrity-checked artwork. Select a mark to verify the public record at its source.</p>
           <div class="credential-safeguard"><span aria-hidden="true">✓</span><p><strong>Authorised marks only</strong><small>No scraped, redrawn or expired organisation logos.</small></p></div>
         </div>
-        <div class="credential-grid" aria-label="Aquatic industry directory listings">
-          <a class="credential-card" href="https://12524.locationlandingpages.com/australia/victoria/california-gully/hv-swim-school-bendigo/2807" target="_blank" rel="noopener">
-            <span class="directory-card-mark" data-label="Issued badge required" aria-hidden="true"><b>SWIM</b><small>Badge-ready</small></span>
-            <span><strong>SWIM Coaches &amp; Teachers Australia</strong><small>View HV Swim’s public school record</small><em class="credential-state review">Membership evidence to confirm</em></span>
-          </a>
-          <a class="credential-card" href="https://austswim.com.au/australian-swim-school-finder" target="_blank" rel="noopener">
-            <span class="directory-card-mark" data-label="Issued badge required" aria-hidden="true"><b>AUSTSWIM</b><small>Badge-ready</small></span>
-            <span><strong>AUSTSWIM Swim School Network</strong><small>View the public swim-school finder</small><em class="credential-state listed">Public listing located</em></span>
-          </a>
-          <a class="credential-card" href="https://autism-swim.org/providers/aquatic-centre-hidden-valley-swim-school-bendigo/" target="_blank" rel="noopener">
-            <span class="directory-card-mark" data-label="Issued badge required" aria-hidden="true"><b>AUTISM SWIM</b><small>Badge-ready</small></span>
-            <span><strong>Autism Swim provider directory</strong><small>View the public provider record</small><em class="credential-state review">Renewal and record correction required</em></span>
-          </a>
-        </div>
+        <div class="credential-grid" id="association-badge-list" aria-label="Current aquatic industry credentials"></div>
       </div>
     </section>
 
