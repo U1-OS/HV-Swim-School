@@ -1,15 +1,27 @@
 #!/bin/zsh
 cd "$(dirname "$0")" || exit 1
 hv_preview_port=8765
+hv_venv=.venv312
 
-if [[ ! -x ".venv/bin/python" ]]; then
+if [[ ! -x "$hv_venv/bin/python" ]]; then
+  hv_python=""
+  for hv_candidate in python3.14 python3.13 python3.12 python3 /opt/homebrew/bin/python3 /usr/local/bin/python3; do
+    if command -v "$hv_candidate" >/dev/null 2>&1 && "$hv_candidate" -c 'import sys; sys.exit(sys.version_info < (3, 12))' >/dev/null 2>&1; then
+      hv_python="$hv_candidate"
+      break
+    fi
+  done
+  if [[ -z "$hv_python" ]]; then
+    echo "HV Swim needs Python 3.12 or newer. Install it from python.org, then run this launcher again."
+    exit 1
+  fi
   echo "Preparing the private HV Swim server environment…"
-  python3 -m venv .venv || { echo; echo "Could not create the Python environment. Check that python3 is installed."; exit 1; }
+  "$hv_python" -m venv "$hv_venv" || { echo "Could not create the Python environment."; exit 1; }
 fi
 
-if [[ ! -f ".venv/.hv-ready" || "requirements.txt" -nt ".venv/.hv-ready" ]]; then
+if [[ ! -f "$hv_venv/.hv-ready" || "requirements.txt" -nt "$hv_venv/.hv-ready" ]]; then
   echo "Installing the HV Swim server components…"
-  if ! .venv/bin/python -m pip install --disable-pip-version-check -r requirements.txt; then
+  if ! "$hv_venv/bin/python" -m pip install --disable-pip-version-check -r requirements.txt; then
     echo
     echo "The install did not finish. The usual causes:"
     echo "  • no internet connection"
@@ -19,19 +31,19 @@ if [[ ! -f ".venv/.hv-ready" || "requirements.txt" -nt ".venv/.hv-ready" ]]; the
     echo "and run this file again."
     exit 1
   fi
-  touch .venv/.hv-ready
+  touch "$hv_venv/.hv-ready"
 fi
 
 # Confirm the server can actually be imported before promising anything.
-if ! .venv/bin/python -c "import uvicorn, backend.server" >/dev/null 2>&1; then
+if ! "$hv_venv/bin/python" -c "import uvicorn, backend.server" >/dev/null 2>&1; then
   echo
   echo "The components installed, but the server could not be loaded. Details:"
-  .venv/bin/python -c "import uvicorn, backend.server" 2>&1 | tail -5
+  "$hv_venv/bin/python" -c "import uvicorn, backend.server" 2>&1 | tail -5
   exit 1
 fi
 
 echo "Starting HV Swim Bendigo at http://localhost:$hv_preview_port"
-.venv/bin/python -m uvicorn backend.server:app --host 127.0.0.1 --port "$hv_preview_port" &
+"$hv_venv/bin/python" -m uvicorn backend.server:app --host 127.0.0.1 --port "$hv_preview_port" &
 hv_server_pid=$!
 trap 'kill "$hv_server_pid" 2>/dev/null' EXIT INT TERM
 

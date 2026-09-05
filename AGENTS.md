@@ -5,7 +5,8 @@ Both Claude and Codex work here. Both read this file. Keep it accurate.
 
 ## The one rule
 
-`~/Documents/GitHub/HV-Swim-School` is the only working copy.
+`~/Developer/HV-Swim-School` is the only working copy. Keep it on the Mac's local disk,
+outside iCloud Drive, Desktop and Documents. Do not recreate a second copy in Documents.
 GitHub remote: `https://github.com/U1-OS/HV-Swim-School` (private).
 
 Do **not** work in `~/.codex/.chatgpt-projects/.../hv_swim_v4` — that folder is a
@@ -38,7 +39,8 @@ Pull before you start even if you think nothing changed — the other agent may 
 pushed since you last looked. If a pull brings in conflicts, resolve them before writing
 anything new.
 
-**Push your work.** A commit that is not pushed does not exist for the other agent, and
+**Push every verified update to the private GitHub repository.** Keep credentials,
+databases and personal records local/private, never in Git history. A commit that is not pushed does not exist for the other agent, and
 has already been lost once on this project. Do not end a session on an unpushed commit.
 
 ## Handoff
@@ -113,9 +115,10 @@ Read `README.md`, `PRODUCTION_HANDOFF.md`, `MOBILE_APP_README.md` and
 Boutique swim school in California Gully, Bendigo VIC. This is paid client work, not a
 demo — build it to that standard.
 
-Live scope includes: the public site, an admin/CMS layer, enrolment operations, an
-iOS + Android app, and logo'd merch (swimwear, bottles, towels, uniforms) via
-print-on-demand. The client already uses Xero. Live local weather and daily pool
+Current scope includes the public website, role-protected operations portals and branded
+merchandise. The mobile app is paused. Enrolment begins with an enquiry; staff confirm
+placement. Lessons route through Xero, merchandise through Shopify, and uniforms stay
+inside protected staff/management pages. The client already uses Xero. Live local weather and daily pool
 temperatures are wanted on the site.
 
 A former instructor has left the business and has been removed from the site. Do not

@@ -62,7 +62,7 @@ from .security import business_date_from_timestamp, business_today, decrypt_sens
 SESSION_COOKIE = "hv_session"
 MELBOURNE_TZ = ZoneInfo("Australia/Melbourne")
 SWIMMER_SENSITIVE_FIELDS = ("emergency_contact", "medical_notes", "allergies", "medications", "support_notes")
-INCIDENT_SENSITIVE_FIELDS = ("what_happened", "injury_observed", "first_aid_applied", "further_action", "witnesses")
+INCIDENT_SENSITIVE_FIELDS = ("what_happened", "injury_observed", "first_aid_applied", "further_action", "witnesses", "first_aider", "supporting_notes")
 LOGGER = logging.getLogger("hv_swim.backend")
 DEFAULT_API_BODY_LIMIT = 2_000_000
 QUALIFICATION_API_BODY_LIMIT = 7_100_000
@@ -228,7 +228,7 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(
     title="HV Swim Bendigo Platform API",
-    version="5.12.0",
+    version="5.13.0",
     docs_url="/api/docs" if not settings.production else None,
     openapi_url="/openapi.json" if not settings.production else None,
     redoc_url=None,
@@ -651,8 +651,17 @@ class QualificationDocumentInput(BaseModel):
         return self
 
 
+class StudentSkillInput(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    swimmer_id: int = Field(ge=1)
+    skill_name: str = Field(min_length=2, max_length=100)
+    skill_status: Literal["practising", "developing", "achieved"]
+    feedback: str = Field(min_length=3, max_length=1000)
+    next_step: str = Field(default="", max_length=500)
+
+
 class IncidentReportInput(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
     swimmer_id: int = Field(ge=1)
     location_slug: str
@@ -664,6 +673,10 @@ class IncidentReportInput(BaseModel):
     further_action: str = Field(default="", max_length=2000)
     witnesses: str = Field(default="", max_length=500)
     parent_notified: bool = False
+    severity: Literal["unassessed", "minor", "moderate", "serious", "critical"] = "unassessed"
+    first_aider: str = Field(default="", max_length=200)
+    emergency_services: bool = False
+    supporting_notes: str = Field(default="", max_length=2000)
 
     @model_validator(mode="after")
     def clean_incident(self) -> "IncidentReportInput":
@@ -673,7 +686,9 @@ class IncidentReportInput(BaseModel):
 
 
 class IncidentStatusInput(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
     status: Literal["open", "follow_up", "closed"]
+    manager_review: str = Field(default="", max_length=2000)
 
 
 class AdminUserInput(BaseModel):
@@ -781,12 +796,14 @@ class ClassInput(BaseModel):
 
 
 class RosterInput(BaseModel):
-    staff_id: int
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    staff_id: int = Field(ge=1)
     location_slug: str
     shift_date: date
     start_time: TimeOfDay
     end_time: TimeOfDay
-    role_label: str = Field(default="Instructor", max_length=80)
+    role_label: str = Field(default="Instructor", min_length=1, max_length=80)
 
     @model_validator(mode="after")
     def check_shift_order(self):
@@ -818,7 +835,9 @@ class ReminderPreferencesInput(BaseModel):
 
 
 class EnquiryInput(BaseModel):
-    enquiry_type: Literal["lesson", "merchandise", "general"] = "lesson"
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    enquiry_type: Literal["lesson", "merchandise", "general", "existing_customer", "lesson_question", "private_lesson", "billing", "feedback", "other"] = "lesson"
     name: str = Field(min_length=2, max_length=100)
     email: EmailStr
     phone: str = Field(default="", max_length=40)
@@ -827,11 +846,17 @@ class EnquiryInput(BaseModel):
     program_interest: str = Field(default="", max_length=100)
     preferred_class: str = Field(default="", max_length=180)
     preferred_days: str = Field(default="", max_length=180)
-    contact_method: str = Field(default="email", max_length=30)
+    contact_method: Literal["email", "phone", "sms"] = "email"
     experience: str = Field(default="", max_length=500)
     support_needs: str = Field(default="", max_length=500)
     # Honeypot. The form renders this hidden and off-screen, so a person never fills it in.
     website: str = Field(default="", max_length=200)
+
+    @model_validator(mode="after")
+    def validate_reply_details(self):
+        if self.contact_method in {"phone", "sms"} and not 8 <= sum(character.isdecimal() for character in self.phone) <= 15:
+            raise ValueError("Enter a complete phone number for your selected reply method")
+        return self
 
 
 class EnquiryStatusInput(BaseModel):
@@ -1314,10 +1339,35 @@ def incident_reference(db: sqlite3.Connection) -> str:
 def incident_payloads(cursor: sqlite3.Cursor) -> list[dict[str, Any]]:
     payload = rows(cursor)
     for record in payload:
-        for field_name in INCIDENT_SENSITIVE_FIELDS:
-            record[field_name] = decrypt_sensitive(record.get(field_name)) or ""
+        for field_name in (*INCIDENT_SENSITIVE_FIELDS, "manager_review"):
+            if field_name in record:
+                record[field_name] = decrypt_sensitive(record[field_name]) or ""
         record["parent_notified"] = bool(record["parent_notified"])
+        if "emergency_services" in record:
+            record["emergency_services"] = bool(record["emergency_services"])
     return payload
+
+
+def skill_progress_rows(db: sqlite3.Connection, user: dict[str, Any]) -> list[dict[str, Any]]:
+    if user["role"] == "customer":
+        permitted = [row["id"] for row in db.execute("SELECT id FROM swimmers WHERE customer_id=? AND active=1", (user["id"],))]
+    else:
+        permitted = sorted({row["swimmer_id"] for row in eligible_achievement_swimmers(db, user)})
+    if not permitted:
+        return []
+    placeholders = ",".join("?" for _ in permitted)
+    result = rows(db.execute(
+        f"""SELECT p.*,s.first_name swimmer_first,s.last_name swimmer_last,s.level,
+                   TRIM(u.first_name || ' ' || u.last_name) instructor_name
+            FROM swimmer_skill_updates p JOIN swimmers s ON s.id=p.swimmer_id
+            JOIN users u ON u.id=p.recorded_by
+            WHERE p.swimmer_id IN ({placeholders}) AND p.id IN
+              (SELECT MAX(id) FROM swimmer_skill_updates GROUP BY swimmer_id,LOWER(skill_name))
+            ORDER BY s.first_name,s.last_name,p.skill_name""", tuple(permitted)))
+    for record in result:
+        record["feedback"] = decrypt_sensitive(record["feedback"])
+        record["next_step"] = decrypt_sensitive(record["next_step"])
+    return result
 
 
 def achievement_template_rows(db: sqlite3.Connection) -> list[dict[str, Any]]:
@@ -1873,7 +1923,7 @@ def renumber_waitlist(db: sqlite3.Connection, class_id: int) -> None:
 
 @app.get("/api/health")
 def health() -> dict[str, Any]:
-    return {"ok": True, "service": "HV Swim Bendigo", "version": "5.12.0", "environment": settings.app_env, "time": now_iso()}
+    return {"ok": True, "service": "HV Swim Bendigo", "version": "5.13.0", "environment": settings.app_env, "time": now_iso()}
 
 
 @app.get("/api/admin/system-health")
@@ -2331,6 +2381,11 @@ def list_classes() -> dict[str, Any]:
         return {
             "classes": output,
             "term_calendar": public_term_context(db),
+            "enrolment": {
+                "mode": "enquiry_only",
+                "url": "/enquire.html",
+                "message": "Every new lesson enrolment starts with an enquiry and is confirmed personally by HV Swim.",
+            },
             "payment": {
                 "route": "xero_invoice_workflow",
                 "status": "configuration_required",
@@ -2420,6 +2475,7 @@ def customer_achievements(user: dict[str, Any] = Depends(require_roles("customer
                    ORDER BY a.awarded_at DESC,a.id DESC"""
         return {
             "achievements": rows(db.execute(query, (user["id"],))),
+            "skill_progress": skill_progress_rows(db, user),
             "privacy": {
                 "family_visible_evidence": True,
                 "staff_notes_excluded": True,
@@ -2592,6 +2648,7 @@ def staff_achievements(user: dict[str, Any] = Depends(require_roles("staff", "ad
         return {
             "achievements": staff_achievement_rows(db, user),
             "eligible_swimmers": eligible_achievement_swimmers(db, user),
+            "skill_progress": skill_progress_rows(db, user),
             "templates": achievement_template_rows(db),
             "privacy": {
                 "evidence_note": "Family-visible certificate evidence",
@@ -2599,6 +2656,26 @@ def staff_achievements(user: dict[str, Any] = Depends(require_roles("staff", "ad
             },
             "certificate_rendering": "html_print",
         }
+
+
+@app.post("/api/staff/skill-progress")
+def record_skill_progress(payload: StudentSkillInput, request: Request, user: dict[str, Any] = Depends(require_roles("staff", "admin")), x_csrf_token: str | None = Header(default=None)) -> dict[str, Any]:
+    csrf_guard(request, user, x_csrf_token)
+    with db_session() as db:
+        db.execute("BEGIN IMMEDIATE")
+        eligible = eligible_achievement_swimmers(db, user)
+        if not any(row["swimmer_id"] == payload.swimmer_id for row in eligible):
+            raise HTTPException(status_code=404, detail="Eligible swimmer not found")
+        cursor = db.execute(
+            """INSERT INTO swimmer_skill_updates
+               (swimmer_id,skill_name,skill_status,feedback,next_step,recorded_by,recorded_at)
+               VALUES(?,?,?,?,?,?,?)""",
+            (payload.swimmer_id, payload.skill_name, payload.skill_status, encrypt_sensitive(payload.feedback),
+             encrypt_sensitive(payload.next_step), user["id"], now_iso()),
+        )
+        audit(db, user["id"], "record_skill_progress", "swimmer_skill_update", cursor.lastrowid,
+              {"swimmer_id": payload.swimmer_id, "skill_status": payload.skill_status}, client_ip(request))
+        return {"saved": True, "id": cursor.lastrowid, "family_visible": True}
 
 
 @app.post("/api/staff/achievements")
@@ -2909,7 +2986,15 @@ def customer_bookings(user: dict[str, Any] = Depends(require_roles("customer", "
                               FROM waitlist w JOIN swimmers s ON s.id=w.swimmer_id JOIN classes c ON c.id=w.class_id
                               JOIN locations l ON l.id=c.location_id WHERE {where} AND w.status='waiting'
                               ORDER BY c.weekday,c.start_time,w.position"""
-        return {"bookings": bookings, "waitlist": rows(db.execute(waitlist_query, params))}
+        return {
+            "bookings": bookings,
+            "waitlist": rows(db.execute(waitlist_query, params)),
+            "new_enrolments": {
+                "mode": "enquiry_only",
+                "url": "/enquire.html",
+                "message": "Send a lesson enquiry for every new enrolment or waitlist request.",
+            },
+        }
 
 
 @app.get("/api/customer/billing")
@@ -3087,7 +3172,8 @@ def report_customer_absence(payload: AbsenceReportInput, request: Request, user:
 
 
 @app.post("/api/customer/bookings")
-def create_booking(payload: BookingInput, request: Request, user: dict[str, Any] = Depends(require_roles("customer", "admin")), x_csrf_token: str | None = Header(default=None)) -> dict[str, Any]:
+def create_booking(payload: BookingInput, request: Request, user: dict[str, Any] = Depends(require_roles("admin")), x_csrf_token: str | None = Header(default=None)) -> dict[str, Any]:
+    """Management-only confirmation path used after the team has reviewed an enquiry."""
     csrf_guard(request, user, x_csrf_token)
     with db_session() as db:
         # Capacity is read and then written. Without an immediate write lock two requests
@@ -3099,7 +3185,7 @@ def create_booking(payload: BookingInput, request: Request, user: dict[str, Any]
             raise HTTPException(status_code=409, detail="Management must publish an active school term before accepting lesson bookings")
         swimmer = db.execute("SELECT * FROM swimmers WHERE id=?", (payload.swimmer_id,)).fetchone()
         swim_class = db.execute("SELECT * FROM classes WHERE id=? AND active=1", (payload.class_id,)).fetchone()
-        if not swimmer or (user["role"] == "customer" and swimmer["customer_id"] != user["id"]):
+        if not swimmer:
             raise HTTPException(status_code=404, detail="Swimmer not found")
         if not swim_class:
             raise HTTPException(status_code=404, detail="Class not found")
@@ -3519,6 +3605,11 @@ def create_incident_report(
             ),
         ).lastrowid
         db.execute(
+            """UPDATE incident_reports SET severity=?,first_aider=?,emergency_services=?,supporting_notes=?
+               WHERE id=?""",
+            (payload.severity, encrypted["first_aider"], int(payload.emergency_services), encrypted["supporting_notes"], incident_id),
+        )
+        db.execute(
             """INSERT INTO notifications(user_id,title,message,kind,delivery_channels,created_at)
                VALUES(?,?,?,?,?,?)""",
             (
@@ -3553,10 +3644,15 @@ def update_incident_status(
 ) -> dict[str, Any]:
     csrf_guard(request, user, x_csrf_token)
     with db_session() as db:
-        incident = db.execute("SELECT id,reference,status FROM incident_reports WHERE id=?", (incident_id,)).fetchone()
+        db.execute("BEGIN IMMEDIATE")
+        incident = db.execute("SELECT id,reference,status,manager_review FROM incident_reports WHERE id=?", (incident_id,)).fetchone()
         if not incident:
             raise HTTPException(status_code=404, detail="Incident report not found")
+        if payload.status == "closed" and not (payload.manager_review or incident["manager_review"]):
+            raise HTTPException(status_code=422, detail="Record a management review before closing an incident")
         db.execute("UPDATE incident_reports SET status=? WHERE id=?", (payload.status, incident_id))
+        if payload.manager_review:
+            db.execute("UPDATE incident_reports SET manager_review=?,reviewed_by=?,reviewed_at=? WHERE id=?", (encrypt_sensitive(payload.manager_review), user["id"], now_iso(), incident_id))
         audit(db, user["id"], "update_incident_status", "incident_report", incident_id, {"reference": incident["reference"], "from": incident["status"], "to": payload.status}, client_ip(request))
         return {"saved": True, "id": incident_id, "status": payload.status}
 
@@ -3567,7 +3663,7 @@ def customer_incidents(user: dict[str, Any] = Depends(require_roles("customer"))
         reports = incident_payloads(db.execute(
             """SELECT ir.id,ir.reference,ir.incident_at,ir.incident_type,ir.what_happened,
                       ir.injury_observed,ir.first_aid_applied,ir.further_action,ir.witnesses,
-                      ir.parent_notified,ir.status,ir.created_at,
+                      ir.parent_notified,ir.status,ir.created_at,ir.severity,ir.first_aider,ir.emergency_services,
                       s.first_name swimmer_first,s.last_name swimmer_last,s.swimmer_number,
                       family.customer_number,reporter.staff_number,
                       reporter.first_name reporter_first,reporter.last_name reporter_last,l.name location_name
@@ -4614,13 +4710,44 @@ def create_class(payload: ClassInput, request: Request, user: dict[str, Any] = D
 def create_roster(payload: RosterInput, request: Request, user: dict[str, Any] = Depends(require_roles("admin")), x_csrf_token: str | None = Header(default=None)) -> dict[str, Any]:
     csrf_guard(request, user, x_csrf_token)
     with db_session() as db:
+        db.execute("BEGIN IMMEDIATE")
         location = location_by_slug(db, payload.location_slug)
         staff = db.execute("SELECT id FROM users WHERE id=? AND role IN ('staff','admin') AND active=1", (payload.staff_id,)).fetchone()
         if not staff:
             raise HTTPException(status_code=404, detail="Staff member not found")
+        check_roster_conflict(db, payload)
         cursor = db.execute("INSERT INTO rosters(staff_id,location_id,shift_date,start_time,end_time,role_label,status) VALUES(?,?,?,?,?,?,?)", (payload.staff_id, location["id"], payload.shift_date.isoformat(), payload.start_time, payload.end_time, payload.role_label, "published"))
         audit(db, user["id"], "publish_roster_shift", "roster", cursor.lastrowid, payload.model_dump(mode="json"), client_ip(request))
         return {"id": cursor.lastrowid, "published": True}
+
+
+def check_roster_conflict(db, payload: RosterInput, excluding_id: int = 0) -> None:
+    conflict = db.execute(
+        """SELECT id FROM rosters WHERE staff_id=? AND shift_date=? AND id!=?
+           AND status='published' AND start_time<? AND end_time>? LIMIT 1""",
+        (payload.staff_id, payload.shift_date.isoformat(), excluding_id, payload.end_time, payload.start_time),
+    ).fetchone()
+    if conflict:
+        raise HTTPException(status_code=409, detail="This team member already has an overlapping shift. Review the roster before publishing.")
+
+
+@app.patch("/api/admin/roster/{roster_id}")
+def update_roster(roster_id: int, payload: RosterInput, request: Request, user: dict[str, Any] = Depends(require_roles("admin")), x_csrf_token: str | None = Header(default=None)) -> dict[str, Any]:
+    csrf_guard(request, user, x_csrf_token)
+    with db_session() as db:
+        db.execute("BEGIN IMMEDIATE")
+        previous = db.execute("SELECT * FROM rosters WHERE id=?", (roster_id,)).fetchone()
+        if not previous:
+            raise HTTPException(status_code=404, detail="Roster shift not found")
+        if previous["shift_date"] < business_today().isoformat() or payload.shift_date < business_today():
+            raise HTTPException(status_code=409, detail="Past roster shifts are preserved. Use the reviewed timesheet workflow to correct worked hours.")
+        location = location_by_slug(db, payload.location_slug)
+        if not db.execute("SELECT id FROM users WHERE id=? AND active=1 AND role IN ('staff','admin')", (payload.staff_id,)).fetchone():
+            raise HTTPException(status_code=404, detail="Staff member not found")
+        check_roster_conflict(db, payload, roster_id)
+        db.execute("UPDATE rosters SET staff_id=?,location_id=?,shift_date=?,start_time=?,end_time=?,role_label=? WHERE id=?", (payload.staff_id, location["id"], payload.shift_date.isoformat(), payload.start_time, payload.end_time, payload.role_label, roster_id))
+        audit(db, user["id"], "update_roster_shift", "roster", roster_id, {"before": dict(previous), "after": payload.model_dump(mode="json")}, client_ip(request))
+        return {"id": roster_id, "saved": True}
 
 
 @app.post("/api/admin/notifications")
@@ -5534,6 +5661,7 @@ def create_enquiry(payload: EnquiryInput, request: Request) -> dict[str, Any]:
     if payload.website.strip():
         return {"id": 0, "reference": "HV-ENQ-0000", "received": True, "message": "Thanks — the HV Swim team can now follow up with you."}
     with db_session() as db:
+        db.execute("BEGIN IMMEDIATE")
         cutoff = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
         recent = db.execute(
             "SELECT COUNT(*) FROM audit_log WHERE action='create_enquiry' AND ip_address=? AND created_at>?",
@@ -5553,9 +5681,9 @@ def create_enquiry(payload: EnquiryInput, request: Request) -> dict[str, Any]:
         if payload.enquiry_type == "merchandise":
             title = f"New merchandise enquiry · {reference}"
             message = f"{payload.name} asked about the HV Swim collection."
-        elif payload.enquiry_type == "general":
-            title = f"New general enquiry · {reference}"
-            message = f"{payload.name} sent a general HV Swim enquiry."
+        elif payload.enquiry_type not in {"lesson", "private_lesson", "lesson_question"}:
+            title = f"New {payload.enquiry_type.replace('_', ' ')} enquiry · {reference}"
+            message = f"{payload.name} sent an enquiry for team follow-up."
         else:
             swimmer = payload.swimmer_name or f"swimmer age {payload.swimmer_age or 'not supplied'}"
             program = payload.program_interest or "program match required"

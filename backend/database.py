@@ -379,6 +379,17 @@ CREATE TABLE IF NOT EXISTS notification_receipts (
   read_at TEXT NOT NULL,
   PRIMARY KEY (notification_id, user_id)
 );
+CREATE TABLE IF NOT EXISTS swimmer_skill_updates (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  swimmer_id INTEGER NOT NULL REFERENCES swimmers(id),
+  skill_name TEXT NOT NULL,
+  skill_status TEXT NOT NULL CHECK (skill_status IN ('practising','developing','achieved')),
+  feedback TEXT NOT NULL,
+  next_step TEXT NOT NULL,
+  recorded_by INTEGER NOT NULL REFERENCES users(id),
+  recorded_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_skill_progress ON swimmer_skill_updates(swimmer_id,skill_name,id);
 CREATE TABLE IF NOT EXISTS achievement_templates (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   code TEXT UNIQUE NOT NULL,
@@ -678,6 +689,18 @@ def initialise_database() -> None:
         }.items():
             if column not in enquiry_columns:
                 db.execute(f"ALTER TABLE enquiries ADD COLUMN {column} {definition}")
+        incident_columns = {row[1] for row in db.execute("PRAGMA table_info(incident_reports)")}
+        for column, definition in {
+            "severity": "TEXT NOT NULL DEFAULT 'unassessed'",
+            "first_aider": "TEXT",
+            "emergency_services": "INTEGER NOT NULL DEFAULT 0",
+            "supporting_notes": "TEXT",
+            "manager_review": "TEXT",
+            "reviewed_by": "INTEGER REFERENCES users(id)",
+            "reviewed_at": "TEXT",
+        }.items():
+            if column not in incident_columns:
+                db.execute(f"ALTER TABLE incident_reports ADD COLUMN {column} {definition}")
         product_columns = {row[1] for row in db.execute("PRAGMA table_info(products)")}
         for column, definition in {
             "sample_status": "TEXT NOT NULL DEFAULT 'not_ordered'",
@@ -936,7 +959,7 @@ def initialise_database() -> None:
             db.execute("INSERT OR IGNORE INTO integration_connections(provider,status,metadata,updated_at) VALUES(?,?,?,?)", (provider, "not_connected", "{}", created))
         site_defaults = {
             "announcement_enabled": "0",
-            "announcement_text": "Enrolments are open — ask about the best lesson for your swimmer.",
+            "announcement_text": "Lesson enquiries are open — ask about the best class for your swimmer.",
             "enrolment_status": "open",
             "hero_eyebrow": "Bendigo's confidence-first swim school",
             "hero_heading": "Confidence starts",
@@ -947,6 +970,11 @@ def initialise_database() -> None:
             "feature_association_badges": "0",
         }
         db.executemany("INSERT OR IGNORE INTO site_settings(key,value,updated_at) VALUES(?,?,?)", [(key, value, created) for key, value in site_defaults.items()])
+        db.execute(
+            """UPDATE site_settings SET value=?,updated_at=?
+               WHERE key='announcement_text' AND value='Enrolments are open — ask about the best lesson for your swimmer.'""",
+            (site_defaults["announcement_text"], created),
+        )
         achievement_templates = [
             ("first-splash", "First Splash", "Celebrating a brave, positive start and a swimmer's first confident steps with HV Swim.", "sunrise-ripple", "wave", 10, created),
             ("water-confidence", "Water Confidence", "Recognising calm, growing confidence and a positive connection with the water.", "calm-current", "spark", 20, created),

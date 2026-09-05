@@ -1,12 +1,23 @@
-# HV Swim Bendigo V5.12.0 Premium Platform
+# HV Swim Bendigo V5.13.0 Premium Platform
 
 Premium public website and connected operations platform for HV Swim Bendigo. The build combines a polished responsive front end with a FastAPI service, role-based accounts and a SQLite preview database. SQLite is not approved for the final production deployment that will store customer, child or payroll data.
 
 ## Preview on this Mac
 
+The working copy lives at `/Users/u1/Developer/HV-Swim-School`, outside iCloud-synced
+Desktop/Documents. Keep tested changes in the private `U1-OS/HV-Swim-School` GitHub repo;
+do not upload `.env`, databases, certificates or customer records. The earlier Documents
+location is retired, not a second working copy.
+
 Double-click `start-hv-swim.command`, then use the Start Here page that opens in your default browser. On first launch, macOS may ask you to confirm opening the file. Keep the Terminal window open while previewing; close it to stop the local server.
 
-The launcher creates its own Python environment and installs the pinned dependencies on first use. It starts the site at `http://127.0.0.1:8765` and opens `START_HERE.html`. Production uses Python 3.12 or newer; the GitHub quality workflow verifies that baseline.
+The launcher requires Python 3.12 or newer and creates `.venv312` on first use, leaving
+any older `.venv` intact. It starts the site at `http://127.0.0.1:8765` and opens
+`START_HERE.html`. The GitHub quality workflow verifies Python 3.12.
+
+See `PREMIUM_V2_UPGRADE_REPORT.md` for the September review, validation evidence and
+remaining launch gates. Development previews are explicitly labelled; sample accounts,
+capacity and timetable data must not be represented as live business records.
 
 ## Main files
 
@@ -50,7 +61,7 @@ Demo credentials only work while `HV_APP_ENV=development`. Production mode disab
 - Real Google and Apple OpenID Connect foundation for family sign-up/sign-in, with
   PKCE/state/nonce protection, verified server-side identity tokens and provider tokens
   deliberately excluded from storage; staff and management identities remain invitation-only
-- Family swimmers, editable emergency/allergy/medication/support profiles encrypted at rest, class availability, bookings, cancellations, waitlists and notices
+- Family swimmers, editable emergency/allergy/medication/support profiles encrypted at rest, enquiry-first class preferences, existing lesson and waitlist visibility, cancellations and notices
 - Automatic permanent family (`HVS-…`) and student (`HVS-S-…`) numbers, guaranteed again at lesson purchase and snapshotted into the Xero lesson-charge record so website, family, student and accounting records can be reconciled
 - Management lesson-invoice ledger with grouped unbilled charges, local draft/approval controls, duplicate-charge protection, immutable event history and a deliberately gated Xero DRAFT-invoice handoff; families see only approved invoices and confirmed payment status
 - Atomic invoice creation, approval and outbound claims plus strict Xero invoice-ID, DRAFT
@@ -58,13 +69,13 @@ Demo credentials only work while `HV_APP_ENV=development`. Production mode disab
   responses move the record to manual review instead of changing the family ledger
 - Family absence reporting against the active term calendar, with a visible two-credit
   allowance per swimmer and an explicit no-make-up/no-automatic-refund boundary
-- Filtered family class finder with live capacity meters and visible waitlist positions
+- Filtered family lesson finder with live capacity meters and enquiry links; families cannot self-enrol or join a waitlist from the portal
 - Staff clock-on/clock-off with break recording, manual weekly/daily hour entry, permanent worker numbers, management approval, rosters, pool checks, achievements and private certificate-document tracking
 - Role-protected incident/injury reporting linked to the family, student and worker numbers, with encrypted sensitive narratives, family-visible references and management follow-up status
 - Date-based staff lesson registers with attendance, family-reported absence status,
   parent/guardian-on-site enforcement, photo-clearance snapshots and privacy-limited notes
 - Source-labelled management dashboard with class utilisation, enquiry workload, hours pipeline and pool readiness
-- Management enrolment desk with today's run sheet, weekly capacity board and audited waitlist promotion
+- Management enquiry-to-enrolment desk with today's run sheet, weekly capacity board and audited waitlist promotion after personal review
 - Management term operations with draft/active/closed calendars, absence-credit ledger,
   term-aware “today” schedules and all-staff lesson-register oversight
 - Responsive, searchable website navigation tailored to family, staff and management roles
@@ -72,7 +83,7 @@ Demo credentials only work while `HV_APP_ENV=development`. Production mode disab
 - Safe CSV exports for enquiries, staff hours and the merchandise catalogue
 - Staff-verified water temperatures, opening checklists and public condition updates
 - Management metrics, roster/class creation, timesheet approvals, communications and audit trail
-- Management website editor for the homepage announcement, enrolment status, hero message
+- Management website editor for the homepage announcement, lesson-enquiry status, hero message
   and primary call-to-action, plus server-enforced release gates for merchandise and
   third-party qualification/member marks
 - Protected association-artwork register with PNG validation, SHA-256 integrity checks,

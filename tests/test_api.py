@@ -81,6 +81,104 @@ def make_test_png_base64(width=64, height=64):
 
 # --- public surface -------------------------------------------------------------------
 
+def test_skill_progress_preserves_history_encryption_and_role_boundaries(client):
+    from backend.database import db_session
+    client.cookies.clear()
+    sign_in(client, FAMILY)
+    swimmer_id = client.get("/api/customer/swimmers").json()["swimmers"][0]["id"]
+    payload = {"swimmer_id": swimmer_id, "skill_name": "QA supported float", "skill_status": "practising",
+               "feedback": "Practised a calm supported float.", "next_step": "Continue with instructor support."}
+    assert client.post("/api/staff/skill-progress", json=payload).status_code == 403
+    client.cookies.clear()
+    staff_csrf = sign_in(client, STAFF)
+    assert client.post("/api/staff/skill-progress", json=payload | {"swimmer_id": 999999}, headers={"X-CSRF-Token": staff_csrf}).status_code == 404
+    client.cookies.clear()
+    csrf = sign_in(client, ADMIN)
+    first = client.post("/api/staff/skill-progress", json=payload, headers={"X-CSRF-Token": csrf})
+    assert first.status_code == 200, first.text
+    second = client.post("/api/staff/skill-progress", json=payload | {"skill_status": "achieved"}, headers={"X-CSRF-Token": csrf})
+    assert second.status_code == 200
+    with db_session() as db:
+        records = db.execute("SELECT feedback,next_step FROM swimmer_skill_updates WHERE swimmer_id=? AND skill_name=?", (swimmer_id, payload["skill_name"])).fetchall()
+        assert len(records) == 2
+        assert all(row["feedback"].startswith("enc:v1:") and row["next_step"].startswith("enc:v1:") for row in records)
+    client.cookies.clear()
+    sign_in(client, FAMILY)
+    current = client.get("/api/customer/achievements").json()["skill_progress"]
+    assert len([row for row in current if row["skill_name"] == payload["skill_name"]]) == 1
+    assert current[0]["skill_status"] == "achieved"
+    assert current[0]["feedback"] == payload["feedback"]
+
+
+def test_enquiry_reply_validation_and_categories(client):
+    from backend.server import EnquiryInput, IncidentReportInput
+    from pydantic import ValidationError
+
+    for kind in ("lesson", "existing_customer", "lesson_question", "private_lesson", "billing", "merchandise", "feedback", "other"):
+        parsed = EnquiryInput(name="  Test Parent  ", email="qa@example.com", enquiry_type=kind)
+        assert parsed.name == "Test Parent"
+    for override in ({"name": "   "}, {"contact_method": "carrier_pigeon"}, {"contact_method": "phone"}, {"contact_method": "sms", "phone": "abcdefgh"}):
+        with pytest.raises(ValidationError):
+            EnquiryInput(**({"name": "QA Parent", "email": "qa@example.com"} | override))
+    assert EnquiryInput(name="QA Parent", email="qa@example.com", contact_method="phone", phone="+61 413 462 112").phone
+    with pytest.raises(ValidationError):
+        IncidentReportInput(swimmer_id=1, location_slug="wood-street", incident_at=datetime.now(timezone.utc), incident_type="injury", what_happened=" " * 12)
+
+
+def test_roster_conflicts_edits_and_permissions(client):
+    client.cookies.clear()
+    csrf = sign_in(client, ADMIN)
+    staff = client.get("/api/admin/staff").json()["staff"][0]
+    payload = {"staff_id": staff["id"], "location_slug": "wood-street", "shift_date": "2099-05-04",
+               "start_time": "09:00", "end_time": "11:00", "role_label": "QA instructor"}
+    headers = {"X-CSRF-Token": csrf}
+    first = client.post("/api/admin/roster", json=payload, headers=headers)
+    assert first.status_code == 200, first.text
+    assert client.post("/api/admin/roster", json=payload | {"location_slug": "bendigo-east"}, headers=headers).status_code == 409
+    adjacent = client.post("/api/admin/roster", json=payload | {"start_time": "11:00", "end_time": "12:00"}, headers=headers)
+    assert adjacent.status_code == 200, adjacent.text
+    route = f"/api/admin/roster/{first.json()['id']}"
+    assert client.patch(route, json=payload | {"end_time": "11:30"}, headers=headers).status_code == 409
+    assert client.patch(route, json=payload | {"end_time": "10:30"}, headers=headers).status_code == 200
+    assert client.patch(route, json=payload | {"shift_date": "2000-01-01"}, headers=headers).status_code == 409
+    assert client.patch(route, json=payload).status_code == 403
+    client.cookies.clear()
+    staff_csrf = sign_in(client, STAFF)
+    assert client.patch(route, json=payload, headers={"X-CSRF-Token": staff_csrf}).status_code == 403
+
+
+def test_incident_review_is_encrypted_and_excluded_from_family(client):
+    from backend.database import db_session
+    client.cookies.clear()
+    sign_in(client, FAMILY)
+    swimmer = client.get("/api/customer/swimmers").json()["swimmers"][0]
+    client.cookies.clear()
+    staff_csrf = sign_in(client, STAFF)
+    payload = {"swimmer_id": swimmer["id"], "location_slug": "wood-street",
+               "incident_at": datetime.now(timezone.utc).isoformat(), "incident_type": "near_miss",
+               "what_happened": "QA record: child stopped at the pool edge.", "severity": "moderate",
+               "first_aider": "QA instructor", "supporting_notes": "Staff-only QA handover",
+               "emergency_services": True}
+    created = client.post("/api/staff/incidents", json=payload, headers={"X-CSRF-Token": staff_csrf})
+    assert created.status_code == 200, created.text
+    incident_id = created.json()["id"]
+    route = f"/api/admin/incidents/{incident_id}"
+    assert client.patch(route, json={"status": "closed"}, headers={"X-CSRF-Token": staff_csrf}).status_code == 403
+    client.cookies.clear()
+    csrf = sign_in(client, ADMIN)
+    assert client.patch(route, json={"status": "closed"}, headers={"X-CSRF-Token": csrf}).status_code == 422
+    assert client.patch(route, json={"status": "closed", "manager_review": "Reviewed for QA, follow-up complete."}, headers={"X-CSRF-Token": csrf}).status_code == 200
+    with db_session() as db:
+        row = db.execute("SELECT first_aider,supporting_notes,manager_review,reviewed_by,reviewed_at FROM incident_reports WHERE id=?", (incident_id,)).fetchone()
+        assert all(row[field].startswith("enc:v1:") for field in ("first_aider", "supporting_notes", "manager_review"))
+        assert row["reviewed_by"] and row["reviewed_at"]
+    client.cookies.clear()
+    sign_in(client, FAMILY)
+    report = next(item for item in client.get("/api/customer/incidents").json()["reports"] if item["id"] == incident_id)
+    assert report["severity"] == "moderate" and report["emergency_services"] is True
+    assert report["first_aider"] == "QA instructor"
+    assert "supporting_notes" not in report and "manager_review" not in report
+
 def test_health_is_public(client):
     response = client.get("/api/health")
     assert response.status_code == 200
@@ -633,7 +731,7 @@ def test_confirmed_lesson_creates_xero_only_billing_record(client):
     from backend.database import db_session
 
     client.cookies.clear()
-    csrf = sign_in(client, FAMILY)
+    sign_in(client, FAMILY)
     swimmers = client.get("/api/customer/swimmers").json()["swimmers"]
     classes = client.get("/api/classes").json()["classes"]
     with db_session() as db:
@@ -642,6 +740,8 @@ def test_confirmed_lesson_creates_xero_only_billing_record(client):
     with db_session() as db:
         db.execute("UPDATE users SET customer_number=NULL WHERE id=?", (pair[1]["customer_id"],))
         db.execute("UPDATE swimmers SET swimmer_number=NULL WHERE id=?", (pair[1]["id"],))
+    client.cookies.clear()
+    csrf = sign_in(client, ADMIN)
     response = client.post(
         "/api/customer/bookings",
         json={"class_id": pair[0]["id"], "swimmer_id": pair[1]["id"]},
@@ -1213,7 +1313,7 @@ def test_family_can_update_owned_child_safety_profile_without_auditing_health_te
     assert allergy_text not in audit_detail
 
 
-def test_family_cannot_book_a_swimmer_it_does_not_own(client):
+def test_family_cannot_create_any_booking_or_waitlist_request(client):
     client.cookies.clear()
     csrf = sign_in(client, FAMILY)
     response = client.post(
@@ -1221,7 +1321,12 @@ def test_family_cannot_book_a_swimmer_it_does_not_own(client):
         json={"class_id": 1, "swimmer_id": 999999},
         headers={"X-CSRF-Token": csrf},
     )
-    assert response.status_code in (403, 404), response.text
+    assert response.status_code == 403, response.text
+    classes = client.get("/api/classes").json()
+    lessons = client.get("/api/customer/bookings").json()
+    assert classes["enrolment"]["mode"] == "enquiry_only"
+    assert lessons["new_enrolments"]["mode"] == "enquiry_only"
+    assert classes["enrolment"]["url"] == lessons["new_enrolments"]["url"] == "/enquire.html"
 
 
 def test_hv_achievement_templates_are_complete_and_authenticated(client):
@@ -1978,11 +2083,13 @@ def test_large_assets_are_compressed_for_mobile_delivery(client):
 def test_a_swimmer_cannot_be_booked_twice_into_the_same_class(client):
     """Guarded in application code and by a unique index, so a race cannot slip past."""
     client.cookies.clear()
-    csrf = sign_in(client, FAMILY)
-    swimmers = client.get("/api/customer/swimmers").json()["swimmers"]
+    from backend.database import db_session
+
+    csrf = sign_in(client, ADMIN)
+    with db_session() as db:
+        swimmer_id = db.execute("SELECT id FROM swimmers WHERE active=1 ORDER BY id LIMIT 1").fetchone()["id"]
     classes = client.get("/api/classes").json()["classes"]
-    assert swimmers and classes, "seed data is missing"
-    swimmer_id = swimmers[0]["id"]
+    assert swimmer_id and classes, "seed data is missing"
     target = next((c for c in classes if c["available"] > 0), classes[0])
     headers = {"X-CSRF-Token": csrf}
     body = {"class_id": target["id"], "swimmer_id": swimmer_id}
@@ -1996,14 +2103,17 @@ def test_a_swimmer_cannot_be_booked_twice_into_the_same_class(client):
 def test_booking_a_full_class_offers_the_waitlist_rather_than_overfilling(client):
     """Class capacity encodes the instructor-to-swimmer ratio, so it must never be exceeded."""
     client.cookies.clear()
-    csrf = sign_in(client, FAMILY)
-    swimmers = client.get("/api/customer/swimmers").json()["swimmers"]
+    from backend.database import db_session
+
+    csrf = sign_in(client, ADMIN)
+    with db_session() as db:
+        swimmers = [row["id"] for row in db.execute("SELECT id FROM swimmers WHERE active=1 ORDER BY id")]
     full = [c for c in client.get("/api/classes").json()["classes"] if c["available"] == 0]
     if not full or not swimmers:
         pytest.skip("no full class in the seed data")
     response = client.post(
         "/api/customer/bookings",
-        json={"class_id": full[0]["id"], "swimmer_id": swimmers[-1]["id"]},
+        json={"class_id": full[0]["id"], "swimmer_id": swimmers[-1]},
         headers={"X-CSRF-Token": csrf},
     )
     assert response.status_code in (200, 409)
@@ -2011,7 +2121,9 @@ def test_booking_a_full_class_offers_the_waitlist_rather_than_overfilling(client
         assert response.json()["status"] == "waitlisted"
 
 
-def test_a_family_can_cancel_rebook_and_cancel_the_same_class(client):
+def test_management_can_confirm_after_enquiry_and_family_can_cancel(client):
+    from backend.database import db_session
+
     client.cookies.clear()
     admin_csrf = sign_in(client, ADMIN)
     staff = client.get("/api/admin/staff").json()["staff"]
@@ -2033,17 +2145,24 @@ def test_a_family_can_cancel_rebook_and_cancel_the_same_class(client):
     )
     assert create.status_code == 200, create.text
 
-    client.cookies.clear()
-    family_csrf = sign_in(client, FAMILY)
-    swimmer_id = client.get("/api/customer/swimmers").json()["swimmers"][0]["id"]
+    with db_session() as db:
+        swimmer_id = db.execute("SELECT id FROM swimmers WHERE active=1 ORDER BY id LIMIT 1").fetchone()["id"]
     body = {"class_id": create.json()["id"], "swimmer_id": swimmer_id}
-    headers = {"X-CSRF-Token": family_csrf}
+    headers = {"X-CSRF-Token": admin_csrf}
     first = client.post("/api/customer/bookings", json=body, headers=headers)
     assert first.status_code == 200, first.text
-    assert client.delete(f"/api/customer/bookings/{first.json()['booking_id']}", headers=headers).status_code == 200
+    client.cookies.clear()
+    family_csrf = sign_in(client, FAMILY)
+    family_headers = {"X-CSRF-Token": family_csrf}
+    assert client.delete(f"/api/customer/bookings/{first.json()['booking_id']}", headers=family_headers).status_code == 200
+    client.cookies.clear()
+    admin_csrf = sign_in(client, ADMIN)
+    headers = {"X-CSRF-Token": admin_csrf}
     second = client.post("/api/customer/bookings", json=body, headers=headers)
     assert second.status_code == 200, second.text
-    assert client.delete(f"/api/customer/bookings/{second.json()['booking_id']}", headers=headers).status_code == 200
+    client.cookies.clear()
+    family_csrf = sign_in(client, FAMILY)
+    assert client.delete(f"/api/customer/bookings/{second.json()['booking_id']}", headers={"X-CSRF-Token": family_csrf}).status_code == 200
 
 
 def test_lesson_invoice_requires_local_review_and_never_blindly_syncs_to_xero(client):
@@ -2071,13 +2190,12 @@ def test_lesson_invoice_requires_local_review_and_never_blindly_syncs_to_xero(cl
     )
     assert created_class.status_code == 200, created_class.text
 
-    client.cookies.clear()
-    family_csrf = sign_in(client, FAMILY)
-    swimmer_id = client.get("/api/customer/swimmers").json()["swimmers"][0]["id"]
+    with db_session() as db:
+        swimmer_id = db.execute("SELECT id FROM swimmers WHERE active=1 ORDER BY id LIMIT 1").fetchone()["id"]
     booking = client.post(
         "/api/customer/bookings",
         json={"class_id": created_class.json()["id"], "swimmer_id": swimmer_id},
-        headers={"X-CSRF-Token": family_csrf},
+        headers={"X-CSRF-Token": admin_csrf},
     )
     assert booking.status_code == 200, booking.text
     assert booking.json()["payment"]["provider"] == "Xero"

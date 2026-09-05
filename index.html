@@ -21,11 +21,11 @@
   <link rel="icon" href="assets/app-icon-v3-64.png">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="assets/app-icon-v3-180.png">
-  <link rel="stylesheet" href="assets/styles.css?v=5.11.0-ui7">
-  <link rel="stylesheet" href="assets/support.css?v=5.11.0-ui7">
-  <script defer src="assets/app.js?v=5.11.0-ui7"></script>
-  <script defer src="assets/support.js?v=5.11.0-ui7"></script>
-  <script defer src="assets/public-api.js?v=5.11.0-ui7"></script>
+  <link rel="stylesheet" href="assets/styles.css?v=5.13.0-ui11">
+  <link rel="stylesheet" href="assets/support.css?v=5.13.0-ui11">
+  <script defer src="assets/app.js?v=5.13.0-ui11"></script>
+  <script defer src="assets/support.js?v=5.13.0-ui11"></script>
+  <script defer src="assets/public-api.js?v=5.13.0-ui11"></script>
   <script type="application/ld+json">{
   "@context": "https://schema.org",
   "@type": "SportsActivityLocation",
@@ -76,7 +76,7 @@
       </div>
     </div>
   </header>
-  <div class="site-announcement" id="site-announcement" hidden><div class="container"><span class="site-announcement-status" id="site-enrolment-status">Enrolments open</span><strong id="site-announcement-text">Enrolments are open — ask about the best lesson for your swimmer.</strong><a href="enquire.html">Enquire now →</a></div></div>
+  <div class="site-announcement" id="site-announcement" hidden><div class="container"><span class="site-announcement-status" id="site-enrolment-status">Lesson enquiries open</span><strong id="site-announcement-text">Lesson enquiries are open — ask about the best class for your swimmer.</strong><a href="enquire.html">Enquire now →</a></div></div>
 
   <main id="main-content">
     <section class="hero">
@@ -144,7 +144,7 @@
           <h2>A place where every swimmer can belong.</h2>
           <p class="lead" style="margin-top:22px">Led by Laura, HV Swim Bendigo brings experienced, confidence-led teaching to a warm, supportive swim-school community. Lessons focus on sound technique and practical water safety — never one-size-fits-all progress.</p>
           <div class="stat-row">
-            <div class="stat"><strong>4m+</strong><span>Programs from infant aquatics through to adults</span></div>
+            <div class="stat"><strong data-counter="4" data-suffix="m+">4m+</strong><span>Programs from infant aquatics through to adults</span></div>
             <div class="stat"><strong>1:1</strong><span>Private tuition available for focused support</span></div>
             <div class="stat"><strong>Small</strong><span>Group sizes for personal, confidence-led support</span></div>
           </div>
@@ -201,9 +201,62 @@
       </div>
     </section>
 
+    <section class="section community-stories-section" id="stories">
+      <div class="container">
+        <div class="section-head reveal">
+          <div>
+            <div class="eyebrow">Every swimmer has a starting point</div>
+            <h2>Confidence in every splash.</h2>
+            <p class="lead" style="margin-top:16px">Progress looks different for everyone. Talk with the team about a personal goal, then celebrate each step at the swimmer’s own pace.</p>
+          </div>
+        </div>
+        <div class="community-grid">
+          <article class="community-card reveal">
+            <div class="community-card-head">
+              <span class="community-avatar" aria-hidden="true">01</span>
+              <div>
+                <strong>Feel comfortable in the water</strong>
+                <small>Infant Aquatics to Learn to Swim</small>
+              </div>
+            </div>
+            <p>A positive first step might be entering the pool calmly, getting comfortable with splashes or practising a supported float. Share what helps your child feel settled.</p>
+            <div class="community-milestone">
+              <span class="milestone-badge">Confidence at their pace</span>
+            </div>
+          </article>
+          <article class="community-card reveal">
+            <div class="community-card-head">
+              <span class="community-avatar" aria-hidden="true">02</span>
+              <div>
+                <strong>Build on the foundations</strong>
+                <small>Stroke Development</small>
+              </div>
+            </div>
+            <p>Talk with your instructor about breathing, body position and stroke technique. Clear feedback helps swimmers understand what to practise next, without comparing themselves with others.</p>
+            <div class="community-milestone">
+              <span class="milestone-badge">Skills, not competition</span>
+            </div>
+          </article>
+          <article class="community-card reveal">
+            <div class="community-card-head">
+              <span class="community-avatar" aria-hidden="true">03</span>
+              <div>
+                <strong>Make space for personal goals</strong>
+                <small>Private 1:1 Coaching</small>
+              </div>
+            </div>
+            <p>Whether you are starting swimming or returning to the pool, tell the team about your confidence, communication preferences and goals so they can discuss suitable support.</p>
+            <div class="community-milestone">
+              <span class="milestone-badge">A personal starting point</span>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
     <section class="section faq-section">
       <div class="container faq-layout">
-        <div class="reveal"><div class="eyebrow">Helpful answers</div><h2>Before you dive in.</h2><p class="lead" style="margin-top:18px">Clear answers for families choosing a program, preparing for lessons or checking a venue.</p><a class="text-link" href="enquire.html" style="margin-top:24px">Still have a question?</a></div>
+        <div class="reveal"><div class="eyebrow">Helpful answers</div><h2>Before you dive in.</h2><p class="lead" style="margin-top:18px">Clear answers for families choosing a program, preparing for lessons or checking a venue.</p><div class="faq-search-wrap" style="margin-top:24px"><input class="input faq-search-input" id="faq-search" type="search" placeholder="Search questions (e.g. fees, private, absences)..." aria-label="Search questions"></div><a class="text-link" href="enquire.html" style="margin-top:20px;display:inline-block">Still have a question?</a></div>
         <div class="faq-list reveal">
           <details open><summary>What age can swimmers start?<span>+</span></summary><p>HV Swim's pathway begins from approximately four months with a parent or carer, and continues through children, teens and adults.</p></details>
           <details><summary>Are private lessons available?<span>+</span></summary><p>Yes. One-on-one tuition can support specific goals, confidence, communication preferences or a more individual pace.</p></details>

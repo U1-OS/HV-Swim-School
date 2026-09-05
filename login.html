@@ -5,7 +5,7 @@
   <meta name="description" content="Secure sign in for the HV Swim Bendigo family, staff and management platform.">
   <title>Sign in | HV Swim Bendigo</title>
   <link rel="icon" href="assets/app-icon-v3-64.png"><link rel="apple-touch-icon" href="assets/app-icon-v3-180.png"><link rel="manifest" href="manifest.webmanifest">
-  <link rel="stylesheet" href="assets/styles.css?v=5.11.0-ui7"><link rel="stylesheet" href="assets/platform.css?v=5.11.0-ui7"><link rel="stylesheet" href="assets/support.css?v=5.11.0-ui7"><script defer src="assets/platform.js?v=5.11.0-ui7"></script><script defer src="assets/support.js?v=5.11.0-ui7"></script>
+  <link rel="stylesheet" href="assets/styles.css?v=5.13.0-ui11"><link rel="stylesheet" href="assets/platform.css?v=5.13.0-ui11"><link rel="stylesheet" href="assets/support.css?v=5.13.0-ui11"><script defer src="assets/platform.js?v=5.13.0-ui11"></script><script defer src="assets/support.js?v=5.13.0-ui11"></script>
 </head>
 <body data-platform-page="login">
   <a class="skip-link" href="#main-content">Skip to main content</a>
@@ -34,7 +34,7 @@
           <p class="social-legal">By continuing, you agree to the <a href="terms.html">terms</a> and acknowledge the <a href="privacy.html">privacy policy</a>.</p>
         </section>
         <div class="signin-divider" id="signin-divider"><span>or use email and password</span></div>
-        <form class="auth-form" id="login-form">
+        <form class="auth-form" id="login-form" method="post" action="/api/auth/login">
           <div class="field"><label for="login-email">Email</label><input class="input" id="login-email" name="email" type="email" autocomplete="username" required></div>
           <div class="field"><label for="login-password">Password</label><div class="password-wrap"><input class="input" id="login-password" name="password" type="password" autocomplete="current-password" required minlength="8"><button class="password-toggle" type="button" id="password-toggle">Show</button></div></div>
           <button class="btn btn-blue" type="submit" id="login-submit">Sign in securely</button>

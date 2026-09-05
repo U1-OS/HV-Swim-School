@@ -22,11 +22,11 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="assets/app-icon-v3-180.png">
   <link rel="preload" as="image" href="assets/hero-enquire-v4.jpg" fetchpriority="high">
-  <link rel="stylesheet" href="assets/styles.css?v=5.11.0-ui7">
-  <link rel="stylesheet" href="assets/support.css?v=5.11.0-ui7">
-  <script defer src="assets/app.js?v=5.11.0-ui7"></script>
-  <script defer src="assets/support.js?v=5.11.0-ui7"></script>
-  <script defer src="assets/enquire.js?v=5.11.0-ui7"></script>
+  <link rel="stylesheet" href="assets/styles.css?v=5.13.0-ui11">
+  <link rel="stylesheet" href="assets/support.css?v=5.13.0-ui11">
+  <script defer src="assets/app.js?v=5.13.0-ui11"></script>
+  <script defer src="assets/support.js?v=5.13.0-ui11"></script>
+  <script defer src="assets/enquire.js?v=5.13.0-ui11"></script>
 </head>
 <body data-page="enquire">
   <a class="skip-link" href="#main-content">Skip to main content</a>
@@ -51,6 +51,7 @@
         </aside>
 
         <form class="enrolment-wizard reveal" id="enrolment-wizard" novalidate>
+          <div class="field full enquiry-category"><label for="enquiry-type">How can we help?</label><select id="enquiry-type" name="enquiry_type"><option value="lesson">New enrolment enquiry</option><option value="existing_customer">Existing customer</option><option value="lesson_question">Lesson question</option><option value="private_lesson">Private lessons</option><option value="billing">Billing</option><option value="merchandise">Merchandise</option><option value="feedback">Feedback</option><option value="other">Other</option></select><p class="field-hint">Lesson enquiries are reviewed personally. For other questions, go straight to your contact details.</p></div>
           <div class="enrolment-topline"><span id="wizard-step-label" aria-live="polite">Step 1 of 4</span><div id="wizard-progress-track" role="progressbar" aria-label="Enquiry progress" aria-valuemin="1" aria-valuemax="4" aria-valuenow="1" aria-valuetext="Step 1 of 4"><i id="wizard-progress-bar"></i></div></div>
           <div class="enquiry-draft-notice" id="enquiry-draft-notice" role="status" hidden><span aria-hidden="true">✓</span><p><strong>Lesson preferences restored.</strong> We kept only non-contact choices from this browser tab. Names and contact details are never saved here.</p><button type="button" id="enquiry-draft-clear">Start again</button></div>
 

@@ -37,7 +37,7 @@ def expect(label, condition):
 def main():
     public = urllib.request.build_opener()
     status, health = request(public, "/api/health")
-    expect("health endpoint", status == 200 and health.get("version") == "5.12.0")
+    expect("health endpoint", status == 200 and health.get("version") == "5.13.0")
     status, account_providers = request(public, "/api/auth/oauth/providers")
     expect(
         "family Google and Apple account boundary",
@@ -53,11 +53,14 @@ def main():
     programs_page = public.open(BASE + "/programs.html", timeout=30).read().decode("utf-8")
     expect("premium programs and pricing page", "Every swimmer has" in programs_page and "Guided lesson matcher" in programs_page and "program-availability" in programs_page)
     shop_page = public.open(BASE + "/shop.html", timeout=30).read().decode("utf-8")
+    shop_script = public.open(BASE + "/assets/shop.js", timeout=30).read().decode("utf-8")
     expect("premium commerce storefront", "Shopping bag" in shop_page and "The right maker for every item" in shop_page and "shop-load-more" in shop_page and "cart-drawer" in shop_page)
     expect("embroidered towels and POD shop", "The towel edit" in shop_page and "POD family wear" in shop_page and "Printify → Shopify" in shop_page)
-    expect("guided merchandise kit builder", "First Splash Kit" in shop_page and "Lesson Day Kit" in shop_page and "data-kit-add" in shop_page and "Size it, care for it" in shop_page)
+    expect("guided merchandise kit builder", "First Splash Kit" in shop_script and "Lesson Day Kit" in shop_script and "data-kit-add" in shop_script and "Size it, care for it" in shop_page)
     enquire_page = public.open(BASE + "/enquire.html", timeout=30).read().decode("utf-8")
-    expect("guided enrolment concierge", "Four clear steps" in enquire_page and "wizard-class-grid" in enquire_page and "enrolment-success" in enquire_page)
+    expect("guided lesson enquiry", "Four clear steps" in enquire_page and "wizard-class-grid" in enquire_page and "No instant booking" in enquire_page)
+    platform_script = public.open(BASE + "/assets/platform.js", timeout=30).read().decode("utf-8")
+    expect("family enrolment is enquiry-only", "No online enrolment" in platform_script and "Enquire about this class" in platform_script and "data-action=\"book-class\"" not in platform_script)
     for paused_path in ("/app.html", "/mobile-shell.html"):
         try:
             public.open(BASE + paused_path, timeout=30)

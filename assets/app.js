@@ -58,7 +58,7 @@
       const response = await fetch(url, { ...options, signal:controller.signal });
       let payload = null;
       try { payload = await response.json(); } catch (_) {}
-      if (!response.ok) throw new Error(payload?.detail || `Request failed (${response.status})`);
+      if (!response.ok) throw new Error(errorMessage(payload?.detail, response.status));
       return payload;
     } finally {
       window.clearTimeout(timer);
@@ -72,7 +72,11 @@
     requestCache.set(url, pending);
     return pending;
   }
-  window.HVSwim = Object.assign(window.HVSwim || {}, { fetchJSON, formatClassTime, formatDateTime });
+  function errorMessage(detail,status) {
+    if(Array.isArray(detail))return detail.map(item=>`${(item.loc||[]).filter(part=>part!=='body').join(' ').replaceAll('_',' ')}: ${item.msg||'Check this value'}`).join('. ');
+    return typeof detail==='string'?detail:`Request failed (${status}). Please try again.`;
+  }
+  window.HVSwim = Object.assign(window.HVSwim || {}, { fetchJSON, formatClassTime, formatDateTime, errorMessage });
 
   const escapePublic = value => String(value ?? '').replace(/[&<>'"]/g, character => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[character]));
   async function hydrateAssociationBadges() {
@@ -100,6 +104,12 @@
       const payload = await fetchJSON('/api/public/site-settings', { headers:{ Accept:'application/json' } });
       const mode = payload.mode === 'preview' ? 'preview' : 'production';
       document.documentElement.dataset.siteMode = mode;
+      if(mode==='preview'&&!document.body.dataset.platformPage&&!document.querySelector('.preview-data-notice')){
+        const notice=document.createElement('div');
+        notice.className='preview-data-notice';
+        notice.textContent='Development preview · Class places and account records are sample data. No real booking or payment is taken here.';
+        document.querySelector('main')?.prepend(notice);
+      }
       document.querySelectorAll('[data-preview-only]').forEach(element => { element.hidden = mode !== 'preview'; });
       document.querySelectorAll('[data-public-feature]').forEach(element => {
         element.hidden = element.dataset.publicFeature === 'association_badges' || payload.features?.[element.dataset.publicFeature] !== true;
@@ -274,8 +284,39 @@
     window.setInterval(() => { if (!document.hidden) hydratePublicAlerts(); }, 15000);
     document.addEventListener('visibilitychange', () => { if (!document.hidden) hydratePublicAlerts(); });
   }
+  function animateCounter(element, target, prefix = '', suffix = '', duration = 1000) {
+    if (element.dataset.animated) return;
+    element.dataset.animated = 'true';
+    const startTime = performance.now();
+    const isDecimal = String(target).includes('.');
+    const decimals = isDecimal ? (String(target).split('.')[1]?.length || 1) : 0;
+    const targetNum = Number(target);
+    const motionPreference = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const finish = () => { element.textContent = `${prefix}${targetNum.toFixed(decimals)}${suffix}`; };
+    if (motionPreference.matches) { finish(); return; }
+    function tick(now) {
+      if (motionPreference.matches) { finish(); return; }
+      const elapsed = now - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      const ease = 1 - Math.pow(1 - progress, 3);
+      const current = (targetNum * ease).toFixed(decimals);
+      element.textContent = `${prefix}${current}${suffix}`;
+      if (progress < 1) requestAnimationFrame(tick);
+      else element.textContent = `${prefix}${targetNum.toFixed(decimals)}${suffix}`;
+    }
+    requestAnimationFrame(tick);
+  }
+
   const observer = 'IntersectionObserver' in window ? new IntersectionObserver(entries => entries.forEach(entry => {
-    if (entry.isIntersecting) { entry.target.classList.add('visible'); observer.unobserve(entry.target); }
+    if (entry.isIntersecting) {
+      entry.target.classList.add('visible');
+      observer.unobserve(entry.target);
+      const counters = entry.target.matches('[data-counter]') ? [entry.target] : [...entry.target.querySelectorAll('[data-counter]')];
+      counters.forEach(el => {
+        const val = parseFloat(el.dataset.counter);
+        if (!Number.isNaN(val)) animateCounter(el, val, el.dataset.prefix || '', el.dataset.suffix || '');
+      });
+    }
   }), { threshold:0, rootMargin:'0px 0px -8% 0px' }) : null;
   document.querySelectorAll('.reveal').forEach(el => observer ? observer.observe(el) : el.classList.add('visible'));
 
@@ -478,4 +519,19 @@
 
   // Preview-centre shortcuts provide the supplied test-account guidance.
   document.querySelectorAll('[data-demo-action]').forEach(button => button.addEventListener('click', () => showToast(button.dataset.demoAction || 'This action is available in the live connected build.')));
+
+  // Interactive FAQ filter
+  const faqSearch = document.getElementById('faq-search');
+  if (faqSearch) {
+    const faqDetails = document.querySelectorAll('.faq-list details');
+    faqSearch.addEventListener('input', () => {
+      const q = faqSearch.value.trim().toLowerCase();
+      faqDetails.forEach(detail => {
+        const text = detail.textContent.toLowerCase();
+        const matches = !q || text.includes(q);
+        detail.hidden = !matches;
+        if (q && matches) detail.open = true;
+      });
+    });
+  }
 })();

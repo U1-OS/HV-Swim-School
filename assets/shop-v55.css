@@ -373,9 +373,11 @@ body[data-page="shop"] .shop-card {
   border-color:rgba(4,46,82,.11);
   border-radius:25px;
   box-shadow:0 14px 40px rgba(3,33,64,.075);
+  transition:transform .35s cubic-bezier(.16,1,.3,1),border-color .3s ease,box-shadow .35s ease;
+  overflow:hidden;
 }
-body[data-page="shop"] .shop-card:hover { transform:translateY(-6px); border-color:rgba(7,121,171,.25); box-shadow:0 30px 68px rgba(3,28,59,.145); }
-body[data-page="shop"] .shop-product-visual { aspect-ratio:1.16; background:linear-gradient(145deg,#082d5a,#086f98); }
+body[data-page="shop"] .shop-card:hover { transform:translateY(-8px); border-color:rgba(7,121,171,.35); box-shadow:0 30px 68px rgba(3,28,59,.18); }
+body[data-page="shop"] .shop-product-visual { aspect-ratio:1.16; background:linear-gradient(145deg,#082d5a,#086f98); overflow:hidden; position:relative; }
 body[data-page="shop"] .shop-product-visual::after {
   content:"";
   position:absolute;
@@ -392,6 +394,10 @@ body[data-page="shop"] .shop-product-crop {
   background-image:linear-gradient(145deg,rgba(2,20,47,.04),rgba(4,42,78,.05)),url("merch-kids-premium-v55.jpg");
   background-size:230%;
   filter:saturate(.91) contrast(1.03);
+  transition:transform .45s cubic-bezier(.16,1,.3,1);
+}
+body[data-page="shop"] .shop-card:hover .shop-product-crop {
+  transform:scale(1.06);
 }
 body[data-page="shop"] .shop-product-crop.uniform-studio-crop {
   background-image:linear-gradient(145deg,rgba(2,20,47,.02),rgba(4,42,78,.03)),url("merch-staff-premium-v55.jpg");

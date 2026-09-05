@@ -16,6 +16,15 @@
   const merchInterest=incoming.get('merch')||'';
   const matcherConfidence=incoming.get('matcher_confidence')||'';
   const matcherGoal=incoming.get('matcher_goal')||'';
+  const termWeeks=incoming.get('term_weeks')||'';
+  const lessonFormat=incoming.get('lesson_format')||'';
+  const enquiryType=document.getElementById('enquiry-type');
+  const heroHeading=document.querySelector('.enrolment-hero h1');
+  const heroCopy=document.querySelector('.enrolment-hero-grid > div > p');
+  const lessonHeading=heroHeading.innerHTML;
+  const lessonCopy=heroCopy.textContent;
+  const lessonEnquiry=()=>['lesson','lesson_question','private_lesson'].includes(enquiryType.value);
+  const scrollBehavior=()=>window.matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth';
   const DRAFT_KEY='hv-swim-enquiry-preferences-v1';
   let currentStep=1;
   let classes=[];
@@ -32,7 +41,7 @@
     try{return JSON.parse(sessionStorage.getItem(DRAFT_KEY)||'null');}catch(_){return null;}
   }
   function saveDraft(){
-    if(merchInterest)return;
+    if(!lessonEnquiry())return;
     const draft={
       age:elements.age.value,
       confidence:form.querySelector('[name="confidence"]:checked')?.value||'',
@@ -76,7 +85,9 @@
     if(step===4)syncPhoneRequirement();
     const section=stepElement(step);
     section.querySelectorAll('[required]').forEach(input=>markInvalid(input,false));
-    for(const input of section.querySelectorAll('[required]')){
+    for(const input of section.querySelectorAll('input:not([type="hidden"]),select,textarea')){
+      if(input.disabled)continue;
+      if(input.type!=='checkbox'&&input.type!=='radio')input.value=input.value.trim();
       if(!input.checkValidity()){
         const name=fieldLabel(input);
         if(input.type==='radio')elements.error.textContent=name?`Choose an option for “${name}” before continuing.`:'Choose the option that feels closest before continuing.';
@@ -86,7 +97,7 @@
         else elements.error.textContent=name?`Please fill in “${name}” before continuing.`:'Please complete the highlighted field before continuing.';
         markInvalid(input,true);
         input.focus({preventScroll:true});
-        input.scrollIntoView({behavior:'smooth',block:'center'});
+        input.scrollIntoView({behavior:scrollBehavior(),block:'center'});
         return false;
       }
     }
@@ -100,13 +111,13 @@
     elements.progressBar.style.width=`${currentStep*25}%`;
     elements.progressTrack?.setAttribute('aria-valuenow',String(currentStep));
     elements.progressTrack?.setAttribute('aria-valuetext',`Step ${currentStep} of 4`);
-    elements.back.hidden=currentStep===1;
+    elements.back.hidden=currentStep===1||!lessonEnquiry();
     elements.next.hidden=currentStep===4;
     elements.submit.hidden=currentStep!==4;
     elements.error.textContent='';
     if(currentStep===4)renderReview();
     if(scroll){
-      document.getElementById('enrolment').scrollIntoView({behavior:'smooth',block:'start'});
+      document.getElementById('enrolment').scrollIntoView({behavior:scrollBehavior(),block:'start'});
       requestAnimationFrame(()=>{
         const heading=stepElement(currentStep).querySelector('h2');
         heading?.focus({preventScroll:true});
@@ -162,6 +173,10 @@
   document.querySelector('.day-choice-grid').addEventListener('change',()=>{elements.preferredDays.value=[...form.querySelectorAll('[name="preferred_day"]:checked')].map(input=>input.value).join(', ');saveDraft();});
 
   function renderReview(){
+    if(!lessonEnquiry()){
+      document.getElementById('enrolment-review').innerHTML=`<div><span>Enquiry type</span><strong>${esc(enquiryType.selectedOptions[0].textContent)}</strong><small>The team will review your message and reply using your preferred contact method.</small></div>`;
+      return;
+    }
     if(merchInterest){
       document.getElementById('enrolment-review').innerHTML=`<div><span>Enquiry type</span><strong>HV Swim Collection</strong><small>Pre-launch merchandise interest</small></div><div><span>Saved preferences</span><strong>${esc(merchInterest)}</strong><small>No stock is reserved and no payment is taken</small></div><div><span>Next step</span><strong>Team follow-up</strong><small>Final products, options and launch timing are confirmed personally</small></div>`;
       return;
@@ -171,7 +186,7 @@
     document.getElementById('enrolment-review').innerHTML=`<div><span>Swimmer</span><strong>${esc(elements.swimmerName.value||'Merchandise enquiry')}</strong><small>${esc(elements.age.value||'Not applicable')}</small></div><div><span>Suggested pathway</span><strong>${esc(elements.program.value||'Team recommendation')}</strong><small>${esc(confidence)} · ${esc(goal)}</small></div><div><span>Class preference</span><strong>${esc(elements.preferredClass.value||'Flexible')}</strong><small>${esc(elements.preferredDays.value||'No other days selected')}</small></div>`;
   }
   function composeExperience(){
-    if(merchInterest)return `Merchandise collection interest: ${merchInterest}`;
+    if(!lessonEnquiry())return elements.notes.value.trim();
     const confidence=form.querySelector('[name="confidence"]:checked')?.value||'Not supplied';
     const goal=elements.goal.selectedOptions[0]?.textContent||'Not supplied';
     return `Confidence: ${confidence}. Main goal: ${goal}.${queryLocation?` Preferred location: ${queryLocation}.`:''}${elements.notes.value.trim()?` Additional context: ${elements.notes.value.trim()}`:''}`;
@@ -183,8 +198,11 @@
   form.addEventListener('change',event=>{if(['confidence','swimmer-goal'].includes(event.target.name)||event.target.id==='swimmer-goal')recommendation();saveDraft();});
   form.addEventListener('submit',async event=>{
     event.preventDefault();
+    if(lessonEnquiry()){
+      for(const step of [1,2,3]){if(!validateStep(step)){showStep(step,false);validateStep(step);return;}}
+    }
     if(!validateStep(4))return;
-    elements.experience.value=composeExperience();
+    elements.experience.value=composeExperience().slice(0,500);
     elements.preferredDays.value=[...form.querySelectorAll('[name="preferred_day"]:checked')].map(input=>input.value).join(', ');
     const payload=Object.fromEntries(new FormData(form).entries());
     delete payload.confidence;delete payload.class_choice;delete payload.preferred_day;
@@ -195,7 +213,7 @@
       document.getElementById('success-reference').textContent=result.reference||`HV-ENQ-${String(result.id).padStart(4,'0')}`;
       const success=document.getElementById('enrolment-success');success.hidden=false;
       clearDraft();
-      success.scrollIntoView({behavior:'smooth',block:'center'});
+      success.scrollIntoView({behavior:scrollBehavior(),block:'center'});
       requestAnimationFrame(()=>success.querySelector('h2')?.focus({preventScroll:true}));
     }catch(problem){elements.error.textContent=`${problem.message} Please try again or call 0413 462 112.`;elements.submit.disabled=false;elements.submit.innerHTML='Send secure enquiry <span aria-hidden="true">→</span>';}
   });
@@ -203,6 +221,24 @@
   request('/api/classes',{headers:{Accept:'application/json'}}).then(payload=>{classes=payload.classes||[];renderClasses();}).catch(()=>{document.getElementById('wizard-class-grid').innerHTML='<label class="wizard-class-card flexible"><input type="radio" name="class_choice" value="Flexible—team recommendation"><span class="class-choice-check">✓</span><div><span class="class-match-label">Timetable unavailable</span><strong>Keep me flexible</strong><small>The team will check the current classes and recommend a suitable time when they reply.</small></div></label>';});
 
   document.querySelectorAll('.wizard-heading h2').forEach(heading=>heading.tabIndex=-1);
+  function updateEnquiryType(){
+    const isLesson=lessonEnquiry();
+    document.body.classList.toggle('is-contact-enquiry',!isLesson);
+    heroHeading.innerHTML=isLesson?lessonHeading:'Talk to <span>the HV Swim team.</span>';
+    heroCopy.textContent=isLesson?lessonCopy:'Questions about your account, invoices or the collection? Send a message and the team will follow up using your preferred contact method.';
+    document.querySelector('.enrolment-progress').hidden=!isLesson;
+    document.querySelector('.enrolment-topline').hidden=!isLesson;
+    for(const step of [1,2,3])stepElement(step).querySelectorAll('input,select,textarea').forEach(input=>{input.disabled=!isLesson;});
+    elements.notes.required=!isLesson;
+    elements.notes.placeholder=isLesson?'Optional—current skills, past lessons or what success would look like':'How can the team help? Please keep detailed medical information out of this form.';
+    const support=document.getElementById('support-needs');
+    support.disabled=!isLesson;
+    support.closest('.field').hidden=!isLesson;
+    document.querySelector('label[for="experience-notes"]').textContent=isLesson?'Anything else about their experience or goals?':'Your message';
+    if(!isLesson)document.getElementById('enquiry-draft-notice').hidden=true;
+    showStep(isLesson?1:4,false);
+  }
+  enquiryType.addEventListener('change',updateEnquiryType);
   document.querySelector('#enrolment-success h2')?.setAttribute('tabindex','-1');
   syncPhoneRequirement();
   if(!merchInterest){
@@ -254,11 +290,19 @@
     showStep(currentStep,true);
   }));
   if(merchInterest){
+    enquiryType.value='merchandise';
     elements.swimmerName.value='Merchandise enquiry';elements.age.value='Adult';elements.program.value='HV Swim Collection';elements.preferredClass.value='Not applicable';elements.notes.value=merchInterest;
     document.querySelector('.enrolment-hero h1').innerHTML='Your collection <span>interest is ready.</span>';
     document.querySelector('.enrolment-hero-grid > div > p').textContent='Add your contact details and send the saved merchandise preferences directly to the HV Swim team before the collection launches.';
-    showStep(4,false);
+    updateEnquiryType();
   }else{
+    if(termWeeks){
+      const weeks=Number(termWeeks);
+      if(Number.isInteger(weeks)&&weeks>=8&&weeks<=12){
+        const privateLesson=lessonFormat==='Private 1:1 Tuition';
+        elements.notes.value=`Term enquiry: ${weeks} weeks (${privateLesson?'Private 1:1 Tuition':'Standard Lesson'}). ${privateLesson?'Pricing to be confirmed by the team.':`Indicative estimate $${(weeks*22.50).toFixed(2)}; lesson count to be confirmed.`}`;
+      }
+    }
     showStep(1,false);
     // Keep an incoming program authoritative after the initial wizard render.
     if(queryProgram)elements.program.value=queryProgram;

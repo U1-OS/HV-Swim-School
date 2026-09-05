@@ -1,15 +1,6 @@
-# Only FastAPI is pinned to an exact release. Everything below is a floor, so pip resolves
-# a compatible set rather than failing on a version that does not exist.
-#
-# This file previously pinned starlette==0.52.1, which has never been published — the newest
-# release is 0.49.x — so a clean install failed outright and the server could not start.
-# The other exact pins were written the same way and could not be verified, so they are
-# floors now. Regenerate real pins with `.venv/bin/python -m pip freeze` from an install
-# that actually worked, rather than writing version numbers by hand.
-fastapi==0.128.8
-
-# Never pin starlette here: FastAPI declares the range it works with, and a hand-written pin
-# will contradict it. Let pip resolve it.
+# Tested on Python 3.12. Update these together and rerun API and dependency audits.
+fastapi==0.141.1
+starlette==1.6.0
 
 uvicorn[standard]>=0.30
 httpx>=0.28

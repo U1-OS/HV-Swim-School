@@ -22,11 +22,11 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="assets/app-icon-v3-180.png">
   <link rel="preload" as="image" href="assets/hero-programs-v4.jpg" fetchpriority="high">
-  <link rel="stylesheet" href="assets/styles.css?v=5.11.0-ui7">
-  <link rel="stylesheet" href="assets/support.css?v=5.11.0-ui7">
-  <script defer src="assets/app.js?v=5.11.0-ui7"></script>
-  <script defer src="assets/support.js?v=5.11.0-ui7"></script>
-  <script defer src="assets/programs.js?v=5.11.0-ui7"></script>
+  <link rel="stylesheet" href="assets/styles.css?v=5.13.0-ui11">
+  <link rel="stylesheet" href="assets/support.css?v=5.13.0-ui11">
+  <script defer src="assets/app.js?v=5.13.0-ui11"></script>
+  <script defer src="assets/support.js?v=5.13.0-ui11"></script>
+  <script defer src="assets/programs.js?v=5.13.0-ui11"></script>
   <script type="application/ld+json">{"@context":"https://schema.org","@type":"ItemList","name":"HV Swim Bendigo swimming programs","itemListElement":[{"@type":"ListItem","position":1,"item":{"@type":"Service","name":"Infant Aquatics"}},{"@type":"ListItem","position":2,"item":{"@type":"Service","name":"Learn to Swim"}},{"@type":"ListItem","position":3,"item":{"@type":"Service","name":"Stroke Development"}},{"@type":"ListItem","position":4,"item":{"@type":"Service","name":"Private Swimming Lessons"}}]}</script>
 </head>
 <body data-page="programs">
@@ -61,7 +61,7 @@
       <div class="hero-wave"></div>
     </section>
 
-    <nav class="program-anchor-bar" aria-label="Program page sections"><div class="container"><a href="#infant">Infant aquatics</a><a href="#learn">Learn to swim</a><a href="#stroke">Stroke development</a><a href="#private">Private lessons</a><a href="#matcher">Lesson matcher</a></div></nav>
+    <nav class="program-anchor-bar" aria-label="Program page sections"><div class="container"><a href="#infant">Infant aquatics</a><a href="#learn">Learn to swim</a><a href="#stroke">Stroke development</a><a href="#private">Private lessons</a><a href="#calculator">Fee calculator</a><a href="#matcher">Lesson matcher</a></div></nav>
 
     <section class="section program-terms-strip" aria-label="Lesson fees and key enrolment terms">
       <div class="container"><div class="grid-4">
@@ -70,6 +70,60 @@
         <div class="trust-item"><span class="trust-icon">2</span><p><strong>Two absence credits</strong><span>Per swimmer, per term; no make-up classes</span></p></div>
         <div class="trust-item"><span class="trust-icon">♡</span><p><strong>Parent or guardian onsite</strong><span>Except Stroke Development classes</span></p></div>
       </div></div>
+    </section>
+
+    <section class="section calculator-section" id="calculator" aria-label="Interactive term fee and absence credit calculator">
+      <div class="container">
+        <div class="section-head reveal">
+          <div>
+            <div class="eyebrow">Interactive pricing tool</div>
+            <h2>A clearer idea of lesson costs.</h2>
+            <p class="lead" style="margin-top:16px">Estimate lessons at $22.50 each. The team confirms the lesson count, class and term invoice before enrolment. This estimate does not reserve a place or take payment.</p>
+          </div>
+        </div>
+        <div class="calc-card reveal">
+          <div class="calc-controls">
+            <div class="calc-slider-group">
+              <div class="calc-slider-head">
+                <strong>Number of lessons</strong>
+                <span id="calc-weeks-display">10 Weeks</span>
+              </div>
+              <input class="calc-slider" id="calc-weeks-slider" type="range" min="8" max="12" value="10" step="1" aria-label="Term length in weeks">
+              <div style="display:flex;justify-content:space-between;color:var(--muted);font-size:.72rem;">
+                <span>8 weeks</span>
+                <span>10 weeks (example)</span>
+                <span>12 weeks</span>
+              </div>
+            </div>
+            <div class="calc-options-group">
+              <strong style="display:block;margin-bottom:8px;font-size:.88rem;color:#07234b;">Lesson format</strong>
+              <div class="calc-options-grid">
+                <button class="calc-option-btn active" id="calc-fmt-group" type="button" data-rate="22.50" aria-pressed="true">
+                  <strong>Standard Lesson</strong>
+                  <small>$22.50 per lesson</small>
+                </button>
+                <button class="calc-option-btn" id="calc-fmt-private" type="button" aria-pressed="false">
+                  <strong>Private 1:1 Tuition</strong>
+                  <small>Confirm pricing with the team</small>
+                </button>
+              </div>
+            </div>
+          </div>
+          <div class="calc-display">
+            <div class="calc-display-head">
+              <span>Estimated Term Total</span>
+              <div class="calc-total" id="calc-total-display">$225.00</div>
+              <small style="color:#a7effc;font-size:.75rem;">Due on enrolment to confirm the place</small>
+            </div>
+            <ul class="calc-breakdown">
+              <li id="calc-summary-lessons">10 lessons @ $22.50 each</li>
+              <li>Up to 2 eligible absence credits; not deducted here</li>
+              <li>Small groups &amp; personal instructor attention</li>
+            </ul>
+            <a class="btn btn-primary" id="calc-enquire-btn" href="enquire.html?term_weeks=10">Enquire for this term <span aria-hidden="true">→</span></a>
+          </div>
+        </div>
+      </div>
     </section>
 
     <section class="section white">

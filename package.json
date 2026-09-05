@@ -1,6 +1,6 @@
 {
   "name": "hv-swim-bendigo-website",
-  "version": "5.12.0",
+  "version": "5.13.0",
   "private": true,
   "packageManager": "pnpm@11.19.0",
   "description": "HV Swim Bendigo website quality tooling; paused mobile source is retained for a later phase.",

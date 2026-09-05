@@ -29,7 +29,7 @@
       const announcement = document.getElementById('site-announcement');
       if (announcement && settings.announcement_enabled) {
         document.getElementById('site-announcement-text').textContent = settings.announcement_text;
-        document.getElementById('site-enrolment-status').textContent = ({open:'Enrolments open',limited:'Limited places',waitlist:'Waitlist only'})[settings.enrolment_status] || 'Enrolment update';
+        document.getElementById('site-enrolment-status').textContent = ({open:'Lesson enquiries open',limited:'Limited availability',waitlist:'Waitlist enquiries'})[settings.enrolment_status] || 'Lesson enquiry update';
         announcement.hidden = false;
       }
     } catch (_) {}
