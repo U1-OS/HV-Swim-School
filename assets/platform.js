@@ -2,7 +2,7 @@
   'use strict';
 
   const page = document.body.dataset.platformPage;
-  const roleLabels = { customer: 'Family account', staff: 'Staff pool-deck app', admin: 'Management operations' };
+  const roleLabels = { customer: 'Family account', staff: 'Staff workspace', admin: 'Management operations' };
   const weekday = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
   let session = { user: null, csrf: null };
   let routeController = null;
@@ -16,8 +16,26 @@
   const upgradeLegacyIcons = root => root.querySelectorAll('[aria-hidden="true"]').forEach(element=>{if(element.querySelector('svg'))return;const name=iconNames[element.textContent.trim()];if(name)element.innerHTML=iconSvg(name);});
   const money = cents => new Intl.NumberFormat('en-AU',{style:'currency',currency:'AUD'}).format(Number(cents || 0) / 100);
   const dt = value => value ? new Intl.DateTimeFormat('en-AU',{day:'numeric',month:'short',hour:'numeric',minute:'2-digit',timeZone:'Australia/Melbourne'}).format(new Date(value)) : '—';
-  const dOnly = value => value ? new Intl.DateTimeFormat('en-AU',{day:'numeric',month:'short',year:'numeric',timeZone:'Australia/Melbourne'}).format(new Date(`${value}T00:00:00+10:00`)) : '—';
-  const businessDateValue = () => new Intl.DateTimeFormat('en-CA',{year:'numeric',month:'2-digit',day:'2-digit',timeZone:'Australia/Melbourne'}).format(new Date());
+  const dOnly = value => {
+    if (!value) return '—';
+    const text = String(value);
+    const date = new Date(/^\d{4}-\d{2}-\d{2}$/.test(text) ? `${text}T00:00:00+10:00` : text);
+    if (Number.isNaN(date.getTime())) return 'Date unavailable';
+    return new Intl.DateTimeFormat('en-AU',{day:'numeric',month:'short',year:'numeric',timeZone:'Australia/Melbourne'}).format(date);
+  };
+  const businessDateValue = (now = new Date()) => {
+    const parts = new Intl.DateTimeFormat('en-AU',{year:'numeric',month:'2-digit',day:'2-digit',timeZone:'Australia/Melbourne'}).formatToParts(now);
+    return ['year','month','day'].map(type => parts.find(part => part.type === type).value).join('-');
+  };
+  const payrollWeekDates = monday => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(monday)) return [];
+    const base = new Date(`${monday}T00:00:00Z`);
+    if (Number.isNaN(base.getTime()) || base.getUTCDay() !== 1 || base.toISOString().slice(0,10) !== monday) return [];
+    return Array.from({length:7},(_,index) => {
+      const day = new Date(base); day.setUTCDate(base.getUTCDate()+index);
+      return {iso:day.toISOString().slice(0,10),label:day.toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short',timeZone:'UTC'})};
+    });
+  };
   const clockTime = value => {
     const match=String(value||'').match(/^(\d{1,2}):(\d{2})/); if(!match)return String(value||'');
     const hour=Number(match[1]); if(!Number.isInteger(hour)||hour>23)return String(value||'');
@@ -808,10 +826,10 @@
 
   async function staffTimesheetsV2(content) {
     const data=await load('/api/staff/time-entries');
-    const base=new Date(`${businessDateValue()}T12:00:00`);
-    const day=(base.getDay()+6)%7;base.setDate(base.getDate()-day);
+    const base=new Date(`${businessDateValue()}T00:00:00Z`);
+    const day=(base.getUTCDay()+6)%7;base.setUTCDate(base.getUTCDate()-day);
     const weekStart=base.toISOString().slice(0,10);
-    const dayInputs=Array.from({length:7},(_,index)=>{const value=new Date(base);value.setDate(base.getDate()+index);const iso=value.toISOString().slice(0,10);const label=value.toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short'});return `<label class="daily-hours-cell"><span>${esc(label)}</span><input class="input" type="number" min="0" max="16" step="0.25" inputmode="decimal" data-daily-date="${iso}" aria-label="Hours worked on ${esc(label)}" placeholder="0"></label>`}).join('');
+    const dayInputs=payrollWeekDates(weekStart).map(({iso,label})=>`<label class="daily-hours-cell"><span>${esc(label)}</span><input class="input" type="number" min="0" max="16" step="0.25" inputmode="decimal" data-daily-date="${iso}" aria-label="Hours worked on ${esc(label)}" placeholder="0"></label>`).join('');
     const activeEntry=data.time_entries.find(entry=>!entry.clock_out);
     const onBreak=Boolean(activeEntry?.break_started_at);
     const clockState=activeEntry?(onBreak?'On break':'Clocked on'):'Clocked off';
@@ -827,6 +845,17 @@
     const boundary=content.querySelector('#timesheet-form + .data-boundary');if(boundary)boundary.innerHTML='<strong>Payroll boundary:</strong> Clock records and manual entries remain internal drafts until submitted and approved. GPS is not collected and nothing is transmitted to Xero from this screen.';
     const syncMode=()=>{const daily=document.querySelector('[name="entry_mode"]:checked')?.value==='daily';document.querySelector('[data-hours-weekly]').hidden=daily;document.querySelector('[data-hours-daily]').hidden=!daily;document.getElementById('hours-total').required=!daily;};
     content.querySelectorAll('[name="entry_mode"]').forEach(input=>input.addEventListener('change',syncMode));syncMode();
+    const weekInput=content.querySelector('#hours-week-start');
+    weekInput.addEventListener('change',()=>{
+      const dates=payrollWeekDates(weekInput.value);
+      weekInput.setCustomValidity(dates.length?'':'Choose a Monday for the payroll week.');
+      if(!dates.length)return;
+      content.querySelectorAll('[data-daily-date]').forEach((input,index)=>{
+        input.dataset.dailyDate=dates[index].iso;
+        input.setAttribute('aria-label',`Hours worked on ${dates[index].label}`);
+        input.closest('label').querySelector('span').textContent=dates[index].label;
+      });
+    });
   }
 
   async function staffOverviewV2(content) {
