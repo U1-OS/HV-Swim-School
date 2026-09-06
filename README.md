@@ -15,7 +15,9 @@ The launcher requires Python 3.12 or newer and creates `.venv312` on first use, 
 any older `.venv` intact. It starts the site at `http://127.0.0.1:8765` and opens
 `START_HERE.html`. The GitHub quality workflow verifies Python 3.12.
 
-See `PREMIUM_V2_UPGRADE_REPORT.md` for the September review, validation evidence and
+See `INTERACTIVE_3D_REBUILD.md` for the 6 September 3D visual rebuild, browser checks,
+motion controls and staff-date fixes. `PREMIUM_V2_UPGRADE_REPORT.md` covers the earlier
+September review, validation evidence and
 remaining launch gates. Development previews are explicitly labelled; sample accounts,
 capacity and timetable data must not be represented as live business records.
 

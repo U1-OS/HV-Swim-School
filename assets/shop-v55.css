@@ -1,3 +1,4 @@
+@layer legacy {
 /* HV Swim Collection V5.5
    A page-scoped visual layer. Shared site styles remain the source of truth. */
 
@@ -727,3 +728,4 @@ body[data-page="shop"] .dialog-product-copy .shop-production-route { margin-top:
 .kit-foot strong { display:block; font-size:1.2rem; color:#0d2f52; }
 .kit-foot small { display:block; margin-top:2px; font-size:.66rem; color:#62798e; }
 @media (max-width:640px) { .kit-cards { grid-template-columns:1fr; } }
+}

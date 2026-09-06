@@ -1,10 +1,11 @@
-const CORE_CACHE = 'hv-swim-v5130-core-12';
-const RUNTIME_CACHE = 'hv-swim-v5130-runtime-12';
-const PUBLIC_DATA_CACHE = 'hv-swim-v5130-public-data-12';
+const CORE_CACHE = 'hv-swim-v5130-core-17';
+const RUNTIME_CACHE = 'hv-swim-v5130-runtime-17';
+const PUBLIC_DATA_CACHE = 'hv-swim-v5130-public-data-17';
 const CORE_SHELL = [
+  './assets/experience.css?v=5.13.0-ui16', './assets/experience.js?v=5.13.0-ui16',
   './offline.html', './manifest.webmanifest',
-  './assets/styles.css?v=5.13.0-ui11', './assets/app.js?v=5.13.0-ui11',
-  './assets/support.css?v=5.13.0-ui11', './assets/support.js?v=5.13.0-ui11',
+  './assets/styles.css?v=5.13.0-ui16', './assets/app.js?v=5.13.0-ui16',
+  './assets/support.css?v=5.13.0-ui16', './assets/support.js?v=5.13.0-ui16',
   './assets/icons.svg', './assets/hv-swim-logo-v3.png',
   './assets/fonts/manrope-latin-variable.woff2',
   './assets/app-icon-v3-64.png', './assets/app-icon-v3-192.png',

@@ -1,3 +1,4 @@
+@layer legacy {
 @font-face {
   font-family: "Manrope";
   src: url("fonts/manrope-latin-variable.woff2") format("woff2");
@@ -2627,4 +2628,5 @@ body:not([data-platform-page]) .site-footer { border-top:1px solid rgba(118,208,
   body[data-page="home"] .program-card,
   .btn, .hero-float, .calc-card, .calc-slider::-webkit-slider-thumb { transition:none !important; transform:none !important; }
   .hero-glow, .hero-caustics, .live-pulse, .matcher-result.has-result { animation:none !important; }
+}
 }

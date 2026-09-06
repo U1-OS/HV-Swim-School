@@ -3,19 +3,45 @@
 Andrew swaps between Claude and Codex. Read this first and rewrite it last.
 
 **Wheel:** Codex
-**Last updated:** 2026-09-05 by Codex — Premium V2 whole-project upgrade and local-storage migration
+**Last updated:** 2026-09-06 by Codex — interactive 3D rebuild verified
 
-## Current state
+The working directory was missing on arrival. Restored the exact private GitHub main
+commit `676094ff874af6c2bd6fb5ff98fef979367773bc` into the empty local Developer path.
+This restored source only; no previous private runtime database was present or recovered.
+
+## Latest release
+
+Presentation revision `5.13.0-ui16`; service-worker caches end in `-17`.
+Read `INTERACTIVE_3D_REBUILD.md` for this release's complete evidence.
+
+- New shared `assets/experience.css` and `assets/experience.js` apply across all pages.
+- Native CSS 3D pool/program explorer on home; rotatable colour-study bottle in the shop.
+- Native touch scrolling, keyboard rotation/reset, OS reduced-motion handling, saved
+  pause preference, offscreen/hidden-tab animation suspension and pointer card depth.
+- Reworked public, shop, sign-in and portal typography, palettes, cards, spacing and navigation.
+- Legacy style files use `@layer legacy`; do not undo this or specificity conflicts return.
+- Public homepage no longer promotes staff uniforms.
+- Shared date formatting now handles legacy clock timestamps; business dates use
+  `formatToParts`. Staff daily hours correctly follow the selected Monday–Sunday week.
+- New interaction/date regressions are wired into npm test and GitHub CI.
+- Final checks: 128 Python passed/1 skipped, four Node regression scripts passed,
+  49 public + 86 portal + 12 supporting-page browser checks passed, 53 smoke checks and
+  20/20 HTTP security checks passed. Two existing Python deprecation warnings remain.
+- Preview runtime data: `/tmp/hv-swim-3d-preview`, with development sample accounts only.
+  A marked QA daily-hour draft exists there; no record was transmitted to Xero.
+- Source restoration did not restore previous private runtime data or credentials.
+
+## Earlier foundation
 
 The existing V5.13 static site and FastAPI platform were upgraded in place. The public
 experience, enquiry flow, family/staff/management portals, roster, incidents and swimmer
 progress are materially more polished and safer. The app phase remains paused. Enrolment
 is enquiry-only; Xero is the lesson-payment boundary and Shopify is the merchandise boundary.
 
-The sole working copy is now `/Users/u1/Developer/HV-Swim-School`, outside iCloud.
-The old `~/Documents/GitHub/HV-Swim-School` path no longer exists. The move preserved
-8,151 files, produced zero dataless placeholders and retained matching source and private
-database checksums. Private runtime data remains Git-ignored.
+The sole working copy is `/Users/u1/Developer/HV-Swim-School`, outside iCloud.
+The 5 September handoff reported an earlier migration with private data checksums, but
+that folder and private runtime data were absent on 6 September. This session restored
+source from GitHub, not those earlier private records. Private runtime data remains Git-ignored.
 
 ## Delivered
 

@@ -44,3 +44,5 @@ jobs:
       - run: node scripts/check-site.mjs
       - run: node tests/test_logout.mjs
       - run: node tests/test_login.mjs
+      - run: node tests/test_experience.mjs
+      - run: node tests/test_platform_dates.mjs

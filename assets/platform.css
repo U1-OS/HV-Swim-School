@@ -1,3 +1,4 @@
+@layer legacy {
 @font-face {
   font-family:"Manrope";
   src:url("fonts/manrope-latin-variable.woff2") format("woff2");
@@ -596,7 +597,7 @@
 .platform-top-actions > .btn:hover { color:#fff; border-color:rgba(var(--portal-accent-rgb),.48); background:rgba(var(--portal-accent-rgb),.08); }
 .platform-website-link,.platform-signout { white-space:nowrap; }
 .platform-website-link::before { content:"↗"; color:var(--portal-accent); font-size:.72rem; }
-.platform-signout { color:#c9d7e5 !important; }
+.platform-signout { color:#c9d7e5; }
 .notification-button {
   width:42px;
   height:42px;
@@ -1587,4 +1588,5 @@ body[data-login-role] .auth-form .input:focus { border-color:var(--login-role-ac
   .invoice-summary > div { min-width:0; text-align:left; }
   .invoice-foot .btn,.shopify-billing-boundary .btn { width:100%; }
   .family-finance-strip { grid-template-columns:1fr 1fr; }
+}
 }
