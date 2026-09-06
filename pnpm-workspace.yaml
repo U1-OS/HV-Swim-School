@@ -1,0 +1,6 @@
+# Keep the paused mobile asset tool's transitive archive/image readers patched.
+# No changes to the public website's runtime dependencies.
+overrides:
+  'tar@<7.5.22': 7.5.22
+  '@capacitor/assets>sharp': 0.35.4
+  'uuid@<11.1.1': 11.1.1

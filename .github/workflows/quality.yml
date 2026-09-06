@@ -2,7 +2,7 @@ name: Quality
 
 on:
   push:
-    branches: [main]
+    branches: [main, 'codex/platform-rebuild-*']
   pull_request:
     branches: [main]
 
@@ -39,10 +39,12 @@ jobs:
           node-version: "22"
       - run: corepack enable
       - run: pnpm install --frozen-lockfile --ignore-scripts
+      - run: pnpm audit
       - name: Check JavaScript syntax
         run: for file in assets/*.js scripts/*.mjs; do node --check "$file"; done
       - run: node scripts/check-site.mjs
       - run: node tests/test_logout.mjs
       - run: node tests/test_login.mjs
       - run: node tests/test_experience.mjs
+      - run: node tests/test_aquatic_scene.mjs
       - run: node tests/test_platform_dates.mjs
