@@ -46,6 +46,9 @@ def resolved_app_environment() -> str:
 @dataclass(frozen=True)
 class Settings:
     app_env: str = resolved_app_environment()
+    # Only the existing SQLite storage adapter is implemented. A cloud DATABASE_URL
+    # must not be silently ignored and leave private records on an unintended disk.
+    database_url: str = os.getenv("HV_DATABASE_URL", os.getenv("DATABASE_URL", "")).strip()
     session_secret: str = os.getenv("HV_SESSION_SECRET", "local-demo-secret-change-before-production")
     data_encryption_key: str = os.getenv("HV_DATA_ENCRYPTION_KEY", "")
     public_url: str = os.getenv("HV_PUBLIC_URL", "http://localhost:8765").rstrip("/")

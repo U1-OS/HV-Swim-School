@@ -126,4 +126,7 @@ def public_user(row: Any) -> dict[str, Any]:
         payload["customer_number"] = row["customer_number"]
     if "staff_number" in row.keys() and row["role"] in ("staff", "admin"):
         payload["staff_number"] = row["staff_number"]
+    for field in ("management_scope", "mfa_enabled", "created_at", "last_login_at", "email_verified_at"):
+        if field in row.keys():
+            payload[field] = bool(row[field]) if field == "mfa_enabled" else row[field]
     return payload

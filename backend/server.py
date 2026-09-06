@@ -27,6 +27,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
 
 from .config import DATA_DIR, ROOT, settings
+from . import identity, payroll_adapter, workforce
 from .database import audit, db_session, initialise_database, rows
 from .integrations import (
     current_bendigo_weather,
@@ -139,6 +140,8 @@ def fulfilment_mode_for_route(route: str) -> str:
 
 
 def validate_production_config(candidate=settings) -> None:
+    if candidate.database_url:
+        raise RuntimeError("DATABASE_URL / HV_DATABASE_URL is unsupported by this SQLite build. Configure HV_DATA_DIR on a protected persistent disk; PostgreSQL requires a separately tested storage migration.")
     if not candidate.production:
         return
     insecure_secrets = {
@@ -222,6 +225,9 @@ def migrate_integration_token_encryption() -> int:
 async def lifespan(_: FastAPI):
     validate_production_config()
     initialise_database()
+    identity.migrate()
+    workforce.migrate()
+    payroll_adapter.migrate()
     migrate_integration_token_encryption()
     yield
 
@@ -341,6 +347,8 @@ async def security_headers(request: Request, call_next):
     path = request_path
     if path.startswith("/api/"):
         response.headers["Cache-Control"] = "no-store"
+    elif path.startswith("/assets/") and not settings.production:
+        response.headers["Cache-Control"] = "no-store"
     elif path.startswith("/assets/") and request.url.query.startswith("v="):
         # Versioned asset URLs change whenever the file changes, so they can be cached hard.
         response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
@@ -364,6 +372,7 @@ AlertSeverity = Literal["closure", "change", "reopening", "information"]
 class LoginInput(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8, max_length=200)
+    code: str = Field(default="", max_length=6)
 
 
 class ChangePasswordInput(BaseModel):
@@ -566,6 +575,9 @@ class ClockInput(BaseModel):
 
     action: Literal["in", "break_start", "break_end", "out"]
     location_slug: str = "wood-street"
+    request_id: str | None = Field(default=None, min_length=16, max_length=100, pattern=r"^[a-zA-Z0-9_-]+$")
+    entry_id: int | None = Field(default=None, gt=0)
+    paid_break: bool = False
 
 
 class PoolReadingInput(BaseModel):
@@ -957,6 +969,7 @@ def issue_session(
         (stored_session_id, user["id"], csrf, now_iso(), expires_iso()),
     )
     audit(db, user["id"], action, "session", stored_session_id[-12:], audit_detail, ip_address)
+    db.execute("UPDATE users SET last_login_at=? WHERE id=?", (now_iso(), user["id"]))
     response.set_cookie(
         SESSION_COOKIE,
         session_id,
@@ -987,6 +1000,8 @@ def session_user(request: Request) -> dict[str, Any]:
         ).fetchone()
         if not row:
             raise HTTPException(status_code=401, detail="Session expired")
+        if row["must_change_password"] and request.url.path not in {"/api/auth/me", "/api/auth/logout", "/api/auth/change-password"}:
+            raise HTTPException(status_code=403, detail="Change your temporary password before using the workspace")
         return dict(row)
 
 
@@ -2271,13 +2286,13 @@ def login(payload: LoginInput, request: Request, response: Response) -> dict[str
         if failures >= 10:
             raise HTTPException(status_code=429, detail="Too many sign-in attempts. Try again in 15 minutes.")
         user = db.execute("SELECT * FROM users WHERE email=? AND active=1", (email,)).fetchone()
-        success = bool(user and password_verify(payload.password, user["password_hash"]))
+        success = bool(user and password_verify(payload.password, user["password_hash"]) and identity.verify_mfa(db, user, payload.code))
         db.execute("INSERT INTO login_attempts(email,ip_address,success,created_at) VALUES(?,?,?,?)", (email, ip, int(success), now_iso()))
         if not success:
             # The 401 is raised inside db_session(), whose exception path rolls back.
             # Commit the failed attempt first or the limiter never sees any failures.
             db.commit()
-            raise HTTPException(status_code=401, detail="Email or password is incorrect")
+            raise HTTPException(status_code=401, detail="Sign-in details are incorrect. Check your authenticator code if enabled.")
         if password_needs_rehash(user["password_hash"]):
             refreshed_hash = password_hash(payload.password)
             db.execute("UPDATE users SET password_hash=? WHERE id=?", (refreshed_hash, user["id"]))
@@ -2302,6 +2317,7 @@ def logout(request: Request, response: Response, user: dict[str, Any] = Depends(
 @app.post("/api/auth/change-password")
 def change_password(payload: ChangePasswordInput, request: Request, user: dict[str, Any] = Depends(session_user), x_csrf_token: str | None = Header(default=None)) -> dict[str, bool]:
     csrf_guard(request, user, x_csrf_token)
+    identity.proof_attempt(user["id"])
     if hmac.compare_digest(payload.current_password, payload.new_password):
         raise HTTPException(status_code=422, detail="Choose a new password that is different from the current password")
     with db_session() as db:
@@ -2313,6 +2329,7 @@ def change_password(payload: ChangePasswordInput, request: Request, user: dict[s
             (password_hash(payload.new_password), user["id"]),
         )
         db.execute("DELETE FROM sessions WHERE user_id=? AND id<>?", (user["id"], user["session_id"]))
+        db.execute("UPDATE account_tokens SET used_at=? WHERE user_id=? AND used_at IS NULL", (now_iso(), user["id"]))
         audit(db, user["id"], "change_password", "user", user["id"], ip_address=client_ip(request))
     return {"changed": True}
 
@@ -3383,68 +3400,8 @@ def save_lesson_attendance(payload: LessonAttendanceInput, request: Request, use
 @app.post("/api/staff/clock")
 def staff_clock(payload: ClockInput, request: Request, user: dict[str, Any] = Depends(require_roles("staff", "admin")), x_csrf_token: str | None = Header(default=None)) -> dict[str, Any]:
     csrf_guard(request, user, x_csrf_token)
-    recorded_at = datetime.now(timezone.utc)
-    recorded_iso = recorded_at.isoformat()
     with db_session() as db:
-        db.execute("BEGIN IMMEDIATE")
-        active = db.execute(
-            "SELECT * FROM time_entries WHERE staff_id=? AND clock_out IS NULL ORDER BY clock_in DESC LIMIT 1",
-            (user["id"],),
-        ).fetchone()
-        if payload.action == "in":
-            if active:
-                raise HTTPException(status_code=409, detail="You are already clocked on")
-            location = location_by_slug(db, payload.location_slug)
-            local_day = recorded_at.astimezone(MELBOURNE_TZ).date()
-            week_start = local_day - timedelta(days=local_day.weekday())
-            entry_id = db.execute(
-                """INSERT INTO time_entries(
-                       staff_id,location_id,clock_in,status,work_date,week_start,entry_scope,break_minutes
-                   ) VALUES(?,?,?,'draft',?,?,'daily',0)""",
-                (user["id"], location["id"], recorded_iso, local_day.isoformat(), week_start.isoformat()),
-            ).lastrowid
-            audit(db, user["id"], "clock_on", "time_entry", entry_id, {"location": payload.location_slug}, client_ip(request))
-            return {"state": "working", "entry_id": entry_id, "clock_in": recorded_iso, "break_minutes": 0}
-        if not active:
-            raise HTTPException(status_code=409, detail="Clock on before recording work or a break")
-        if payload.action == "break_start":
-            if active["break_started_at"]:
-                raise HTTPException(status_code=409, detail="A break is already running")
-            db.execute("UPDATE time_entries SET break_started_at=? WHERE id=?", (recorded_iso, active["id"]))
-            audit(db, user["id"], "start_break", "time_entry", active["id"], ip_address=client_ip(request))
-            return {"state": "on_break", "entry_id": active["id"], "break_started_at": recorded_iso, "break_minutes": int(active["break_minutes"] or 0)}
-        break_minutes = int(active["break_minutes"] or 0)
-        if payload.action == "break_end":
-            if not active["break_started_at"]:
-                raise HTTPException(status_code=409, detail="No break is currently running")
-            break_started = datetime.fromisoformat(active["break_started_at"])
-            added_minutes = max(1, round((recorded_at - break_started).total_seconds() / 60))
-            break_minutes += added_minutes
-            db.execute(
-                "UPDATE time_entries SET break_started_at=NULL,break_minutes=? WHERE id=?",
-                (break_minutes, active["id"]),
-            )
-            audit(db, user["id"], "end_break", "time_entry", active["id"], {"break_minutes": break_minutes}, client_ip(request))
-            return {"state": "working", "entry_id": active["id"], "break_minutes": break_minutes}
-        if active["break_started_at"]:
-            break_started = datetime.fromisoformat(active["break_started_at"])
-            break_minutes += max(1, round((recorded_at - break_started).total_seconds() / 60))
-        clocked_on = datetime.fromisoformat(active["clock_in"])
-        paid_seconds = max(0, (recorded_at - clocked_on).total_seconds() - break_minutes * 60)
-        paid_hours = round(paid_seconds / 3600, 2)
-        db.execute(
-            """UPDATE time_entries
-               SET clock_out=?,hours=?,break_started_at=NULL,break_minutes=? WHERE id=?""",
-            (recorded_iso, paid_hours, break_minutes, active["id"]),
-        )
-        audit(
-            db, user["id"], "clock_off", "time_entry", active["id"],
-            {"paid_hours": paid_hours, "break_minutes": break_minutes}, client_ip(request),
-        )
-        return {
-            "state": "clocked_off", "entry_id": active["id"], "clock_out": recorded_iso,
-            "hours": paid_hours, "break_minutes": break_minutes,
-        }
+        return workforce.clock_action(db, user, workforce.ClockAction(**payload.model_dump()))
 
 
 @app.get("/api/staff/time-entries")
@@ -3470,7 +3427,7 @@ def create_manual_hours(
         location = location_by_slug(db, payload.location_slug)
         existing = rows(db.execute(
             """SELECT id,work_date,entry_scope,status FROM time_entries
-               WHERE staff_id=? AND week_start=? AND status<>'exported'""",
+               WHERE staff_id=? AND week_start=?""",
             (user["id"], payload.week_start.isoformat()),
         ))
         if payload.entry_mode == "weekly" and existing:
@@ -3488,12 +3445,18 @@ def create_manual_hours(
             start = datetime.combine(work_day, datetime.min.time(), tzinfo=MELBOURNE_TZ)
             finish = start + timedelta(hours=hours)
             current = db.execute(
-                """SELECT id,status FROM time_entries
+                """SELECT * FROM time_entries
                    WHERE staff_id=? AND week_start=? AND work_date=? AND entry_scope='daily'""",
                 (user["id"], payload.week_start.isoformat(), work_day.isoformat()),
             ).fetchone()
             if current and current["status"] != "draft":
                 raise HTTPException(status_code=409, detail=f"Hours for {work_day.isoformat()} have already been submitted")
+            if current and current["origin"] != "manual":
+                raise HTTPException(status_code=409, detail="Use a reviewed correction for an existing clock or legacy entry")
+            workforce.assert_no_entry_overlap(db, user["id"], {
+                "origin": "manual", "entry_scope": payload.entry_mode,
+                "work_date": work_day.isoformat(), "week_start": payload.week_start.isoformat(),
+            }, current["id"] if current else None)
             if current:
                 db.execute(
                     """UPDATE time_entries SET location_id=?,clock_in=?,clock_out=?,hours=?,notes=?
@@ -3512,6 +3475,9 @@ def create_manual_hours(
                     ),
                 ).lastrowid
                 saved_ids.append(entry_id)
+            db.execute("UPDATE time_entries SET origin='manual',worked_seconds=?,review_state='draft',entry_version=entry_version+? WHERE id=?",
+                       (int(workforce.Decimal(str(hours))*3600), 1 if current else 0, saved_ids[-1]))
+            workforce.record_event(db, user, saved_ids[-1], "manual_hours", payload.notes or "Staff-entered hours", current)
         audit(
             db, user["id"], "record_manual_hours", "time_entry",
             detail={"entry_ids": saved_ids, "week_start": payload.week_start.isoformat(), "entry_mode": payload.entry_mode, "total_hours": sum(hours for _, hours in values)},
@@ -3532,7 +3498,7 @@ def submit_timesheet(payload: SubmitTimesheetInput, request: Request, user: dict
         if user["role"] == "staff":
             where_owner = " AND staff_id=?"
             params.append(user["id"])
-        cursor = db.execute(f"UPDATE time_entries SET status='submitted' WHERE id IN ({placeholders}) AND clock_out IS NOT NULL AND status='draft'{where_owner}", params)
+        cursor = db.execute(f"UPDATE time_entries SET status='submitted',review_state='submitted' WHERE id IN ({placeholders}) AND clock_out IS NOT NULL AND status='draft'{where_owner}", params)
         audit(db, user["id"], "submit_timesheet", "time_entry", detail={"entry_ids": payload.entry_ids, "updated": cursor.rowcount}, ip_address=client_ip(request))
         return {"updated": cursor.rowcount}
 
@@ -4412,6 +4378,7 @@ def update_account_status(account_id: int, payload: AccountStatusInput, request:
         db.execute("UPDATE users SET active=? WHERE id=?", (int(payload.active), account_id))
         if not payload.active:
             db.execute("DELETE FROM sessions WHERE user_id=?", (account_id,))
+            db.execute("UPDATE account_tokens SET used_at=? WHERE user_id=? AND used_at IS NULL", (now_iso(), account_id))
         audit(
             db,
             user["id"],
@@ -4440,6 +4407,7 @@ def issue_temporary_password(account_id: int, payload: AdminPasswordResetInput, 
             (password_hash(payload.temporary_password), account_id),
         )
         db.execute("DELETE FROM sessions WHERE user_id=?", (account_id,))
+        db.execute("UPDATE account_tokens SET used_at=? WHERE user_id=? AND used_at IS NULL", (now_iso(), account_id))
         audit(db, user["id"], "issue_temporary_password", "user", account_id, {"role": account["role"]}, client_ip(request))
         return {"saved": True, "id": account_id, "must_change_password": True}
 
@@ -4685,12 +4653,8 @@ def admin_timesheets(user: dict[str, Any] = Depends(require_roles("admin"))) -> 
 def approve_timesheet(payload: ApproveTimesheetInput, request: Request, user: dict[str, Any] = Depends(require_roles("admin")), x_csrf_token: str | None = Header(default=None)) -> dict[str, Any]:
     csrf_guard(request, user, x_csrf_token)
     with db_session() as db:
-        entry = db.execute("SELECT * FROM time_entries WHERE id=? AND status='submitted'", (payload.entry_id,)).fetchone()
-        if not entry:
-            raise HTTPException(status_code=404, detail="Submitted time entry not found")
-        db.execute("UPDATE time_entries SET status='approved',approved_by=?,approved_at=? WHERE id=?", (user["id"], now_iso(), payload.entry_id))
-        audit(db, user["id"], "approve_timesheet", "time_entry", payload.entry_id, {"hours": entry["hours"]}, client_ip(request))
-        return {"approved": True, "entry_id": payload.entry_id}
+        db.execute("BEGIN IMMEDIATE")
+        return workforce.approve_entry(db, user, payload.entry_id)
 
 
 @app.post("/api/admin/classes")
@@ -5331,14 +5295,15 @@ async def sync_xero_timesheets(request: Request, user: dict[str, Any] = Depends(
             blocking_reasons.append("Xero earnings rate is not mapped")
         if missing_staff:
             blocking_reasons.append("One or more staff payroll mappings are incomplete")
-        blocking_reasons.append("Xero pay-period import and idempotent export tracking are not yet implemented")
+        blocking_reasons.append("Live payroll remains locked: provider-verified pay-period, calendar and earnings-rate import and operator reconciliation are required. The local idempotent adapter is implemented and tested without live transmission.")
         readiness = {
             "organisation_connected": True,
             "approved_entries": len(entries),
             "earnings_rate_mapped": bool(settings.xero_earnings_rate_id),
             "staff_mappings_complete": not missing_staff,
             "pay_period_import_implemented": False,
-            "idempotent_export_implemented": False,
+            "idempotent_export_implemented": True,
+            "live_payroll_authorised": False,
         }
         audit(
             db,
@@ -5699,6 +5664,10 @@ def audit_log(user: dict[str, Any] = Depends(require_roles("admin"))) -> dict[st
     with db_session() as db:
         query = """SELECT a.*,u.first_name,u.last_name FROM audit_log a LEFT JOIN users u ON u.id=a.user_id ORDER BY a.created_at DESC LIMIT 200"""
         return {"audit": rows(db.execute(query))}
+
+
+identity.register(app, session_user, csrf_guard)
+workforce.register(app, session_user, csrf_guard)
 
 
 @app.api_route("/api/{unmatched_path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])

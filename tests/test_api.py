@@ -2065,7 +2065,13 @@ def test_api_responses_are_never_cached(client):
     assert client.get("/api/health").headers.get("cache-control") == "no-store"
 
 
-def test_versioned_assets_are_cached_hard(client):
+def test_versioned_assets_are_cached_hard(client, monkeypatch):
+    from dataclasses import replace
+    from backend import server
+    development = client.get("/assets/styles.css?v=5.1.1")
+    assert development.status_code == 200
+    assert development.headers["cache-control"] == "no-store"
+    monkeypatch.setattr(server, "settings", replace(server.settings, app_env="production"))
     response = client.get("/assets/styles.css?v=5.1.1")
     if response.status_code == 200:
         assert "max-age=31536000" in response.headers.get("cache-control", "")
@@ -2296,14 +2302,17 @@ def test_staff_clock_records_breaks_and_paid_hours_without_location_tracking(cli
     assert break_start.json()["state"] == "on_break"
     break_end = client.post("/api/staff/clock", json={"action": "break_end", "location_slug": "wood-street"}, headers=headers)
     assert break_end.status_code == 200, break_end.text
-    assert break_end.json()["break_minutes"] >= 1
+    # Sub-minute breaks no longer invent a one-minute deduction.
+    assert break_end.json()["break_minutes"] >= 0
     clock_off = client.post("/api/staff/clock", json={"action": "out", "location_slug": "wood-street"}, headers=headers)
     assert clock_off.status_code == 200, clock_off.text
     assert clock_off.json()["state"] == "clocked_off"
     records = client.get("/api/staff/time-entries").json()["time_entries"]
     recorded = next(item for item in records if item["id"] == clock_on.json()["entry_id"])
     assert recorded["clock_out"]
-    assert recorded["break_minutes"] >= 1
+    assert recorded["break_minutes"] >= 0
+    assert recorded["status"] == "submitted"
+    assert recorded["worked_seconds"] == recorded["elapsed_seconds"] - recorded["unpaid_seconds"]
     assert recorded["latitude"] is None and recorded["longitude"] is None
 
 
