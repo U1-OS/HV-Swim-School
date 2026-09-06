@@ -23,6 +23,15 @@
   const heroCopy=document.querySelector('.enrolment-hero-grid > div > p');
   const lessonHeading=heroHeading.innerHTML;
   const lessonCopy=heroCopy.textContent;
+  const contactCopyTargets=[
+    ['.enrolment-hero .btn-primary','Write your message →'],
+    ['.enrolment-hero-card ol','<li><span>01</span><p><strong>Your message is saved</strong><small>A reference number confirms the enquiry was received.</small></p></li><li><span>02</span><p><strong>The team reviews it</strong><small>Your question goes to the right people at HV Swim.</small></p></li><li><span>03</span><p><strong>We follow up personally</strong><small>The team uses your preferred contact method.</small></p></li>'],
+    ['[data-step="4"] .wizard-heading > span','Your details · Review &amp; send'],
+    ['[data-step="4"] .wizard-heading > p','Add your message and the contact details the team should use.'],
+    ['[data-step="4"] .info-note','<strong>What happens next:</strong> Your enquiry is saved for the HV Swim team to review and follow up. This form does not take payment or change a booking. See the <a href="privacy.html">privacy policy</a> for how your details are handled.'],
+    ['#enrolment-success > p','Your enquiry has been saved to the HV Swim management inbox. Keep your reference number; the team will review your message and follow up using your preferred contact method.'],
+    ['#enrolment-success .success-next','<div><strong>1</strong><span>Your message is saved</span></div><div><strong>2</strong><span>The team reviews your question</span></div><div><strong>3</strong><span>We follow up personally</span></div>']
+  ].map(([selector,contact])=>{const element=document.querySelector(selector);return {element,contact,lesson:element?.innerHTML};});
   const lessonEnquiry=()=>['lesson','lesson_question','private_lesson'].includes(enquiryType.value);
   const scrollBehavior=()=>window.matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth';
   const DRAFT_KEY='hv-swim-enquiry-preferences-v1';
@@ -226,6 +235,7 @@
     document.body.classList.toggle('is-contact-enquiry',!isLesson);
     heroHeading.innerHTML=isLesson?lessonHeading:'Talk to <span>the HV Swim team.</span>';
     heroCopy.textContent=isLesson?lessonCopy:'Questions about your account, invoices or the collection? Send a message and the team will follow up using your preferred contact method.';
+    contactCopyTargets.forEach(({element,contact,lesson})=>{if(element)element.innerHTML=isLesson?lesson:contact;});
     document.querySelector('.enrolment-progress').hidden=!isLesson;
     document.querySelector('.enrolment-topline').hidden=!isLesson;
     for(const step of [1,2,3])stepElement(step).querySelectorAll('input,select,textarea').forEach(input=>{input.disabled=!isLesson;});

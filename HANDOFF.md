@@ -3,13 +3,51 @@
 Andrew swaps between Claude and Codex. Read this first and rewrite it last.
 
 **Wheel:** Codex
-**Last updated:** 2026-09-06 by Codex — interactive 3D rebuild verified
+**Last updated:** 2026-09-06 by Codex — UI18 accounts, workforce and accounting rebuild verified
 
 The working directory was missing on arrival. Restored the exact private GitHub main
 commit `676094ff874af6c2bd6fb5ff98fef979367773bc` into the empty local Developer path.
 This restored source only; no previous private runtime database was present or recovered.
 
-## Latest release
+## Latest release — UI18
+
+Presentation revision `5.13.0-ui18`; service-worker caches end in `-19`.
+Working branch: `codex/platform-rebuild-20260906`, based on verified private main
+`406306a0628cbd3ba8e36e724d4165465b9f2465`. Read `PLATFORM_REBUILD.md` and
+`WORKFORCE_OPERATIONS.md` before deployment or continuing backend work.
+
+- Preserved the approved logo, public content, enquiry-first enrolment, staff-only
+  uniforms, Xero lesson boundary and Shopify merchandise boundary. Apps remain paused.
+- Polished the shared navy/cyan/gold visual system and portal workspaces. Added optional
+  lightweight WebGL water with reduced-motion, low-power and failure fallbacks.
+- Rebuilt staff workday/working hours: exact server seconds, paid/unpaid breaks,
+  durable retry references, automatic submission and restart-safe persisted state.
+- Added assigned-manager review, rejection/resubmission, reasoned versioned corrections,
+  reapproval, immutable approved CSV/XLSX batches and separately approved amendments.
+- Full-ledger daily/weekly/fortnight/month/custom reports split overnight and daylight-
+  saving intervals. Old manual daily/weekly entry remains, with overlap/export guards.
+- Extended existing accounts with invitation/activation, generic recovery, private
+  handover controls, encrypted TOTP, proof-attempt limits and session revocation.
+- Added a tested per-employee Xero AU 2.0 draft-timesheet adapter with durable outcomes.
+  **Live payroll stays locked:** provider resource import and operator reconciliation
+  UI remain outstanding; no real payment, payroll or email was sent.
+- Fixed preview caching and development-tool security advisories. Python and JavaScript
+  dependency audits report no known vulnerabilities. One glob deprecation remains.
+- Final checks: **151 Python passed, 1 existing seed-dependent test skipped**;
+  two upstream Python test-client deprecation warnings remain. Static checker and all
+  five Node regression suites passed; 53 smoke and 20/20 HTTP security checks passed.
+- Browser checks covered public mobile/tablet/desktop, family and management route
+  matrices, staff routes and start/break/finish/approve/export. Detailed limits and
+  counts are in `PLATFORM_REBUILD.md`; these are not independent certification.
+- Active isolated preview: `http://127.0.0.1:8769/index.html`, data directory
+  `/tmp/hv-swim-rebuild.lZtm3g`. Its marked QA shift/export is synthetic. The old
+  8768 preview may still run older loaded backend code; do not use it for UI18 testing.
+- API-generated sample CSV/XLSX files in `/private/tmp/hv-swim-delivery-20260906`
+  reconcile 43,254 seconds / 12.015 hours. They contain labelled fictional records.
+- SQLite is the implemented database. Unsupported DATABASE_URL/HV_DATABASE_URL settings
+  now fail closed. No real private database was restored, migrated or published.
+
+## Previous presentation release — historical
 
 Presentation revision `5.13.0-ui16`; service-worker caches end in `-17`.
 Read `INTERACTIVE_3D_REBUILD.md` for this release's complete evidence.
@@ -62,7 +100,7 @@ source from GitHub, not those earlier private records. Private runtime data rema
 - Python 3.12 local environment prepared as `.venv312`; old `.venv` preserved.
 - Repeatable role/page browser matrix and UI auth regressions added.
 
-## Verification
+## Earlier foundation verification — historical
 
 Final evidence is in `PREMIUM_V2_UPGRADE_REPORT.md`. The core results are:
 

@@ -6,7 +6,7 @@
   "description": "HV Swim Bendigo website quality tooling; paused mobile source is retained for a later phase.",
   "scripts": {
     "quality": "node scripts/check-site.mjs",
-    "test": "node scripts/check-site.mjs && node tests/test_experience.mjs && node tests/test_platform_dates.mjs",
+    "test": "node scripts/check-site.mjs && node tests/test_experience.mjs && node tests/test_aquatic_scene.mjs && node tests/test_platform_dates.mjs && node tests/test_login.mjs && node tests/test_logout.mjs",
     "mobile:web": "node scripts/build-mobile-web.mjs",
     "mobile:add:ios": "npm run mobile:web && npx cap add ios",
     "mobile:add:android": "npm run mobile:web && npx cap add android",

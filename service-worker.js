@@ -1,11 +1,11 @@
-const CORE_CACHE = 'hv-swim-v5130-core-17';
-const RUNTIME_CACHE = 'hv-swim-v5130-runtime-17';
-const PUBLIC_DATA_CACHE = 'hv-swim-v5130-public-data-17';
+const CORE_CACHE = 'hv-swim-v5130-core-19';
+const RUNTIME_CACHE = 'hv-swim-v5130-runtime-19';
+const PUBLIC_DATA_CACHE = 'hv-swim-v5130-public-data-19';
 const CORE_SHELL = [
-  './assets/experience.css?v=5.13.0-ui16', './assets/experience.js?v=5.13.0-ui16',
+  './assets/experience.css?v=5.13.0-ui18', './assets/experience.js?v=5.13.0-ui18',
   './offline.html', './manifest.webmanifest',
-  './assets/styles.css?v=5.13.0-ui16', './assets/app.js?v=5.13.0-ui16',
-  './assets/support.css?v=5.13.0-ui16', './assets/support.js?v=5.13.0-ui16',
+  './assets/styles.css?v=5.13.0-ui18', './assets/app.js?v=5.13.0-ui18',
+  './assets/support.css?v=5.13.0-ui18', './assets/support.js?v=5.13.0-ui18',
   './assets/icons.svg', './assets/hv-swim-logo-v3.png',
   './assets/fonts/manrope-latin-variable.woff2',
   './assets/app-icon-v3-64.png', './assets/app-icon-v3-192.png',
@@ -80,6 +80,11 @@ self.addEventListener('fetch', event => {
   if (/\.(?:css|js|woff2|png|jpe?g|webp|avif|svg)$/i.test(url.pathname)) {
     event.respondWith((async () => {
       const cached = await caches.match(event.request);
+      if (['localhost','127.0.0.1','[::1]'].includes(url.hostname)) {
+        // Local rebuilds must not stay on an old immutable asset between edits.
+        try { return await cacheSuccessful(RUNTIME_CACHE, event.request, await fetch(event.request,{cache:'no-store'})); }
+        catch (_) { return cached || Response.error(); }
+      }
       const network = fetch(event.request).then(response => cacheSuccessful(RUNTIME_CACHE, event.request, response)).catch(() => cached || Response.error());
       return cached || network;
     })());

@@ -4,6 +4,11 @@ Premium public website and connected operations platform for HV Swim Bendigo. Th
 
 ## Preview on this Mac
 
+The current UI18 workforce rebuild is documented in `PLATFORM_REBUILD.md` and
+`WORKFORCE_OPERATIONS.md`. It adds exact server-timed shifts and breaks, scoped
+management, invitations/recovery, optional authenticator MFA, approved CSV/XLSX
+batches and a controlled Xero AU adapter. Live payroll remains locked.
+
 The working copy lives at `/Users/u1/Developer/HV-Swim-School`, outside iCloud-synced
 Desktop/Documents. Keep tested changes in the private `U1-OS/HV-Swim-School` GitHub repo;
 do not upload `.env`, databases, certificates or customer records. The earlier Documents
@@ -108,7 +113,7 @@ Demo credentials only work while `HV_APP_ENV=development`. Production mode disab
 - Enquiry preference recovery that deliberately excludes names, contact details and free-text notes from browser storage
 - Role-specific family and staff next-action hubs plus a management attention queue built from existing API data
 - Cached Shopify storefront/cart and Printify catalogue boundaries
-- Xero OAuth connection, staff mapping and an audited payroll-readiness preview; outbound payroll transmission remains locked until real pay periods and idempotent export tracking are implemented
+- Xero OAuth connection, staff mapping and an audited payroll-readiness preview; the durable timesheet adapter is implemented and locally tested, while outbound payroll stays locked pending provider-verified resources/pay periods and operator reconciliation
 - Explicit payment routing: lesson/term charges and approved absence-credit adjustments
   belong to the reviewed Xero invoicing workflow; approved merchandise belongs to Shopify
   Checkout, with staff uniforms kept inside protected staff/management views. Neither route
