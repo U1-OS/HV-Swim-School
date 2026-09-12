@@ -49,3 +49,31 @@ jobs:
       - run: node tests/test_aquatic_scene.mjs
       - run: node tests/test_platform_dates.mjs
       - run: node tests/test_lesson_pathway.mjs
+
+  postgres:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: hv_test
+          POSTGRES_USER: hv_test
+          POSTGRES_PASSWORD: disposable-ci-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U hv_test -d hv_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      HV_LOAD_DOTENV: 'false'
+      HV_TEST_POSTGRES_URL: postgresql://hv_test:disposable-ci-password@127.0.0.1:5432/hv_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r requirements-dev.txt
+      - run: python -m pytest tests/test_api.py tests/test_launch_operations.py tests/test_workforce.py tests/test_payroll_adapter.py tests/test_postgres_migration.py -q

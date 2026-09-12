@@ -3,13 +3,54 @@
 Andrew swaps between Claude and Codex. Read this first and rewrite it last.
 
 **Wheel:** Codex
-**Last updated:** 2026-09-13 by Codex — pagination, local email drafts and launch preparation verified
+**Last updated:** 2026-09-13 by Codex — operations/security checkpoint; master brief implementation continues
 
 The working directory was missing on arrival. Restored the exact private GitHub main
 commit `676094ff874af6c2bd6fb5ff98fef979367773bc` into the empty local Developer path.
 This restored source only; no previous private runtime database was present or recovered.
 
-## Current work — UI21 launch preparation
+## Current work — UI22 operations and security foundation
+
+Andrew authorised all six operational improvements, security/legal hardening and then
+provided the full master rebuild brief. **Bendigo, Victoria explicitly reconfirmed**;
+ignore the brief's Logan/Queensland assumptions. New visual direction: premium dark.
+No domain/hosting purchased. No approval to deploy publicly, send live messages or
+activate financial transactions. The one-week sale intention remains ambiguous.
+
+Checkpoint verification: 181 SQLite tests passed / 2 skipped; 137 PostgreSQL contracts
+passed / 1 skipped; six Node suites and mandatory static checks passed.
+
+Current additions: dated lesson calendar; held encrypted mail queue with retries and
+uncertain-send review; encrypted SQLite/database/upload/key recovery; PostgreSQL adapter
+and empty-schema migration with checksums; owner launch-evidence workspace; cookie,
+security and accessibility pages and privacy/terms corrections. Full details and test
+results are in `OPERATIONS_SECURITY_UPGRADE.md` (maintained during this checkpoint).
+
+Independent read-only reviews found and prompted fixes for raw encryption-prefix input,
+OAuth browser binding/local MFA, account-mail approval bypass, chunked request memory
+limits, safeguarding-family disclosure, calendar billing/removal conflict, retrospective
+absence credits and stale browser weather. No independent production pentest has occurred.
+
+### Next up — master brief, not completed
+
+- Finish focused security/operational regression evidence and browser checks; retain exact
+  commands/results in the upgrade report. Add PostgreSQL CI and full uploaded-file recovery.
+- Consolidate premium dark theme across every public/portal state; preserve working flows.
+- Extend enquiries with immutable notes/call events, consent evidence and registration
+  resource versioning/secure expiry-aware manual issue/copy workflow; reuse support messaging.
+- Scheduled management announcements/ticker/archive; bounded CMS for programs, FAQ,
+  parent information, approved acknowledgement and child-safety material.
+- Victorian child-safety section, private review/complaint workflows, policy approval and
+  processor/retention register. Torres Strait flag reproduction requires prior written
+  TSIRC permission: do not download/publish the artwork until rights are recorded.
+- Privacy-first optional analytics only if justified by actual business need; current
+  inert CTA attributes are not analytics. No advertising tracking exists.
+- Responsive/keyboard/reduced-motion/browser functional verification; actual Safari/iPhone
+  and VoiceOver verification remain unavailable locally unless a suitable surface is present.
+- Final update README/environment/deployment/one-week handover checklist, commit and push
+  every verified update. Never present drafts as legal compliance or claim bulletproof security.
+
+## Previous work — UI21 launch preparation
 
 Andrew selected all five next steps and confirmed no domain or hosting account yet.
 Repository visibility is now PUBLIC by Andrew's action. Continue pushing verified source;

@@ -20,6 +20,7 @@ from fastapi import Depends, Header, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 from .database import audit, db_session, rows
+from .config import settings
 from .security import (
     decrypt_sensitive,
     encrypt_sensitive,
@@ -128,7 +129,7 @@ def verify_mfa(db, user, code) -> bool:
 
 
 def email_configured():
-    return all(
+    return settings.production and os.getenv("HV_EMAIL_LIVE_APPROVED")=="true" and all(
         os.getenv(key)
         for key in ("HV_SMTP_HOST", "HV_SMTP_USER", "HV_SMTP_PASSWORD", "HV_SMTP_FROM")
     )

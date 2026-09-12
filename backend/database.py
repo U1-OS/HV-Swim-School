@@ -569,6 +569,9 @@ CREATE INDEX IF NOT EXISTS idx_login_attempts_created_at ON login_attempts(creat
 
 
 def connect() -> sqlite3.Connection:
+    if settings.database_url:
+        from .postgres_storage import Connection
+        return Connection(settings.database_url)
     connection = sqlite3.connect(DB_PATH, timeout=15, check_same_thread=False)
     connection.row_factory = sqlite3.Row
     connection.execute("PRAGMA foreign_keys=ON")
@@ -648,12 +651,21 @@ def migrate_legacy_bookings_table(db: sqlite3.Connection) -> None:
 
 def initialise_database() -> None:
     with db_session() as db:
+        if settings.database_url:
+            from .postgres_storage import install_helpers
+            install_helpers(db)
         # WAL allows readers to continue while a short management write is committed.
         # The explicit busy timeout above turns brief write contention into a bounded wait
         # instead of an immediate operational error.
         db.execute("PRAGMA journal_mode=WAL")
         db.executescript(SCHEMA)
-        migrate_legacy_bookings_table(db)
+        from .lesson_calendar import SCHEMA as CALENDAR_SCHEMA
+        db.executescript(CALENDAR_SCHEMA)
+        from .mail_queue import SCHEMA as MAIL_SCHEMA
+        db.executescript(MAIL_SCHEMA)
+        from .launch_readiness import SCHEMA as LAUNCH_SCHEMA
+        db.executescript(LAUNCH_SCHEMA)
+        if not settings.database_url: migrate_legacy_bookings_table(db)
         # Rate-limit records carry email and IP data. Enforce the documented retention at
         # startup as well as during sign-in so a site receiving only failed traffic cannot
         # grow or retain these rows indefinitely.
@@ -662,7 +674,8 @@ def initialise_database() -> None:
         # Public lesson enquiries are kept for six months under the confirmed business
         # policy. Enrolled-family and ticket records have separate operational purposes.
         enquiry_cutoff = (datetime.now(timezone.utc) - timedelta(days=183)).isoformat()
-        db.execute("DELETE FROM enquiries WHERE created_at<=?", (enquiry_cutoff,))
+        db.execute("DELETE FROM mail_outbox WHERE created_at<=? AND status NOT IN ('processing','uncertain')", (enquiry_cutoff,))
+        db.execute("DELETE FROM enquiries WHERE status='closed' AND created_at<=?", (enquiry_cutoff,))
         # Database-level guards against double booking. Application code already checks,
         # but two requests arriving together can both pass that check before either writes.
         # Created defensively: an older database containing duplicates must not stop startup.
@@ -690,6 +703,8 @@ def initialise_database() -> None:
             "next_action": "TEXT NOT NULL DEFAULT 'review'",
             "follow_up_on": "TEXT",
             "revision": "INTEGER NOT NULL DEFAULT 0",
+            "collection_notice_version": "TEXT",
+            "acknowledged_at": "TEXT",
 
         }.items():
             if column not in enquiry_columns:
@@ -815,7 +830,7 @@ def initialise_database() -> None:
                 db.execute(
                     """UPDATE swimmers SET emergency_contact=?,medical_notes=?,allergies=?,medications=?,support_notes=?
                        WHERE id=?""",
-                    (*(encrypt_sensitive(value) for value in values), swimmer["id"]),
+                    (*(value if value and value.startswith(SENSITIVE_VALUE_PREFIX) else encrypt_sensitive(value) for value in values), swimmer["id"]),
                 )
         attendance_columns = {row[1] for row in db.execute("PRAGMA table_info(lesson_attendance)")}
         if "term_id" not in attendance_columns:
