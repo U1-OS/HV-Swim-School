@@ -112,6 +112,24 @@ def decrypt_sensitive(value: str | None) -> str | None:
         raise RuntimeError("Sensitive customer data could not be decrypted") from exc
 
 
+
+PRIVATE_FILE_PREFIX = b"HVFILE1"
+
+
+def encrypt_private_file(value: bytes) -> bytes:
+    """Authenticated private document encryption using the deployment data key."""
+    return PRIVATE_FILE_PREFIX + bytes(_data_secret_box().encrypt(value))
+
+
+def decrypt_private_file(value: bytes) -> bytes:
+    if not value.startswith(PRIVATE_FILE_PREFIX):
+        raise ValueError("Private document encryption format is invalid")
+    try:
+        return _data_secret_box().decrypt(value[len(PRIVATE_FILE_PREFIX):])
+    except CryptoError as exc:
+        raise ValueError("Private document could not be decrypted") from exc
+
+
 def public_user(row: Any) -> dict[str, Any]:
     payload = {
         "id": row["id"],

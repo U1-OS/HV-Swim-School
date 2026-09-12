@@ -95,7 +95,7 @@ def test_skill_progress_preserves_history_encryption_and_role_boundaries(client)
     assert client.post("/api/staff/skill-progress", json=payload).status_code == 403
     client.cookies.clear()
     staff_csrf = sign_in(client, STAFF)
-    assert client.post("/api/staff/skill-progress", json=payload | {"swimmer_id": 999999}, headers={"X-CSRF-Token": staff_csrf}).status_code == 404
+    assert client.post("/api/staff/skill-progress", json=payload | {"swimmer_id": 999999}, headers={"X-CSRF-Token": staff_csrf}).status_code == 403
     client.cookies.clear()
     csrf = sign_in(client, ADMIN)
     first = client.post("/api/staff/skill-progress", json=payload, headers={"X-CSRF-Token": csrf})
@@ -133,19 +133,19 @@ def test_roster_conflicts_edits_and_permissions(client):
     client.cookies.clear()
     csrf = sign_in(client, ADMIN)
     staff = client.get("/api/admin/staff").json()["staff"][0]
-    payload = {"staff_id": staff["id"], "location_slug": "wood-street", "shift_date": "2099-05-04",
-               "start_time": "09:00", "end_time": "11:00", "role_label": "QA instructor"}
+    payload = {"staff_id": staff["id"], "location_slug": "wood-street", "shift_date": (date.today() + timedelta(days=100)).isoformat(),
+               "start_time": "09:00", "end_time": "11:00", "role_label": "QA instructor", "status": "published"}
     headers = {"X-CSRF-Token": csrf}
-    first = client.post("/api/admin/roster", json=payload, headers=headers)
+    first = client.post("/api/management/roster", json=payload, headers=headers)
     assert first.status_code == 200, first.text
-    assert client.post("/api/admin/roster", json=payload | {"location_slug": "bendigo-east"}, headers=headers).status_code == 409
-    adjacent = client.post("/api/admin/roster", json=payload | {"start_time": "11:00", "end_time": "12:00"}, headers=headers)
+    assert client.post("/api/management/roster", json=payload | {"location_slug": "bendigo-east"}, headers=headers).status_code == 409
+    adjacent = client.post("/api/management/roster", json=payload | {"start_time": "11:00", "end_time": "12:00"}, headers=headers)
     assert adjacent.status_code == 200, adjacent.text
-    route = f"/api/admin/roster/{first.json()['id']}"
-    assert client.patch(route, json=payload | {"end_time": "11:30"}, headers=headers).status_code == 409
-    assert client.patch(route, json=payload | {"end_time": "10:30"}, headers=headers).status_code == 200
-    assert client.patch(route, json=payload | {"shift_date": "2000-01-01"}, headers=headers).status_code == 409
-    assert client.patch(route, json=payload).status_code == 403
+    route = f"/api/management/roster/{first.json()['shift']['id']}"
+    assert client.patch(route, json=payload | {"revision": 0, "end_time": "11:30"}, headers=headers).status_code == 409
+    assert client.patch(route, json=payload | {"revision": 0, "end_time": "10:30"}, headers=headers).status_code == 200
+    assert client.patch(route, json=payload | {"revision": 1, "shift_date": "2000-01-01"}, headers=headers).status_code == 422
+    assert client.patch(route, json=payload | {"revision": 1}).status_code == 403
     client.cookies.clear()
     staff_csrf = sign_in(client, STAFF)
     assert client.patch(route, json=payload, headers={"X-CSRF-Token": staff_csrf}).status_code == 403
@@ -163,10 +163,15 @@ def test_incident_review_is_encrypted_and_excluded_from_family(client):
                "what_happened": "QA record: child stopped at the pool edge.", "severity": "moderate",
                "first_aider": "QA instructor", "supporting_notes": "Staff-only QA handover",
                "emergency_services": True}
-    created = client.post("/api/staff/incidents", json=payload, headers={"X-CSRF-Token": staff_csrf})
+    assert client.post("/api/staff/incidents", json=payload, headers={"X-CSRF-Token": staff_csrf}).status_code == 403
+    client.cookies.clear()
+    owner_csrf = sign_in(client, ADMIN)
+    created = client.post("/api/staff/incidents", json=payload, headers={"X-CSRF-Token": owner_csrf})
     assert created.status_code == 200, created.text
     incident_id = created.json()["id"]
     route = f"/api/admin/incidents/{incident_id}"
+    client.cookies.clear()
+    staff_csrf = sign_in(client, STAFF)
     assert client.patch(route, json={"status": "closed"}, headers={"X-CSRF-Token": staff_csrf}).status_code == 403
     client.cookies.clear()
     csrf = sign_in(client, ADMIN)
@@ -211,7 +216,7 @@ def test_protected_system_health_checks_database_without_exposing_paths_or_secre
 
 def test_api_body_limits_allow_certificate_uploads_but_reject_ordinary_large_requests(client):
     client.cookies.clear()
-    csrf = sign_in(client, STAFF)
+    csrf = sign_in(client, ADMIN)
     headers = {"X-CSRF-Token": csrf}
     # This is deliberately over the normal 2 MB API limit. The qualification route is
     # allowed to reach its own validator, which rejects the fake file by signature.
@@ -931,7 +936,7 @@ def test_public_merchandise_catalogue_does_not_expose_costs_or_supplier_referenc
     assert all(item.get("audience") != "staff" for item in response.json()["products"])
 
 
-def test_staff_merchandise_is_protected_and_staff_only(client, monkeypatch):
+def test_uniform_merchandise_is_management_only(client, monkeypatch):
     from backend import server
 
     monkeypatch.setattr(server, "shopify_ready", lambda: False)
@@ -941,6 +946,9 @@ def test_staff_merchandise_is_protected_and_staff_only(client, monkeypatch):
     assert client.get("/api/staff/merchandise").status_code == 403
     client.cookies.clear()
     sign_in(client, STAFF)
+    assert client.get("/api/staff/merchandise").status_code == 403
+    client.cookies.clear()
+    sign_in(client, ADMIN)
     response = client.get("/api/staff/merchandise")
     assert response.status_code == 200
     assert response.json()["audience"] == "staff_only"
@@ -1225,7 +1233,7 @@ def test_incident_report_links_family_swimmer_and_worker_numbers_with_encrypted_
     sign_in(client, FAMILY)
     family_swimmer_id = client.get("/api/customer/swimmers").json()["swimmers"][0]["id"]
     client.cookies.clear()
-    staff_csrf = sign_in(client, STAFF)
+    staff_csrf = sign_in(client, ADMIN)
     setup = client.get("/api/staff/incidents")
     assert setup.status_code == 200, setup.text
     swimmer = next(item for item in setup.json()["swimmers"] if item["id"] == family_swimmer_id)
@@ -1351,36 +1359,26 @@ def test_hv_achievement_templates_are_complete_and_authenticated(client):
     assert payload["certificate_rendering"] == "html_print"
 
 
-def test_staff_achievement_eligibility_contains_only_confirmed_classes_they_instruct(client):
-    from backend.database import db_session
-
+def test_staff_cannot_list_achievement_details_or_family_data(client):
     client.cookies.clear()
     sign_in(client, STAFF)
-    staff_id = client.get("/api/auth/me").json()["user"]["id"]
     response = client.get("/api/staff/achievements")
-    assert response.status_code == 200
-    payload = response.json()
-    assert payload["eligible_swimmers"]
-    assert "customer_id" not in response.text
+    assert response.status_code == 403
+    assert "eligible_swimmers" not in response.text
     assert "customer_email" not in response.text
-    with db_session() as db:
-        for item in payload["eligible_swimmers"]:
-            eligible = db.execute(
-                """SELECT 1 FROM bookings b JOIN classes c ON c.id=b.class_id
-                   WHERE b.swimmer_id=? AND b.class_id=? AND b.status='confirmed' AND c.instructor_id=?""",
-                (item["swimmer_id"], item["class_id"], staff_id),
-            ).fetchone()
-            assert eligible is not None
 
 
-def test_staff_can_issue_and_revoke_an_achievement_with_family_safe_visibility(client):
+def test_admin_can_issue_and_revoke_an_achievement_with_family_safe_visibility(client):
     from backend.database import db_session
 
     private_marker = "Coach-only progression marker 8421"
     evidence = "Stayed relaxed, listened carefully and completed three controlled floats."
     client.cookies.clear()
-    staff_csrf = sign_in(client, STAFF)
-    eligible = client.get("/api/staff/achievements").json()["eligible_swimmers"][0]
+    sign_in(client, FAMILY)
+    owned_id = client.get("/api/customer/swimmers").json()["swimmers"][0]["id"]
+    client.cookies.clear()
+    staff_csrf = sign_in(client, ADMIN)
+    eligible = next(row for row in client.get("/api/staff/achievements").json()["eligible_swimmers"] if row["swimmer_id"] == owned_id)
     issued = client.post(
         "/api/staff/achievements",
         json={
@@ -1419,7 +1417,7 @@ def test_staff_can_issue_and_revoke_an_achievement_with_family_safe_visibility(c
     assert any(item["kind"] == "achievement" and reference in item["message"] for item in notifications)
 
     client.cookies.clear()
-    staff_csrf = sign_in(client, STAFF)
+    staff_csrf = sign_in(client, ADMIN)
     reason = "Issued against the wrong lesson observation."
     revoked = client.post(
         f"/api/staff/achievements/{achievement_id}/revoke",
@@ -1452,43 +1450,23 @@ def test_staff_can_issue_and_revoke_an_achievement_with_family_safe_visibility(c
     assert revoke_audit and reason in revoke_audit["detail"] and revoke_audit["ip_address"]
 
 
-def test_staff_cannot_award_outside_a_confirmed_class_they_instruct(client):
+def test_staff_cannot_award_any_achievement_even_for_own_class(client):
     from backend.database import db_session
-
     client.cookies.clear()
-    staff_csrf = sign_in(client, STAFF)
+    csrf = sign_in(client, STAFF)
     staff_id = client.get("/api/auth/me").json()["user"]["id"]
-    eligible = client.get("/api/staff/achievements").json()["eligible_swimmers"][0]
-    missing_class = client.post(
-        "/api/staff/achievements",
-        json={
-            "template_code": "first-splash", "swimmer_id": eligible["swimmer_id"],
-            "evidence_note": "A positive first lesson.", "private_staff_note": "",
-        },
-        headers={"X-CSRF-Token": staff_csrf},
-    )
-    assert missing_class.status_code == 400
-
     with db_session() as db:
-        foreign_class = db.execute(
-            "SELECT id FROM classes WHERE instructor_id IS NOT NULL AND instructor_id<>? ORDER BY id LIMIT 1",
-            (staff_id,),
-        ).fetchone()
-        assert foreign_class is not None
-        db.execute(
-            "INSERT OR IGNORE INTO bookings(class_id,swimmer_id,status,created_at) VALUES(?,?,?,?)",
-            (foreign_class["id"], eligible["swimmer_id"], "confirmed", datetime.now(timezone.utc).isoformat()),
-        )
-    forbidden = client.post(
-        "/api/staff/achievements",
-        json={
-            "template_code": "first-splash", "swimmer_id": eligible["swimmer_id"],
-            "class_id": foreign_class["id"], "evidence_note": "A positive first lesson.",
-            "private_staff_note": "Must not be stored",
-        },
-        headers={"X-CSRF-Token": staff_csrf},
-    )
-    assert forbidden.status_code == 404
+        eligible = db.execute("SELECT b.swimmer_id,c.id class_id FROM bookings b JOIN classes c ON c.id=b.class_id WHERE c.instructor_id=? AND b.status='confirmed' LIMIT 1", (staff_id,)).fetchone()
+        before = db.execute('SELECT COUNT(*) FROM swimmer_achievements').fetchone()[0]
+    assert eligible is not None
+    for class_id in (eligible['class_id'], 999999):
+        response = client.post('/api/staff/achievements', json={
+            'template_code':'first-splash', 'swimmer_id':eligible['swimmer_id'], 'class_id':class_id,
+            'evidence_note':'Synthetic positive lesson.', 'private_staff_note':'Must not be stored'
+        },headers={'X-CSRF-Token':csrf})
+        assert response.status_code == 403
+    with db_session() as db:
+        assert db.execute('SELECT COUNT(*) FROM swimmer_achievements').fetchone()[0] == before
 
 
 def test_admin_can_award_any_swimmer_but_family_ownership_and_revoke_roles_stay_isolated(client):
@@ -1698,7 +1676,7 @@ def test_customer_support_tickets_require_csrf_and_are_ownership_isolated(client
     assert reply.json()["status"] == "open"
 
 
-def test_staff_support_queue_keeps_internal_notes_private_and_reports_delivery_boundaries(client):
+def test_admin_support_queue_keeps_internal_notes_private_and_reports_delivery_boundaries(client):
     from backend.database import db_session
 
     client.cookies.clear()
@@ -1718,7 +1696,7 @@ def test_staff_support_queue_keeps_internal_notes_private_and_reports_delivery_b
     visible_marker = "The HV Swim team has checked your account message area."
 
     client.cookies.clear()
-    staff_csrf = sign_in(client, STAFF)
+    staff_csrf = sign_in(client, ADMIN)
     staff_id = client.get("/api/auth/me").json()["user"]["id"]
     queue = client.get("/api/staff/support-tickets")
     assert queue.status_code == 200 and reference in queue.text
@@ -1760,7 +1738,7 @@ def test_staff_support_queue_keeps_internal_notes_private_and_reports_delivery_b
     assert "visibility" not in family_text
 
     client.cookies.clear()
-    sign_in(client, STAFF)
+    sign_in(client, ADMIN)
     staff_detail = client.get(f"/api/staff/support-tickets/{ticket_id}").json()["ticket"]
     assert private_marker in str(staff_detail)
     with db_session() as db:
@@ -1842,7 +1820,7 @@ def test_pool_closure_alert_is_updated_then_resolved_with_a_reopening_notice(cli
     from backend.database import db_session
 
     client.cookies.clear()
-    staff_csrf = sign_in(client, STAFF)
+    staff_csrf = sign_in(client, ADMIN)
     closed = client.post(
         "/api/staff/pool-readings",
         json={"location_slug": "wood-street", "temperature": None, "status": "closed", "note": "Lessons are paused due to an unexpected pool closure."},
@@ -2366,7 +2344,7 @@ def test_lesson_register_enforces_assignment_parent_and_photo_rules(client):
     occurrence = (term_start + timedelta(days=(3 - term_start.weekday()) % 7)).isoformat()
 
     client.cookies.clear()
-    csrf = sign_in(client, STAFF)
+    csrf = sign_in(client, ADMIN)
     register = client.get(f"/api/staff/lesson-register?occurrence_date={occurrence}")
     assert register.status_code == 200, register.text
     class_item = next(item for item in register.json()["classes"] if item["title"] == "Learn to Swim 3")
@@ -2472,7 +2450,7 @@ def test_staff_clock_rejects_location_coordinates_in_payload(client):
 
 def test_pool_temperature_outside_a_plausible_range_is_rejected(client):
     client.cookies.clear()
-    csrf = sign_in(client, STAFF)
+    csrf = sign_in(client, ADMIN)
     for bad in (-5, 80):
         response = client.post(
             "/api/staff/pool-readings",

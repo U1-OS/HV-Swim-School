@@ -2,7 +2,7 @@
 
 Andrew swaps between Claude and Codex. Read this first and rewrite it last.
 
-**Wheel:** Codex
+**Wheel:** Root Codex — sole editor; requirements_audit backend handback complete
 **Last updated:** 2026-09-13 by Codex — fresh rebuild explicitly authorised; branch codex/fresh-brand-rebuild
 
 The working directory was missing on arrival. Restored the exact private GitHub main
@@ -23,17 +23,25 @@ crisp static text and restrained vector water motion. No new clone or second wor
 No live data destruction, public deployment, financial activation or outgoing messages.
 The full prior source is recoverable through Git; do not duplicate it into served folders.
 
-Root Codex is the only editor. Audit agents are read-only. Current implementation and
-verification progress will be updated below before each pushed checkpoint.
+The bounded staff backend implementation and regression phase is complete. Root now holds the sole-editor role again for frontend integration, paperwork and the verified GitHub checkpoint; requirements_audit is read-only. No commit or push was made by the implementation subagent.
 
-## Active work — security and owner-requested additions
+## Active work - separate portals and owner paperwork
 
-13 September: Andrew asks for deeper security testing, then confirms the planned merchandise
-range from hvswimshop.png, flags/Acknowledgement of Country, restricted staff self-service
-(profile, clock, roster, leave and certificates), and Google/Apple-only sign-in linked to
-profiles. Root remains the sole editor; three agents audit read-only. Security work is in
-progress. No production, external message or live commerce approval. Provider credentials,
-domain and Torres Strait flag publication permission still require resolution.
+Root is sole editor. Staff backend and dedicated staff.html/team.html interfaces are
+implemented. Parent and owner use customer.html/admin.html; the legacy platform entry
+routes the authenticated role to its own portal. Staff have own details, clock/work hours,
+published roster, leave, absence/unavailability notices and private documents only.
+Start shift / Finish shift were browser-tested with synthetic records. Completed hours
+appear in My hours. Shift notices never edit planned rosters or actual payroll.
+Full backend: 204 passed / 2 skipped. Focused staff suite: 12 passed. Static site, login,
+logout and private-cache tests pass. No real records, live messages or payments changed.
+See STAFF_PORTAL_API.md; new notice routes are /api/workforce/shift-notices and
+/api/management/shift-notices with revisioned management review.
+
+Next: owner/parent visual cleanup, owner paperwork library (nine fillable business forms
+plus five achievement certificates), confirmed merchandise/flags, provider-only sign-in.
+The PDF generator and blank masters are currently separate unfinished additions, not yet
+integrated or visually verified. Do not describe them as completed functionality yet.
 
 ## Security checkpoint — verified before next feature work
 

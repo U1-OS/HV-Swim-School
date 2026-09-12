@@ -2,7 +2,8 @@
   'use strict';
 
   const page = document.body.dataset.platformPage;
-  const roleLabels = { customer: 'Family account', staff: 'Staff workspace', admin: 'Management operations' };
+  const roleLabels = { customer: 'Parent portal', staff: 'Staff portal', admin: 'Owner & admin' };
+  const portalFor = role => ({customer:'customer.html',staff:'staff.html',admin:'admin.html'}[role] || 'login.html');
   const weekday = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
   let session = { user: null, csrf: null };
   let routeController = null;
@@ -149,7 +150,7 @@
       staff: {
         eyebrow: 'Staff sign in',
         heading: 'Ready for the pool deck?',
-        copy: 'Open your roster, pool checks, tickets and timesheets in the secure staff workspace.',
+        copy: 'Start or finish your shift, view your roster and hours, request time off and update your own details.',
         submit: 'Open staff workspace',
         title: 'Staff sign in | HV Swim Bendigo'
       },
@@ -169,7 +170,8 @@
       event.preventDefault(); error.classList.remove('show'); submit.disabled = true; submit.textContent = 'Signing in…';
       try {
         await api('/api/auth/login',{method:'POST',body:JSON.stringify({email:email.value,password:password.value,code:document.getElementById('login-code')?.value||''})});
-        location.href = 'platform.html';
+        const signedIn = await api('/api/auth/me');
+        location.href = portalFor(signedIn.user.role);
       } catch (problem) {
         error.textContent = problem.message; error.classList.add('show'); submit.disabled = false; submit.textContent = submitLabel;
       }
@@ -251,12 +253,12 @@
   const navByRole = {
     customer: [['overview','home','Home'],['classes','calendar','Lesson enquiry'],['bookings','clock','My lessons'],['billing','document','Billing & invoices'],['absences','document','Absences'],['swimmers','heart','Child details'],['achievements','status','Progress & certificates'],['incidents','shield','Incident reports'],['messages','message','Messages'],['shop','bag','Family shop'],['notifications','bell','Notices & reminders']],
     staff: [['overview','home','Today'],['register','check','Lesson register'],['roster','calendar','Roster'],['pool','thermometer','Pool checks'],['incidents','shield','Incident & injury reports'],['tickets','message','Family tickets'],['achievements','status','Swimmer certificates'],['timesheets','document','Working hours'],['qualifications','shield','Certificates & licences'],['merch','bag','Staff uniforms'],['notifications','bell','Notices']],
-    admin: [['overview','home','Command centre'],['tickets','message','Family tickets'],['enrolments','status','Lesson confirmations'],['accounts','users','People & accounts'],['enquiries','mail','Enquiries'],['incidents','shield','Incident register'],['terms','calendar','Terms'],['calendar','calendar','Lesson calendar'],['mail','mail','Email queue'],['launch','shield','Launch checks'],['register','check','Lesson registers'],['timesheets','check','Payroll hours'],['roster','calendar','Roster'],['classes','waves','Classes'],['achievements','status','Swimmer certificates'],['compliance','shield','Staff certificates'],['billing','document','Billing & invoices'],['integrations','link','Xero & Shopify'],['merch','bag','Merchandise'],['website','layout','Website content'],['locations','thermometer','Pools & locations'],['associations','status','Industry marks'],['notifications','message','Communications'],['audit','trend','Audit trail']]
+    admin: [['overview','home','Business overview'],['tickets','message','Family tickets'],['enrolments','status','Lesson confirmations'],['accounts','users','People & accounts'],['enquiries','mail','Enquiries'],['incidents','shield','Incident register'],['terms','calendar','Terms'],['calendar','calendar','Lesson calendar'],['mail','mail','Email queue'],['launch','shield','Launch checks'],['register','check','Lesson registers'],['timesheets','check','Payroll hours'],['roster','calendar','Roster planner'],['leave','calendar','Leave & availability'],['documents','document','Private staff documents'],['classes','waves','Classes'],['achievements','status','Swimmer certificates'],['compliance','shield','Staff certificates'],['billing','document','Billing & invoices'],['integrations','link','Xero & Shopify'],['merch','bag','Merchandise'],['website','layout','Website content'],['locations','thermometer','Pools & locations'],['associations','status','Industry marks'],['notifications','message','Communications'],['audit','trend','Audit trail']]
   };
   const navGroupByRole = {
     customer:{overview:'Account',classes:'Lessons',bookings:'Lessons',billing:'Lessons & billing',absences:'Lessons & billing',swimmers:'Family records',achievements:'Family records',incidents:'Family records',messages:'Support & shop',shop:'Support & shop',notifications:'Support & shop'},
     staff:{overview:'Workday',register:'Workday',roster:'Workday',pool:'Workday',incidents:'Safety & families',tickets:'Safety & families',achievements:'Safety & families',timesheets:'My employment',qualifications:'My employment',merch:'My employment',notifications:'My employment'},
-    admin:{overview:'Overview',tickets:'Families & safety',enrolments:'Families & safety',accounts:'Families & safety',enquiries:'Families & safety',incidents:'Families & safety',terms:'Lessons & team',calendar:'Lessons & team',mail:'Website & communications',launch:'Security',register:'Lessons & team',timesheets:'Lessons & team',roster:'Lessons & team',classes:'Lessons & team',achievements:'Lessons & team',compliance:'Lessons & team',billing:'Finance & sales',integrations:'Finance & sales',merch:'Finance & sales',website:'Website & communications',locations:'Website & communications',associations:'Website & communications',notifications:'Website & communications',audit:'Security'}
+    admin:{overview:'Overview',tickets:'Families & safety',enrolments:'Families & safety',accounts:'Families & safety',enquiries:'Families & safety',incidents:'Families & safety',terms:'Lessons & team',calendar:'Lessons & team',mail:'Website & communications',launch:'Security',register:'Lessons & team',timesheets:'Lessons & team',roster:'Lessons & team',leave:'Lessons & team',documents:'Lessons & team',classes:'Lessons & team',achievements:'Lessons & team',compliance:'Lessons & team',billing:'Finance & sales',integrations:'Finance & sales',merch:'Finance & sales',website:'Website & communications',locations:'Website & communications',associations:'Website & communications',notifications:'Website & communications',audit:'Security'}
   };
 
   const compactSidebar = window.matchMedia('(max-width:820px)');
@@ -357,6 +359,8 @@
       }
       return;
     }
+    const destination=portalFor(session.user.role);
+    if(location.pathname.split('/').pop()!==destination){location.replace(destination+location.hash);return;}
     document.title = `${session.user.display_name} | HV Swim`;
     document.body.classList.add(`role-${session.user.role}`);
     document.getElementById('platform-user-name').textContent = session.user.display_name;
@@ -369,14 +373,6 @@
     if(session.user.role==='admin'){
       navByRole.admin.push(['team','users','Team access & settings']);
       navGroupByRole.admin.team='Security';
-    }
-    if(session.user.role==='staff'){
-      navByRole.staff.splice(navByRole.staff.findIndex(item=>item[0]==='timesheets')+1,0,['manualhours','document','Manual hours']);
-      navGroupByRole.staff.manualhours='My employment';
-      if(session.user.management_scope==='manager'){
-        navByRole.staff.push(['accounting','dollar','Team hours & approval']);
-        navGroupByRole.staff.accounting='My team';
-      }
     }
     buildNav();
     buildMobileTabbar();
@@ -472,6 +468,7 @@
     const allowed = navByRole[session.user.role].map(item => item[0]);
     let route = location.hash.replace('#','') || 'overview';
     if (!allowed.includes(route)) route='overview';
+    if(session.user.role==='admin' && ['roster','leave','documents'].includes(route)){location.href='team.html#'+route;return;}
     document.body.dataset.portalView=route;
     const routeLabel=navByRole[session.user.role].find(item=>item[0]===route)?.[2]||'Workspace';
     document.title=`${routeLabel} | HV Swim Bendigo`;
@@ -733,7 +730,7 @@
     const attentionRows=attention.map(item=>`<div class="attention-row" data-attention-kind="${esc(item.kind)}"><span class="attention-icon" aria-hidden="true">${iconSvg(item.icon)}</span><div class="attention-copy"><span>${esc(item.label)}</span><strong>${esc(item.title)}</strong><small>${esc(item.copy)}</small></div><strong class="attention-value">${esc(item.display)}</strong><button class="btn btn-soft btn-small" type="button" data-route-jump="${esc(item.route)}">${esc(item.action)}</button></div>`).join('');
     const attentionQueue=`<section class="panel panel-pad management-attention" aria-labelledby="management-attention-heading"><div class="management-attention-head"><div><span class="role-action-kicker">Action queue</span><h2 id="management-attention-heading">Needs attention</h2><p>Current operational items from the connected preview database, ordered by pool readiness, billing, payroll and family follow-up.</p></div>${chip(attention.length?`${attention.length} ${attention.length===1?'area':'areas'}`:'All clear',attention.length?'changed':'open')}</div>${attentionRows?`<div class="attention-list">${attentionRows}</div>`:`<div class="attention-clear"><span aria-hidden="true">${iconSvg('check')}</span><div><strong>No open items in this queue.</strong><p>Pool readiness, billing, submitted hours, new enquiries, waitlists and qualification records are all clear in the current preview data.</p></div></div>`}</section>`;
     const definitions=Object.entries(data.definitions).map(([key,value])=>`<div><strong>${esc(key.replaceAll('_',' '))}</strong><span>${esc(value)}</span></div>`).join('');
-    content.innerHTML=shell('HV Swim command centre','Start with the live action queue, then review the wider operating picture.',`<div class="ops-source"><div><span class="live-dot"></span><strong>${esc(data.source.name)}</strong><small>${esc(data.source.mode)} · refreshed ${dt(data.generated_at)}</small></div><div class="export-actions"><a href="/api/admin/exports/enquiries.csv">Enquiries CSV</a><a href="/api/admin/exports/timesheets.csv">Operational hours CSV (all states)</a><a href="/api/admin/exports/products.csv">Merch CSV</a></div></div>${attentionQueue}<div class="platform-grid">${metric('Active swimmers',m.active_swimmers,'Active swimmer profiles','♡')}${metric('Confirmed bookings',m.confirmed_bookings,`${m.waitlist} currently waitlisted`,'▦')}${metric('New enquiries',m.new_enquiries,`${m.enquiries_total} enquiries in workflow`,'✉')}${metric('Class utilisation',`${m.class_utilisation}%`,`${m.confirmed_bookings} of ${m.class_capacity} places`,'↗')}<section class="panel panel-pad p-span-5"><div class="panel-head"><div><h2>Enquiry workload</h2><p>Current records by status—not a conversion funnel</p></div><button class="btn btn-soft btn-small" data-route-jump="enquiries">Open inbox</button></div><div class="ops-bar-chart">${enquiries}</div></section><section class="panel panel-pad p-span-7"><div class="panel-head"><div><h2>Class capacity</h2><p>Confirmed bookings against each active class limit</p></div><button class="btn btn-soft btn-small" data-route-jump="classes">Manage classes</button></div><div class="ops-bar-chart class-bars">${classes||empty('No active classes are available.')}</div></section><section class="panel panel-pad p-span-5"><div class="panel-head"><div><h2>Staff hours pipeline</h2><p>${hourTotal.toFixed(1)} hours recorded across all workflow stages</p></div><button class="btn btn-soft btn-small" data-route-jump="timesheets">Review</button></div><div class="hours-stack" role="img" aria-label="${esc(hourSummary||'No staff hours recorded')}">${hourStack}</div><div class="hours-legend">${hours}</div><div class="priority-callout"><span>Needs approval</span><strong>${Number(m.pending_hours).toFixed(1)} h</strong></div></section><section class="panel panel-pad p-span-7"><div class="panel-head"><div><h2>Pool readiness</h2><p>${m.pool_readings_current} of ${m.pool_locations} locations have a water reading from the last 24 hours</p></div><button class="btn btn-soft btn-small" data-route-jump="locations">All locations</button></div><div class="pool-readiness-grid">${pools}</div></section><section class="panel panel-pad p-span-12"><div class="panel-head"><div><h2>Metric definitions & data boundary</h2><p>Definitions travel with the dashboard so numbers remain accountable.</p></div>${chip('Preview data','changed')}</div><div class="definition-grid">${definitions}</div><div class="data-boundary"><strong>Production boundary:</strong> These figures come from this Mac's protected preview database. They become live business metrics after authorised customer, class and staff data is migrated to production. No fabricated historical trend is shown.</div></section></div>`);
+    content.innerHTML=shell('Your school, at a glance.','Start with the live action queue, then review the wider operating picture.',`<div class="ops-source"><div><span class="live-dot"></span><strong>${esc(data.source.name)}</strong><small>${esc(data.source.mode)} · refreshed ${dt(data.generated_at)}</small></div><div class="export-actions"><a href="/api/admin/exports/enquiries.csv">Enquiries CSV</a><a href="/api/admin/exports/timesheets.csv">Operational hours CSV (all states)</a><a href="/api/admin/exports/products.csv">Merch CSV</a></div></div>${attentionQueue}<div class="platform-grid">${metric('Active swimmers',m.active_swimmers,'Active swimmer profiles','♡')}${metric('Confirmed bookings',m.confirmed_bookings,`${m.waitlist} currently waitlisted`,'▦')}${metric('New enquiries',m.new_enquiries,`${m.enquiries_total} enquiries in workflow`,'✉')}${metric('Class utilisation',`${m.class_utilisation}%`,`${m.confirmed_bookings} of ${m.class_capacity} places`,'↗')}<section class="panel panel-pad p-span-5"><div class="panel-head"><div><h2>Enquiry workload</h2><p>Current records by status—not a conversion funnel</p></div><button class="btn btn-soft btn-small" data-route-jump="enquiries">Open inbox</button></div><div class="ops-bar-chart">${enquiries}</div></section><section class="panel panel-pad p-span-7"><div class="panel-head"><div><h2>Class capacity</h2><p>Confirmed bookings against each active class limit</p></div><button class="btn btn-soft btn-small" data-route-jump="classes">Manage classes</button></div><div class="ops-bar-chart class-bars">${classes||empty('No active classes are available.')}</div></section><section class="panel panel-pad p-span-5"><div class="panel-head"><div><h2>Staff hours pipeline</h2><p>${hourTotal.toFixed(1)} hours recorded across all workflow stages</p></div><button class="btn btn-soft btn-small" data-route-jump="timesheets">Review</button></div><div class="hours-stack" role="img" aria-label="${esc(hourSummary||'No staff hours recorded')}">${hourStack}</div><div class="hours-legend">${hours}</div><div class="priority-callout"><span>Needs approval</span><strong>${Number(m.pending_hours).toFixed(1)} h</strong></div></section><section class="panel panel-pad p-span-7"><div class="panel-head"><div><h2>Pool readiness</h2><p>${m.pool_readings_current} of ${m.pool_locations} locations have a water reading from the last 24 hours</p></div><button class="btn btn-soft btn-small" data-route-jump="locations">All locations</button></div><div class="pool-readiness-grid">${pools}</div></section><section class="panel panel-pad p-span-12"><div class="panel-head"><div><h2>Metric definitions & data boundary</h2><p>Definitions travel with the dashboard so numbers remain accountable.</p></div>${chip('Preview data','changed')}</div><div class="definition-grid">${definitions}</div><div class="data-boundary"><strong>Production boundary:</strong> These figures come from this Mac's protected preview database. They become live business metrics after authorised customer, class and staff data is migrated to production. No fabricated historical trend is shown.</div></section></div>`);
   }
 
   async function adminTermOperations(content) {

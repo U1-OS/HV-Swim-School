@@ -78,7 +78,7 @@ def test_unsupported_database_url_fails_closed(client):
 
 
 def test_rejection_resubmission_and_self_approval_guard(client):
-    staff, headers = principal(client)
+    staff, headers = principal(client, role="admin")
     ident = insert_shift(
         staff, "2026-08-03T00:00:00+00:00", "2026-08-03T01:00:00+00:00"
     )
@@ -362,7 +362,7 @@ def test_complete_queries_exact_small_shifts_and_settings(client):
 def test_manual_weekly_not_silently_prorated(client):
     from backend.database import db_session
 
-    staff, headers = principal(client)
+    staff, headers = principal(client, role="admin")
     result = client.post(
         "/api/staff/time-entries",
         json={
@@ -375,18 +375,18 @@ def test_manual_weekly_not_silently_prorated(client):
     )
     assert result.status_code == 200, result.text
     report = client.get(
-        "/api/workforce/report", params={"period": "monthly", "on": "2026-07-01"}
+        "/api/workforce/report", params={"period": "monthly", "on": "2026-07-01", "staff_id": staff}
     ).json()
     assert report["issues"] and report["totals"]["worked_seconds"] == 0
     report = client.get(
         "/api/workforce/report",
-        params={"period": "custom", "start": "2026-06-29", "end": "2026-07-05"},
+        params={"period": "custom", "start": "2026-06-29", "end": "2026-07-05", "staff_id": staff},
     ).json()
     assert report["totals"]["worked_seconds"] == 45000
 
 
 def test_manual_totals_cannot_duplicate_overnight_or_previous_week_clock(client):
-    worker, headers = principal(client)
+    worker, headers = principal(client, role="admin")
     insert_shift(worker, "2026-08-02T23:00:00+10:00", "2026-08-03T01:00:00+10:00")
     daily = {
         "week_start": "2026-08-03",
@@ -487,13 +487,13 @@ def test_manager_scope_self_approval_and_no_owner_access(client):
         client.post(
             f"/api/workforce/entries/{allowed}/review", json=payload, headers=headers
         ).status_code
-        == 200
+        == 403
     )
     assert (
         client.post(
             f"/api/workforce/entries/{denied}/review", json=payload, headers=headers
         ).status_code
-        == 404
+        == 403
     )
     assert client.post(
         f"/api/workforce/entries/{own}/review", json=payload, headers=headers
@@ -504,6 +504,11 @@ def test_manager_scope_self_approval_and_no_owner_access(client):
         client.get("/api/workforce/report", params={"staff_id": unrelated}).status_code
         == 403
     )
+    assert client.get('/api/workforce/report',params={'staff_id':worker}).status_code == 403
+    assert client.get(f'/api/workforce/entries/{allowed}/history').status_code == 404
+    client.cookies.clear()
+    admin_headers = {'X-CSRF-Token': sign_in(client, ADMIN)}
+    assert client.post(f'/api/workforce/entries/{allowed}/review',json=payload,headers=admin_headers).status_code == 200
     client.cookies.clear()
     sign_in(client, FAMILY)
     assert client.get("/api/workforce/report").status_code == 403

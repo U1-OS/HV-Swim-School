@@ -116,15 +116,6 @@ def scope_ids(db, user, *, review=False) -> list[int] | None:
         return None
     if user["role"] != "staff":
         raise HTTPException(403, "Staff account required")
-    if user.get("management_scope") == "manager":
-        assigned = [
-            r[0]
-            for r in db.execute(
-                "SELECT staff_id FROM manager_assignments WHERE manager_id=?",
-                (user["id"],),
-            )
-        ]
-        return assigned if review else list(set(assigned + [user["id"]]))
     if review:
         raise HTTPException(403, "Management approval required")
     return [user["id"]]
@@ -920,8 +911,7 @@ def register(app, session_user, csrf_guard):
                     r for r in staff if permitted is None or r["id"] in permitted
                 ],
                 "locations": rows(db.execute("SELECT id,name,slug FROM locations")),
-                "can_review": user["role"] == "admin"
-                or user.get("management_scope") == "manager",
+                "can_review": user["role"] == "admin",
             }
 
     @app.get("/api/workforce/export-preview")

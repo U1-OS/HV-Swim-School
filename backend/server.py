@@ -28,7 +28,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
 
 from .config import DATA_DIR, ROOT, settings
-from . import identity, payroll_adapter, workforce, lesson_calendar, mail_queue, launch_readiness
+from . import identity, payroll_adapter, workforce, lesson_calendar, mail_queue, launch_readiness, staff_portal, shift_notices
 from .database import audit, db_session, initialise_database, rows
 from .integrations import (
     current_bendigo_weather,
@@ -252,6 +252,8 @@ async def lifespan(_: FastAPI):
     initialise_database()
     identity.migrate()
     workforce.migrate()
+    staff_portal.migrate()
+    shift_notices.migrate()
     payroll_adapter.migrate()
     migrate_integration_token_encryption()
     yield
@@ -307,7 +309,7 @@ async def security_headers(request: Request, call_next):
     content_length = request.headers.get("content-length")
     body_limit = (
         QUALIFICATION_API_BODY_LIMIT
-        if request_path == "/api/staff/qualifications"
+        if request_path in {"/api/staff/qualifications", "/api/workforce/documents"}
         else APPLE_CALLBACK_BODY_LIMIT
         if request_path == "/api/auth/oauth/apple/callback"
         else DEFAULT_API_BODY_LIMIT
@@ -362,16 +364,16 @@ async def security_headers(request: Request, call_next):
     response.headers["Cross-Origin-Opener-Policy"] = "same-origin"
     response.headers["Origin-Agent-Cluster"] = "?1"
     response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
-    response.headers["Content-Security-Policy"] = (
+    response.headers.setdefault("Content-Security-Policy", (
         "default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; "
         "script-src 'self'; object-src 'none'; connect-src 'self'; frame-src https://www.facebook.com; "
         "form-action 'self' mailto:; base-uri 'self'; frame-ancestors 'self'"
-    )
+    ))
     if settings.production:
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     path = request_path
     if path.startswith("/api/"):
-        response.headers["Cache-Control"] = "no-store"
+        response.headers["Cache-Control"] = "private, no-store" if "private" in response.headers.get("Cache-Control", "") else "no-store"
     elif path.startswith("/assets/") and not settings.production:
         response.headers["Cache-Control"] = "no-store"
     elif path.startswith("/assets/") and request.url.query.startswith("v="):
@@ -1034,7 +1036,9 @@ def session_user(request: Request) -> dict[str, Any]:
             raise HTTPException(status_code=401, detail="Session expired")
         if row["must_change_password"] and request.url.path not in {"/api/auth/me", "/api/auth/logout", "/api/auth/change-password"}:
             raise HTTPException(status_code=403, detail="Change your temporary password before using the workspace")
-        return dict(row)
+        user = dict(row)
+        staff_portal.enforce_staff_capability(user, request.method, request.url.path)
+        return user
 
 
 def require_roles(*roles: str):
@@ -1048,7 +1052,7 @@ def require_roles(*roles: str):
 def csrf_guard(request: Request, user: dict[str, Any], token: str | None) -> None:
     if request.method in {"GET", "HEAD", "OPTIONS"}:
         return
-    if not token or not hmac.compare_digest(token, user["csrf_token"] or ""):
+    if not token or not token.isascii() or not hmac.compare_digest(token, user["csrf_token"] or ""):
         raise HTTPException(status_code=403, detail="Security token is missing or expired")
 
 
@@ -2108,7 +2112,7 @@ async def complete_oauth_login(
         return oauth_error_redirect("invalid_response")
     state_digest = hashlib.sha256(state.encode("utf-8")).hexdigest()
     browser_verifier=request.cookies.get(oauth_browser_cookie(provider),'')
-    if not browser_verifier or not hmac.compare_digest(browser_verifier,state_digest):
+    if not browser_verifier or not browser_verifier.isascii() or not hmac.compare_digest(browser_verifier,state_digest):
         return oauth_error_redirect('browser_mismatch')
     with db_session() as db:
         db.execute("DELETE FROM oauth_login_attempts WHERE expires_at<=?", (now_iso(),))
@@ -3320,7 +3324,7 @@ def staff_roster(user: dict[str, Any] = Depends(require_roles("staff", "admin"))
         where, params = ("r.staff_id=?", (user["id"],)) if user["role"] == "staff" else ("1=1", ())
         query = f"""SELECT r.*,l.name location_name,l.slug location_slug,u.first_name,u.last_name
                     FROM rosters r JOIN locations l ON l.id=r.location_id JOIN users u ON u.id=r.staff_id
-                    WHERE {where} AND r.shift_date>=? ORDER BY r.shift_date,r.start_time"""
+                    WHERE {where} AND r.status='published' AND r.shift_date>=? ORDER BY r.shift_date,r.start_time"""
         return {"roster": rows(db.execute(query, params + (business_today().isoformat(),)))}
 
 
@@ -3817,7 +3821,7 @@ def qualification_document(
             document_path,
             media_type=record["document_media_type"],
             filename=record["original_filename"],
-            content_disposition_type="inline",
+            content_disposition_type="attachment",
             headers={"Cache-Control": "private, no-store"},
         )
 
@@ -4781,16 +4785,7 @@ def create_class(payload: ClassInput, request: Request, user: dict[str, Any] = D
 @app.post("/api/admin/roster")
 def create_roster(payload: RosterInput, request: Request, user: dict[str, Any] = Depends(require_roles("admin")), x_csrf_token: str | None = Header(default=None)) -> dict[str, Any]:
     csrf_guard(request, user, x_csrf_token)
-    with db_session() as db:
-        db.execute("BEGIN IMMEDIATE")
-        location = location_by_slug(db, payload.location_slug)
-        staff = db.execute("SELECT id FROM users WHERE id=? AND role IN ('staff','admin') AND active=1", (payload.staff_id,)).fetchone()
-        if not staff:
-            raise HTTPException(status_code=404, detail="Staff member not found")
-        check_roster_conflict(db, payload)
-        cursor = db.execute("INSERT INTO rosters(staff_id,location_id,shift_date,start_time,end_time,role_label,status) VALUES(?,?,?,?,?,?,?)", (payload.staff_id, location["id"], payload.shift_date.isoformat(), payload.start_time, payload.end_time, payload.role_label, "published"))
-        audit(db, user["id"], "publish_roster_shift", "roster", cursor.lastrowid, payload.model_dump(mode="json"), client_ip(request))
-        return {"id": cursor.lastrowid, "published": True}
+    raise HTTPException(status_code=410, detail="Use /api/management/roster with revision-aware publish and leave checks")
 
 
 def check_roster_conflict(db, payload: RosterInput, excluding_id: int = 0) -> None:
@@ -4806,20 +4801,7 @@ def check_roster_conflict(db, payload: RosterInput, excluding_id: int = 0) -> No
 @app.patch("/api/admin/roster/{roster_id}")
 def update_roster(roster_id: int, payload: RosterInput, request: Request, user: dict[str, Any] = Depends(require_roles("admin")), x_csrf_token: str | None = Header(default=None)) -> dict[str, Any]:
     csrf_guard(request, user, x_csrf_token)
-    with db_session() as db:
-        db.execute("BEGIN IMMEDIATE")
-        previous = db.execute("SELECT * FROM rosters WHERE id=?", (roster_id,)).fetchone()
-        if not previous:
-            raise HTTPException(status_code=404, detail="Roster shift not found")
-        if previous["shift_date"] < business_today().isoformat() or payload.shift_date < business_today():
-            raise HTTPException(status_code=409, detail="Past roster shifts are preserved. Use the reviewed timesheet workflow to correct worked hours.")
-        location = location_by_slug(db, payload.location_slug)
-        if not db.execute("SELECT id FROM users WHERE id=? AND active=1 AND role IN ('staff','admin')", (payload.staff_id,)).fetchone():
-            raise HTTPException(status_code=404, detail="Staff member not found")
-        check_roster_conflict(db, payload, roster_id)
-        db.execute("UPDATE rosters SET staff_id=?,location_id=?,shift_date=?,start_time=?,end_time=?,role_label=? WHERE id=?", (payload.staff_id, location["id"], payload.shift_date.isoformat(), payload.start_time, payload.end_time, payload.role_label, roster_id))
-        audit(db, user["id"], "update_roster_shift", "roster", roster_id, {"before": dict(previous), "after": payload.model_dump(mode="json")}, client_ip(request))
-        return {"id": roster_id, "saved": True}
+    raise HTTPException(status_code=410, detail="Use /api/management/roster with revision-aware publish and leave checks")
 
 
 @app.post("/api/admin/notifications")
@@ -5949,6 +5931,8 @@ def save_launch_evidence(key:str,payload:LaunchEvidenceInput,request:Request,use
 
 identity.register(app, session_user, csrf_guard)
 workforce.register(app, session_user, csrf_guard)
+staff_portal.register(app, session_user, csrf_guard, validate_qualification_document)
+shift_notices.register(app, session_user, csrf_guard)
 
 
 @app.api_route("/api/{unmatched_path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])
@@ -6009,6 +5993,7 @@ PUBLIC_ROOT_FILES = frozenset(
         "shop.html",
         "sitemap.xml",
         "staff.html",
+        "team.html",
         "terms.html",
     }
 )
