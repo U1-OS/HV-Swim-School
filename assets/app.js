@@ -206,7 +206,7 @@
     strip.dataset.publicFeature = 'association_badges';
     strip.hidden = true;
     strip.setAttribute('aria-label', 'HV Swim aquatic industry directory links');
-    strip.innerHTML = `<div class="footer-association-intro"><span>Current credentials</span><strong>Check HV Swim at the source.</strong><small>Organisation-issued marks with management-verified evidence and expiry dates.</small></div><div class="footer-association-links"></div>`;
+    strip.innerHTML = `<div class="footer-association-intro"><span>Current credentials</span><strong>Check HV Swim at the source.</strong><small>View our current listings with the issuing organisations.</small></div><div class="footer-association-links"></div>`;
     const footerBottom = footer.querySelector('.footer-bottom');
     if (footerBottom) footer.insertBefore(strip, footerBottom);
     else footer.append(strip);

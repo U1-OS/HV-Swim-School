@@ -2,7 +2,7 @@ name: Quality
 
 on:
   push:
-    branches: [main, 'codex/platform-rebuild-*']
+    branches: [main, 'codex/*']
   pull_request:
     branches: [main]
 

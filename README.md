@@ -4,27 +4,27 @@ Premium public website and connected operations platform for HV Swim Bendigo. Th
 
 ## Preview on this Mac
 
-The current UI18 workforce rebuild is documented in `PLATFORM_REBUILD.md` and
-`WORKFORCE_OPERATIONS.md`. It adds exact server-timed shifts and breaks, scoped
-management, invitations/recovery, optional authenticator MFA, approved CSV/XLSX
-batches and a controlled Xero AU adapter. Live payroll remains locked.
+The sole working copy is `~/Developer/HV-Swim-School`. On Andrew’s current Mac this is
+`/Users/andrewhains/Developer/HV-Swim-School`; Documents is retired.
 
-The working copy lives at `/Users/u1/Developer/HV-Swim-School`, outside iCloud-synced
-Desktop/Documents. Keep tested changes in the private `U1-OS/HV-Swim-School` GitHub repo;
-do not upload `.env`, databases, certificates or customer records. The earlier Documents
-location is retired, not a second working copy.
+Double-click `preview-local.command`, then open `http://127.0.0.1:8772/index.html`.
+The isolated launcher ignores `.env`, excludes inherited integration credentials,
+and uses synthetic records in the ignored `data/local-preview/` directory.
+Keep its terminal open during preview. Do not put real customer or staff data there.
 
-Double-click `start-hv-swim.command`, then use the Start Here page that opens in your default browser. On first launch, macOS may ask you to confirm opening the file. Keep the Terminal window open while previewing; close it to stop the local server.
+The current rebuild and exact business/credential blockers are in `SUNLIT_REBUILD.md`.
+Desktop and mobile screenshots are in `design/`. The existing `start-hv-swim.command`
+remains available for the older configured workflow and should not be confused with
+the isolated launcher.
 
-The launcher requires Python 3.12 or newer and creates `.venv312` on first use, leaving
-any older `.venv` intact. It starts the site at `http://127.0.0.1:8765` and opens
-`START_HERE.html`. The GitHub quality workflow verifies Python 3.12.
+The Python 3.12+ environment is `.venv312`. For a new Mac:
 
-See `INTERACTIVE_3D_REBUILD.md` for the 6 September 3D visual rebuild, browser checks,
-motion controls and staff-date fixes. `PREMIUM_V2_UPGRADE_REPORT.md` covers the earlier
-September review, validation evidence and
-remaining launch gates. Development previews are explicitly labelled; sample accounts,
-capacity and timetable data must not be represented as live business records.
+```sh
+python3.12 -m venv .venv312
+.venv312/bin/python -m pip install -r requirements-dev.txt
+.venv312/bin/python scripts/preview-local.py
+```
+
 
 ## Main files
 

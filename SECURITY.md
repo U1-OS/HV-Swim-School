@@ -48,7 +48,11 @@ risk but do not make the service “unhackable” and are not a substitute for p
 modelling, infrastructure review and an independent penetration test before real child,
 health, payroll or payment-related data is accepted.
 
-## 2026 Starlette advisory review
+## Historical Starlette advisory review — superseded
+
+The following records the earlier compatibility decision. Current requirements pin
+FastAPI 0.141.1 and Starlette 1.6.0; CI no longer ignores these advisories. Use the
+current requirements and workflow, not this historical section, for dependency state.
 
 FastAPI 0.128.8 currently constrains Starlette to `<1.0`; the compatible current release
 is pinned at 0.52.1. `pip-audit` also reports five advisories whose patched Starlette

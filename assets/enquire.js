@@ -29,7 +29,7 @@
     ['[data-step="4"] .wizard-heading > span','Your details · Review &amp; send'],
     ['[data-step="4"] .wizard-heading > p','Add your message and the contact details the team should use.'],
     ['[data-step="4"] .info-note','<strong>What happens next:</strong> Your enquiry is saved for the HV Swim team to review and follow up. This form does not take payment or change a booking. See the <a href="privacy.html">privacy policy</a> for how your details are handled.'],
-    ['#enrolment-success > p','Your enquiry has been saved to the HV Swim management inbox. Keep your reference number; the team will review your message and follow up using your preferred contact method.'],
+    ['#enrolment-success > p','Your enquiry has been received. Keep your reference number; the team will review your message and follow up using your preferred contact method.'],
     ['#enrolment-success .success-next','<div><strong>1</strong><span>Your message is saved</span></div><div><strong>2</strong><span>The team reviews your question</span></div><div><strong>3</strong><span>We follow up personally</span></div>']
   ].map(([selector,contact])=>{const element=document.querySelector(selector);return {element,contact,lesson:element?.innerHTML};});
   const lessonEnquiry=()=>['lesson','lesson_question','private_lesson'].includes(enquiryType.value);
@@ -171,7 +171,7 @@
       const selected=(queryClass&&value.toLowerCase().includes(queryClass.toLowerCase().replace(' at ',' · ')))||(!queryClass&&elements.preferredClass.value===value);
       const preferredVenue=locationMatch(item);
       const matchLabel=isMatch&&preferredVenue?'Program + venue match':(preferredVenue?'Preferred venue':(isMatch?'Suggested match':'Other pathway'));
-      return `<label class="wizard-class-card ${isMatch?'recommended':''}"><input type="radio" name="class_choice" value="${esc(value)}" ${selected?'checked':''}><span class="class-choice-check">✓</span><div><span class="class-match-label">${matchLabel}</span><strong>${esc(item.title)}</strong><small>${esc(days[item.weekday])} · ${esc(time)} · ${esc(item.location_name)}</small><p><b>${money(item.price)} indicative</b><em class="${available?'available':'waitlist'}">${available?`${available} ${available===1?'place':'places'} showing`:'Waitlist'}</em></p></div></label>`;
+      return `<label class="wizard-class-card ${isMatch?'recommended':''}"><input type="radio" name="class_choice" value="${esc(value)}" ${selected?'checked':''}><span class="class-choice-check">✓</span><div><span class="class-match-label">${matchLabel}</span><strong>${esc(item.title)}</strong><small>${esc(days[item.weekday])} · ${esc(time)} · ${esc(item.location_name)}</small><p><b>${/private/i.test(item.title)?'Private pricing by enquiry':`${money(item.price)} indicative`}</b><em class="${available?'available':'waitlist'}">${available?`${available} ${available===1?'place':'places'} showing`:'Waitlist'}</em></p></div></label>`;
     }).join('');
     const selected=target.querySelector('[name="class_choice"]:checked');
     if(selected)elements.preferredClass.value=selected.value;
@@ -221,6 +221,7 @@
       form.hidden=true;document.querySelector('.enrolment-progress').hidden=true;
       document.getElementById('success-reference').textContent=result.reference||`HV-ENQ-${String(result.id).padStart(4,'0')}`;
       const success=document.getElementById('enrolment-success');success.hidden=false;
+      document.querySelector('[data-lesson-guidance]').hidden=true;
       clearDraft();
       success.scrollIntoView({behavior:scrollBehavior(),block:'center'});
       requestAnimationFrame(()=>success.querySelector('h2')?.focus({preventScroll:true}));
@@ -232,6 +233,8 @@
   document.querySelectorAll('.wizard-heading h2').forEach(heading=>heading.tabIndex=-1);
   function updateEnquiryType(){
     const isLesson=lessonEnquiry();
+    document.querySelector('.enrolment-hero-trust').hidden=!isLesson;
+    document.querySelector('[data-lesson-guidance]').hidden=!isLesson;
     document.body.classList.toggle('is-contact-enquiry',!isLesson);
     heroHeading.innerHTML=isLesson?lessonHeading:'Talk to <span>the HV Swim team.</span>';
     heroCopy.textContent=isLesson?lessonCopy:'Questions about your account, invoices or the collection? Send a message and the team will follow up using your preferred contact method.';

@@ -42,7 +42,7 @@
       const available = Number(item.available || 0);
       const time = classTime(item.start_time);
       const query = new URLSearchParams({program:item.title, class:`${days[item.weekday]} ${time} at ${item.location_name}`});
-      return `<article class="availability-card reveal visible" style="--reveal-delay:${Math.min(index * 45, 225)}ms"><div class="class-card-top"><span class="class-day">${esc(days[item.weekday])} · ${esc(time)}</span><span class="status ${available ? 'open' : 'closed'}">${available ? `${available} ${available === 1 ? 'place' : 'places'}` : 'Waitlist'}</span></div><h3>${esc(item.title)}</h3><p>${esc(item.level)} · ${esc(item.duration_minutes)} minutes<br>${esc(item.location_name)}</p><div class="availability-card-foot"><div><strong>${money(item.price)} per lesson</strong><span>Fee confirmed before enrolment</span></div><a class="text-link" href="enquire.html?${query}">${available ? 'Enquire' : 'Join waitlist'}</a></div></article>`;
+      return `<article class="availability-card reveal visible" style="--reveal-delay:${Math.min(index * 45, 225)}ms"><div class="class-card-top"><span class="class-day">${esc(days[item.weekday])} · ${esc(time)}</span><span class="status ${available ? 'open' : 'closed'}">${available ? `${available} ${available === 1 ? 'place' : 'places'}` : 'Waitlist'}</span></div><h3>${esc(item.title)}</h3><p>${esc(item.level)} · ${esc(item.duration_minutes)} minutes<br>${esc(item.location_name)}</p><div class="availability-card-foot"><div><strong>${groupFor(item.title)==='private'?'Contact us for pricing':`${money(item.price)} per lesson`}</strong><span>Fee confirmed before enrolment</span></div><a class="text-link" href="enquire.html?${query}">${available ? 'Enquire' : 'Ask about waitlist'}</a></div></article>`;
     }).join('') || '<div class="empty-state"><strong>No classes match those filters.</strong><p>That does not mean there is nothing suitable — times shift each term and private options are available. Tell us what you need and we will look.</p><a class="btn btn-blue btn-small" href="enquire.html">Find a lesson <span aria-hidden="true">&rarr;</span></a></div>';
   };
 
@@ -52,7 +52,7 @@
     classes = payload.classes || [];
     updateProgramSummaries();
     renderAvailability();
-    document.getElementById('program-availability-source').textContent = 'Current published places are shown here. Lessons are $22.50 each, charged by the term and due on enrolment; HV Swim confirms class fit before the place is finalised.';
+    document.getElementById('program-availability-source').textContent = 'Current published places are shown here. Standard lessons are $22.50 each, charged by the term and due on enrolment. Ask us about private pricing; HV Swim confirms class fit before the place is finalised.';
   }).catch(() => {
     document.querySelectorAll('[data-price]').forEach(element => element.textContent = 'Ask the team');
     document.querySelectorAll('[data-place]').forEach(element => element.textContent = 'Availability confirmed personally');

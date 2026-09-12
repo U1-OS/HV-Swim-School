@@ -3,13 +3,36 @@
 Andrew swaps between Claude and Codex. Read this first and rewrite it last.
 
 **Wheel:** Codex
-**Last updated:** 2026-09-06 by Codex — UI18 accounts, workforce and accounting rebuild verified
+**Last updated:** 2026-09-12 by Codex — sunlit website rebuild and isolated preview verified
 
 The working directory was missing on arrival. Restored the exact private GitHub main
 commit `676094ff874af6c2bd6fb5ff98fef979367773bc` into the empty local Developer path.
 This restored source only; no previous private runtime database was present or recovered.
 
-## Latest release — UI18
+## Latest release — UI19 sunlit rebuild
+
+Branch `codex/sunlit-rebuild`, based on newer UI18 branch commit `beab5cb`.
+Read `SUNLIT_REBUILD.md` for changes, test evidence and precise launch blockers.
+
+- Bright photographic homepage, program explorer, first-lesson guide and shared public/portal polish.
+- Consistent private-price enquiry messaging, simpler general enquiries and family progress copy.
+- New isolated `preview-local.command`: loopback port 8772; no `.env` or inherited provider credentials.
+- Sole source copy moved to `/Users/andrewhains/Developer/HV-Swim-School` on Andrew’s instruction.
+- Preview runtime data is `data/local-preview/`, Git-ignored and synthetic only.
+- Final backend suite: 152 passed / 1 existing skip; five Node scripts and static checks passed.
+- 156 responsive browser matrix checks; 53 smoke and 20 security baseline checks passed.
+- No public deployment, real financial transaction, email or payroll transmission.
+
+### Next up
+
+Review the local design with Andrew. Confirm the business decisions and credentials in
+`SUNLIT_REBUILD.md` before production work. Real photography and private tuition pricing
+are particularly useful next inputs. Production database adaptation, outbound delivery
+and provider acceptance remain separate engineering work. Do not enable live integrations
+or deploy publicly without Andrew’s explicit approval.
+
+## Previous release — UI18 (historical)
+
 
 Presentation revision `5.13.0-ui18`; service-worker caches end in `-19`.
 Working branch: `codex/platform-rebuild-20260906`, based on verified private main
@@ -76,7 +99,7 @@ experience, enquiry flow, family/staff/management portals, roster, incidents and
 progress are materially more polished and safer. The app phase remains paused. Enrolment
 is enquiry-only; Xero is the lesson-payment boundary and Shopify is the merchandise boundary.
 
-The sole working copy is `/Users/u1/Developer/HV-Swim-School`, outside iCloud.
+The sole current working copy is `/Users/andrewhains/Developer/HV-Swim-School`, outside iCloud.
 The 5 September handoff reported an earlier migration with private data checksums, but
 that folder and private runtime data were absent on 6 September. This session restored
 source from GitHub, not those earlier private records. Private runtime data remains Git-ignored.
