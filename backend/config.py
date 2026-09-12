@@ -41,7 +41,10 @@ def resolved_app_environment() -> str:
     legacy = os.getenv("HV_ENVIRONMENT")
     if current and legacy and current.lower() != legacy.lower():
         raise RuntimeError("HV_APP_ENV and legacy HV_ENVIRONMENT disagree")
-    return current or legacy or "development"
+    environment = (current or legacy or "development").strip().lower()
+    if environment not in {"development", "test", "staging", "production"}:
+        raise RuntimeError("HV_APP_ENV must be development, test, staging or production")
+    return environment
 
 
 @dataclass(frozen=True)
@@ -49,7 +52,7 @@ class Settings:
     app_env: str = resolved_app_environment()
     # SQLite is used locally; PostgreSQL is selected by DATABASE_URL. A cloud DATABASE_URL
     # must not be silently ignored and leave private records on an unintended disk.
-    database_url: str = os.getenv("HV_DATABASE_URL", os.getenv("DATABASE_URL", "")).strip()
+    database_url: str = os.getenv("HV_DATABASE_URL", "").strip() or os.getenv("DATABASE_URL", "").strip()
     session_secret: str = os.getenv("HV_SESSION_SECRET", "local-demo-secret-change-before-production")
     data_encryption_key: str = os.getenv("HV_DATA_ENCRYPTION_KEY", "")
     public_url: str = os.getenv("HV_PUBLIC_URL", "http://localhost:8765").rstrip("/")
@@ -70,6 +73,7 @@ class Settings:
     apple_client_id: str = os.getenv("APPLE_CLIENT_ID", "").strip()
     apple_client_secret: str = os.getenv("APPLE_CLIENT_SECRET", "").strip()
     apple_redirect_uri: str = os.getenv("APPLE_REDIRECT_URI", "").strip()
+    commerce_live_approved: bool = os.getenv("HV_COMMERCE_LIVE_APPROVED", "false").lower() == "true"
     shopify_store_domain: str = os.getenv("SHOPIFY_STORE_DOMAIN", "").replace("https://", "").rstrip("/")
     shopify_storefront_token: str = os.getenv("SHOPIFY_STOREFRONT_TOKEN", "")
     shopify_api_version: str = os.getenv("SHOPIFY_API_VERSION", "2026-04")
@@ -89,7 +93,7 @@ class Settings:
 
     @property
     def production(self) -> bool:
-        return self.app_env.lower() == "production"
+        return self.app_env.lower() in {"staging", "production"}
 
 
 settings = Settings()

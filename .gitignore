@@ -26,3 +26,13 @@ data/email-capture/
 # Private qualification uploads and all nested database variants.
 data/staff-qualification-documents/
 data/**/*.db*
+
+# Secret variants, private keys, dumps and staff medical records.
+.env.*
+!.env.example
+*.pem
+*.p8
+*.key
+*.dump
+*.sql
+data/staff-documents/

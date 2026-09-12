@@ -565,6 +565,7 @@ CREATE INDEX IF NOT EXISTS idx_qualifications_expiry ON qualifications(expiry_da
 CREATE INDEX IF NOT EXISTS idx_audit_action_ip ON audit_log(action, ip_address, created_at);
 CREATE INDEX IF NOT EXISTS idx_login_attempts_lookup ON login_attempts(email, ip_address, created_at);
 CREATE INDEX IF NOT EXISTS idx_login_attempts_created_at ON login_attempts(created_at);
+CREATE INDEX IF NOT EXISTS idx_login_attempts_ip ON login_attempts(ip_address, success, created_at);
 """
 
 
@@ -649,8 +650,22 @@ def migrate_legacy_bookings_table(db: sqlite3.Connection) -> None:
         raise RuntimeError("Booking history migration failed its foreign-key check")
 
 
+def reject_preview_database(db) -> None:
+    """Fail before migrations if a production process points at synthetic preview data."""
+    if not settings.production:
+        return
+    if list(db.execute("PRAGMA table_info(users)")) and db.execute("SELECT 1 FROM users WHERE LOWER(email) LIKE '%@hvswim.demo' LIMIT 1").fetchone():
+        raise RuntimeError("Production cannot use a preview database; select a clean production database")
+    term_columns = {row[1] for row in db.execute("PRAGMA table_info(school_terms)")}
+    if "source" in term_columns and db.execute("SELECT 1 FROM school_terms WHERE source='preview' LIMIT 1").fetchone():
+        raise RuntimeError("Production cannot use preview term records")
+    if list(db.execute("PRAGMA table_info(audit_log)")) and db.execute("SELECT 1 FROM audit_log WHERE action='seed_database' LIMIT 1").fetchone():
+        raise RuntimeError("Production cannot use a seeded preview database")
+
+
 def initialise_database() -> None:
     with db_session() as db:
+        reject_preview_database(db)
         if settings.database_url:
             from .postgres_storage import install_helpers
             install_helpers(db)

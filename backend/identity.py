@@ -56,6 +56,17 @@ def migrate():
             """CREATE TABLE IF NOT EXISTS account_mfa(user_id INTEGER PRIMARY KEY REFERENCES users(id),secret TEXT NOT NULL,pending_secret TEXT,last_counter INTEGER NOT NULL DEFAULT -1)""",
         ]:
             db.execute(statement)
+        mfa_columns = {r[1] for r in db.execute("PRAGMA table_info(account_mfa)")}
+        for key in ("pending_session", "pending_expires_at"):
+            if key not in mfa_columns:
+                db.execute(f"ALTER TABLE account_mfa ADD COLUMN {key} TEXT")
+
+
+def fresh_security_user(db, user):
+    fresh = db.execute("SELECT u.* FROM users u JOIN sessions s ON s.user_id=u.id WHERE u.id=? AND u.active=1 AND s.id=? AND s.expires_at>?", (user["id"], user["session_id"], now_iso())).fetchone()
+    if not fresh:
+        raise HTTPException(401, "Sign in again before changing security settings")
+    return fresh
 
 
 def totp(secret: str, counter: int) -> str:
@@ -100,7 +111,7 @@ def proof_attempt(user_id):
 
 def matching_counter(secret, code, last=-1):
     counter = current_counter()
-    if not code or len(code) != 6 or not code.isdigit():
+    if not code or len(code) != 6 or not code.isascii() or not code.isdigit():
         return None
     for candidate in (counter, counter - 1, counter + 1):
         if candidate > last and hmac.compare_digest(totp(secret, candidate), code):
@@ -624,15 +635,18 @@ def register(app, session_user, csrf_guard):
     ):
         csrf_guard(request, user, x_csrf_token)
         proof_attempt(user["id"])
-        if not password_verify(payload.password, user["password_hash"]):
-            raise HTTPException(403, "Confirm your current password")
-        if user["mfa_enabled"]:
-            raise HTTPException(409, "Authenticator already enabled")
         secret = base64.b32encode(secrets.token_bytes(20)).decode().rstrip("=")
         with db_session() as db:
+            db.execute("BEGIN IMMEDIATE")
+            fresh = fresh_security_user(db, user)
+            if not password_verify(payload.password, fresh["password_hash"]):
+                raise HTTPException(403, "Confirm your current password")
+            if fresh["mfa_enabled"]:
+                raise HTTPException(409, "Authenticator already enabled")
+            expires = (datetime.now(timezone.utc) + timedelta(minutes=10)).isoformat()
             db.execute(
-                "INSERT INTO account_mfa(user_id,secret,pending_secret) VALUES(?,?,?) ON CONFLICT(user_id) DO UPDATE SET pending_secret=excluded.pending_secret",
-                (user["id"], "", encrypt_sensitive(secret)),
+                "INSERT INTO account_mfa(user_id,secret,pending_secret,pending_session,pending_expires_at) VALUES(?,?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET pending_secret=excluded.pending_secret,pending_session=excluded.pending_session,pending_expires_at=excluded.pending_expires_at",
+                (user["id"], "", encrypt_sensitive(secret), user["session_id"], expires),
             )
         return {
             "secret": secret,
@@ -649,14 +663,17 @@ def register(app, session_user, csrf_guard):
     ):
         csrf_guard(request, user, x_csrf_token)
         proof_attempt(user["id"])
-        if not password_verify(payload.password, user["password_hash"]):
-            raise HTTPException(403, "Confirm your current password")
         with db_session() as db:
             db.execute("BEGIN IMMEDIATE")
+            fresh = fresh_security_user(db, user)
+            if fresh["mfa_enabled"]:
+                raise HTTPException(409, "Authenticator already enabled")
+            if not password_verify(payload.password, fresh["password_hash"]):
+                raise HTTPException(403, "Confirm your current password")
             record = db.execute(
                 "SELECT * FROM account_mfa WHERE user_id=?", (user["id"],)
             ).fetchone()
-            if not record or not record["pending_secret"]:
+            if not record or not record["pending_secret"] or record["pending_session"] != user["session_id"] or (record["pending_expires_at"] or "") <= now_iso():
                 raise HTTPException(409, "Start authenticator setup first")
             counter = matching_counter(
                 decrypt_sensitive(record["pending_secret"]), payload.code
@@ -664,7 +681,7 @@ def register(app, session_user, csrf_guard):
             if counter is None:
                 raise HTTPException(400, "Use the current six-digit authenticator code")
             db.execute(
-                "UPDATE account_mfa SET secret=pending_secret,pending_secret=NULL,last_counter=? WHERE user_id=?",
+                "UPDATE account_mfa SET secret=pending_secret,pending_secret=NULL,pending_session=NULL,pending_expires_at=NULL,last_counter=? WHERE user_id=?",
                 (counter, user["id"]),
             )
             db.execute("UPDATE users SET mfa_enabled=1 WHERE id=?", (user["id"],))
@@ -686,9 +703,7 @@ def register(app, session_user, csrf_guard):
         proof_attempt(user["id"])
         with db_session() as db:
             db.execute("BEGIN IMMEDIATE")
-            fresh = db.execute(
-                "SELECT * FROM users WHERE id=?", (user["id"],)
-            ).fetchone()
+            fresh = fresh_security_user(db, user)
             if not password_verify(
                 payload.password, fresh["password_hash"]
             ) or not verify_mfa(db, fresh, payload.code):

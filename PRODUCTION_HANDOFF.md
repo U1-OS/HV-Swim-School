@@ -9,7 +9,8 @@ This build is a production foundation, not a substitute for the final deployment
 - Replace SQLite with managed PostgreSQL before real customer use.
 - Set a long random `HV_SESSION_SECRET`, a separate long random
   `HV_DATA_ENCRYPTION_KEY` and `HV_APP_ENV=production`. Keep both keys in the hosting
-  secret store and outside the database, backups and repository.
+  secret store and outside the database, plaintext backups and repository. Separately
+  passphrase-encrypted recovery bundles may contain key material; restrict and test recovery.
 - On the first start of an empty production database only, set
   `HV_BOOTSTRAP_ADMIN_EMAIL` and a unique `HV_BOOTSTRAP_ADMIN_PASSWORD` (12+ characters),
   then remove both values after the management account has been created.

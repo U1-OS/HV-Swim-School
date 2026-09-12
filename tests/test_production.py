@@ -13,6 +13,7 @@ from backend import config, database, server
 def production_settings(**changes):
     values = {
         "app_env": "production",
+        "database_url": "postgresql://test:test@database.example.test/hv?sslmode=verify-full",
         "session_secret": "a-unique-production-secret-with-32-plus-characters",
         "data_encryption_key": "a-separate-production-data-key-with-32-plus-characters",
         "public_url": "https://swim.example.test",
@@ -132,7 +133,7 @@ def test_production_rejects_incomplete_or_insecure_social_signin_configuration()
 def test_empty_production_database_requires_and_uses_one_time_admin_bootstrap(tmp_path, monkeypatch):
     db_path = tmp_path / "production.db"
     monkeypatch.setattr(database, "DB_PATH", db_path)
-    monkeypatch.setattr(database, "settings", production_settings())
+    monkeypatch.setattr(database, "settings", production_settings(database_url=""))
     with pytest.raises(RuntimeError, match="HV_BOOTSTRAP_ADMIN"):
         database.initialise_database()
 
@@ -140,6 +141,7 @@ def test_empty_production_database_requires_and_uses_one_time_admin_bootstrap(tm
         database,
         "settings",
         production_settings(
+            database_url="",
             bootstrap_admin_email="owner@example.test",
             bootstrap_admin_password="OneTimeBootstrap!2026",
             bootstrap_admin_name="HV Swim Owner",

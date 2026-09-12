@@ -26,6 +26,32 @@ The full prior source is recoverable through Git; do not duplicate it into serve
 Root Codex is the only editor. Audit agents are read-only. Current implementation and
 verification progress will be updated below before each pushed checkpoint.
 
+## Active work — security and owner-requested additions
+
+13 September: Andrew asks for deeper security testing, then confirms the planned merchandise
+range from hvswimshop.png, flags/Acknowledgement of Country, restricted staff self-service
+(profile, clock, roster, leave and certificates), and Google/Apple-only sign-in linked to
+profiles. Root remains the sole editor; three agents audit read-only. Security work is in
+progress. No production, external message or live commerce approval. Provider credentials,
+domain and Torres Strait flag publication permission still require resolution.
+
+## Security checkpoint — verified before next feature work
+
+192 Python tests passed / 2 skipped; 11 new focused security regressions included.
+20/20 loopback HTTP checks and Python dependency audit passed; mandatory site check passed.
+Read SECURITY_REVIEW_2026-09-13.md for findings, changes and residual scope. GitHub repository
+secret scanning, push protection and dependency security updates are now enabled (API
+verified). Source remains on codex/fresh-brand-rebuild; no public deployment or live money.
+
+Latest owner clarification: work hours belong in the STAFF portal. Management creates/edits
+rosters; staff can only view their own roster, edit own details, clock, request leave, and
+upload own medical/professional certificates. Implement both API and UI restrictions.
+Google/Apple-only production sign-in still needs explicit account-link invitation flow;
+currently unsafe automatic linking to an existing email is blocked. Source image private
+costs/ratings/third-party partnership claims must not enter public assets or source seeds.
+Shop range has 25 public SKUs after backpack/zipped-tote deduplication, 7 uniforms private.
+TSIRC written flag reproduction permission is required before including that flag image.
+
 ## Fresh 1 — public rebuild implemented and verified
 
 The 16-page public/sign-in rebuild is implemented on `codex/fresh-brand-rebuild`.
