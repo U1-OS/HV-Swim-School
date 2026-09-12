@@ -79,17 +79,27 @@
     const age = document.getElementById('matcher-age').value;
     const confidence = document.getElementById('matcher-confidence').value;
     const goal = document.getElementById('matcher-goal').value;
-    let title = 'Learn to Swim';
-    let anchor = 'learn';
-    let explanation = 'A small-group learn-to-swim pathway can build confidence and core skills, with the exact level confirmed personally.';
-    if (age === 'under2') { title = 'Infant Aquatics'; anchor = 'infant'; explanation = 'A carer-supported infant program creates positive early water experiences and safe foundations.'; }
-    else if (goal === 'personal') { title = 'Private 1:1 Lesson'; anchor = 'private'; explanation = 'One-to-one coaching can match the swimmer’s pace, confidence, communication style and individual goals.'; }
-    else if (confidence === 'independent' || goal === 'technique') { title = 'Stroke Development'; anchor = 'stroke'; explanation = 'A technique-focused pathway can strengthen movement patterns, breathing and endurance for an independent swimmer.'; }
-    else if (age === 'teenadult' && (confidence === 'new' || goal === 'confidence')) { title = 'Adult / Teen Private Assessment'; anchor = 'private'; explanation = 'A calm private assessment gives a teen or adult a personal, no-pressure starting point.'; }
+    const {title, anchor, explanation} = window.HVLessonPathway({age, confidence, goal});
     const query = new URLSearchParams({program:title, matcher_age:age, matcher_confidence:confidence, matcher_goal:goal});
     const result = document.getElementById('matcher-result');
-    result.innerHTML = `<span class="matcher-result-label">Suggested starting point</span><strong>${esc(title)}</strong><p>${esc(explanation)}</p><div class="matcher-result-actions"><a class="btn btn-blue btn-small" href="enquire.html?${query}">Continue to enquiry</a><a class="text-link" href="#${anchor}">Review this program</a></div>`;
+    const answers = ['matcher-age','matcher-confidence','matcher-goal'].map(id => document.getElementById(id).selectedOptions[0].textContent);
+    result.innerHTML = `<div class="matcher-answer-summary">${answers.map(answer => `<span>${esc(answer)}</span>`).join('')}</div><span class="matcher-result-label">Suggested starting point</span><strong>${esc(title)}</strong><p>${esc(explanation)}</p><div class="matcher-result-actions"><a class="btn btn-blue btn-small" href="enquire.html?${query}">Continue to enquiry</a><a class="text-link" href="#${anchor}">Review this program</a></div>`;
     result.classList.add('has-result');
+    result.focus({preventScroll:true});
+  });
+
+
+  const matcher = document.getElementById('program-matcher');
+  const matcherResult = document.getElementById('matcher-result');
+  const initialResult = matcherResult?.innerHTML;
+  matcher?.addEventListener('change', () => {
+    matcherResult.innerHTML = initialResult;
+    matcherResult.classList.remove('has-result');
+  });
+  document.getElementById('lesson-checklist')?.addEventListener('change', event => {
+    const list = event.currentTarget;
+    const count = list.querySelectorAll('input:checked').length;
+    document.getElementById('lesson-checklist-count').textContent = `${count} of 4 ready${count === 4 ? ' · You’re prepared. See you poolside!' : ''}`;
   });
 
   // Interactive Term Fee & Absence Credit Calculator

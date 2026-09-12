@@ -138,12 +138,7 @@
     const age=elements.age.value;
     const confidence=form.querySelector('[name="confidence"]:checked')?.value||'';
     const goal=elements.goal.value;
-    let title='Learn to Swim';
-    let copy='A small-group pathway can build water confidence and strong core swimming skills, with the exact level confirmed personally.';
-    if(age.includes('4–12')||age==='1–2 years'){title='Infant Aquatics';copy='A carer-supported infant pathway can build positive early water experiences and safe foundations.';}
-    else if(goal==='personal'||confidence.includes('one-to-one')){title='Private 1:1 Lesson';copy='One-to-one coaching can match the swimmer’s pace, confidence, communication preferences and individual goals.';}
-    else if(goal==='technique'||confidence==='Swimming independently'){title='Stroke Development';copy='A technique-focused pathway can strengthen movement patterns, breathing and endurance for an independent swimmer.';}
-    else if((age==='Teen'||age==='Adult')&&confidence.includes('New')){title='Adult / Teen Private Assessment';copy='A calm private assessment offers a personal, no-pressure starting point for a teen or adult.';}
+    let {title, explanation:copy}=window.HVLessonPathway({age,confidence,goal});
     if(queryProgram&&!confidence&&!goal){title=queryProgram;copy='You arrived with this program selected. Answer the questions so the team can confirm whether it is the right starting point.';}
     elements.program.value=title;
     const result=document.getElementById('pathway-recommendation');
@@ -204,7 +199,7 @@
   elements.next.addEventListener('click',()=>{if(validateStep(currentStep)){if(currentStep===2)recommendation();showStep(currentStep+1);}});
   elements.back.addEventListener('click',()=>showStep(currentStep-1));
   elements.contactMethod.addEventListener('change',syncPhoneRequirement);
-  form.addEventListener('change',event=>{if(['confidence','swimmer-goal'].includes(event.target.name)||event.target.id==='swimmer-goal')recommendation();saveDraft();});
+  form.addEventListener('change',event=>{if(['confidence','swimmer-goal'].includes(event.target.name)||['swimmer-goal','swimmer-age'].includes(event.target.id))recommendation();saveDraft();});
   form.addEventListener('submit',async event=>{
     event.preventDefault();
     if(lessonEnquiry()){
@@ -276,6 +271,8 @@
       if(preferredConfidence)form.querySelectorAll('[name="confidence"]').forEach(input=>input.checked=input.value===preferredConfidence);
       if(preferredGoal)elements.goal.value=preferredGoal;
     }
+    const incomingAge=incoming.get('matcher_age')||'';
+    if(incoming.has('matcher_age')) elements.age.value=[...elements.age.options].some(option=>option.value===incomingAge)?incomingAge:'';
     if((form.querySelector('[name="confidence"]:checked')&&elements.goal.value)||queryProgram)recommendation();
   }
   document.getElementById('enquiry-draft-clear')?.addEventListener('click',()=>{
@@ -289,7 +286,7 @@
     showStep(1,false);
     elements.age.focus();
   });
-  if(queryProgram){elements.program.value=queryProgram;document.getElementById('pathway-recommendation').innerHTML=`<span>Selected pathway</span><strong>${esc(queryProgram)}</strong><p>Complete the confidence questions so the team can confirm this starting point.</p>`;}
+  if(queryProgram&&!form.querySelector('[name="confidence"]:checked')&&!elements.goal.value){elements.program.value=queryProgram;document.getElementById('pathway-recommendation').innerHTML=`<span>Selected pathway</span><strong>${esc(queryProgram)}</strong><p>Complete the confidence questions so the team can confirm this starting point.</p>`;}
   if(queryLocation){
     elements.preferredClass.value=`Location preference: ${queryLocation}`;
     const heroCopy=document.querySelector('.enrolment-hero-grid > div > p');
@@ -317,7 +314,6 @@
       }
     }
     showStep(1,false);
-    // Keep an incoming program authoritative after the initial wizard render.
-    if(queryProgram)elements.program.value=queryProgram;
+    if(queryProgram&&!form.querySelector('[name="confidence"]:checked')&&!elements.goal.value)elements.program.value=queryProgram;
   }
 })();

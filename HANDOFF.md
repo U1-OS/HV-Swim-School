@@ -3,13 +3,35 @@
 Andrew swaps between Claude and Codex. Read this first and rewrite it last.
 
 **Wheel:** Codex
-**Last updated:** 2026-09-12 by Codex — sunlit website rebuild and isolated preview verified
+**Last updated:** 2026-09-12 by Codex — family journey and enquiry follow-up upgrade verified
 
 The working directory was missing on arrival. Restored the exact private GitHub main
 commit `676094ff874af6c2bd6fb5ff98fef979367773bc` into the empty local Developer path.
 This restored source only; no previous private runtime database was present or recovered.
 
-## Latest release — UI19 sunlit rebuild
+## Latest release — UI20 family journey and enquiry follow-up
+
+Read `FAMILY_JOURNEY_UPGRADE.md` for changes, verification and remaining limitations.
+Branch remains `codex/sunlit-rebuild`; sole copy remains `~/Developer/HV-Swim-School`.
+
+- Shared readiness-aware matcher, exact age handoff and first-lesson checklist.
+- Management ownership/actions/dates/filtering with audited revision-conflict protection.
+- Family shortcuts and clearer lesson-first hierarchy; corrected matcher contrast.
+- Additive enquiry migration runs on startup. Older clients without a revision now
+  receive validation errors; reload UI20 before editing enquiries.
+- 153 Python passed / 1 existing skip; six Node suites and static checker passed.
+- Preview at loopback 8772. QA enquiry HV-ENQ-0001 is synthetic, with a test follow-up.
+- Real-content inputs listed in `CONTENT_CAPTURE_BRIEF.md`. No messages, payments or
+  public deployment performed. Provider delivery and production migration remain open.
+
+### Next up
+
+Review the journey with Andrew, collect approved real content, and select the production
+architecture/provider setup from `SUNLIT_REBUILD.md`. Before high-volume use add server
+pagination for enquiries; the current view discloses its 250-record loaded limit. Follow-up
+dates are internal reminders only. Do not activate live services without approval.
+
+## Previous release — UI19 sunlit rebuild
 
 Branch `codex/sunlit-rebuild`, based on newer UI18 branch commit `beab5cb`.
 Read `SUNLIT_REBUILD.md` for changes, test evidence and precise launch blockers.

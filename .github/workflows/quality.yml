@@ -48,3 +48,4 @@ jobs:
       - run: node tests/test_experience.mjs
       - run: node tests/test_aquatic_scene.mjs
       - run: node tests/test_platform_dates.mjs
+      - run: node tests/test_lesson_pathway.mjs

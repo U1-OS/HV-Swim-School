@@ -12,7 +12,8 @@ The isolated launcher ignores `.env`, excludes inherited integration credentials
 and uses synthetic records in the ignored `data/local-preview/` directory.
 Keep its terminal open during preview. Do not put real customer or staff data there.
 
-The current rebuild and exact business/credential blockers are in `SUNLIT_REBUILD.md`.
+The current journey upgrade is in `FAMILY_JOURNEY_UPGRADE.md`; exact business/credential
+blockers are in `SUNLIT_REBUILD.md` and content inputs in `CONTENT_CAPTURE_BRIEF.md`.
 Desktop and mobile screenshots are in `design/`. The existing `start-hv-swim.command`
 remains available for the older configured workflow and should not be confused with
 the isolated launcher.

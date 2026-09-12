@@ -22,14 +22,15 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="assets/app-icon-v3-180.png">
   <link rel="preload" as="image" href="assets/hero-programs-v4.jpg" fetchpriority="high">
-  <link rel="stylesheet" href="assets/styles.css?v=5.13.0-ui19">
-  <link rel="stylesheet" href="assets/support.css?v=5.13.0-ui19">
-  <script defer src="assets/app.js?v=5.13.0-ui19"></script>
-  <script defer src="assets/support.js?v=5.13.0-ui19"></script>
-  <script defer src="assets/programs.js?v=5.13.0-ui19"></script>
+  <link rel="stylesheet" href="assets/styles.css?v=5.13.0-ui20">
+  <link rel="stylesheet" href="assets/support.css?v=5.13.0-ui20">
+  <script defer src="assets/app.js?v=5.13.0-ui20"></script>
+  <script defer src="assets/support.js?v=5.13.0-ui20"></script>
+  <script defer src="assets/lesson-pathway.js?v=5.13.0-ui20"></script>
+  <script defer src="assets/programs.js?v=5.13.0-ui20"></script>
   <script type="application/ld+json">{"@context":"https://schema.org","@type":"ItemList","name":"HV Swim Bendigo swimming programs","itemListElement":[{"@type":"ListItem","position":1,"item":{"@type":"Service","name":"Infant Aquatics"}},{"@type":"ListItem","position":2,"item":{"@type":"Service","name":"Learn to Swim"}},{"@type":"ListItem","position":3,"item":{"@type":"Service","name":"Stroke Development"}},{"@type":"ListItem","position":4,"item":{"@type":"Service","name":"Private Swimming Lessons"}}]}</script>
-  <link rel="stylesheet" href="assets/experience.css?v=5.13.0-ui19">
-  <script defer src="assets/experience.js?v=5.13.0-ui19"></script>
+  <link rel="stylesheet" href="assets/experience.css?v=5.13.0-ui20">
+  <script defer src="assets/experience.js?v=5.13.0-ui20"></script>
 </head>
 <body data-page="programs">
   <a class="skip-link" href="#main-content">Skip to main content</a>
@@ -159,13 +160,13 @@
 
     <section class="section matcher-section" id="matcher">
       <div class="container matcher-grid">
-        <div class="reveal"><div class="eyebrow">Guided lesson matcher</div><h2>A clearer place to begin.</h2><p class="lead" style="margin-top:18px">Three quick choices create a useful recommendation. It is guidance—not an automated assessment—and the team will personally confirm the best fit.</p><div class="matcher-assurance"><span>✓</span><p><strong>No account needed</strong><small>No medical details or sensitive information are collected here.</small></p></div></div>
+        <div class="reveal"><div class="eyebrow">Guided lesson matcher</div><h2>A clearer place to begin.</h2><p class="lead" style="margin-top:18px">Three quick choices create a useful recommendation. It is guidance—not an automated assessment—and the team will personally confirm the best fit.</p><div class="matcher-assurance"><span>✓</span><p><strong>No account needed</strong><small>Choose age, confidence and goals. No names or contact details needed.</small></p></div></div>
         <form class="matcher-card reveal" id="program-matcher">
-          <div class="matcher-step"><span>1</span><div class="field"><label for="matcher-age">Swimmer's age</label><select id="matcher-age" required><option value="">Choose the closest option</option><option value="under2">Approximately 4 months–2 years</option><option value="child">Child</option><option value="teenadult">Teen or adult</option></select></div></div>
+          <div class="matcher-step"><span>1</span><div class="field"><label for="matcher-age">Swimmer's age</label><select id="matcher-age" required><option value="">Choose the closest option</option><option>Approximately 4–12 months</option><option>1–2 years</option><option>3–5 years</option><option>6–8 years</option><option>9–12 years</option><option>Teen</option><option>Adult</option></select></div></div>
           <div class="matcher-step"><span>2</span><div class="field"><label for="matcher-confidence">Current water confidence</label><select id="matcher-confidence" required><option value="">Choose the closest option</option><option value="new">New, cautious or nervous</option><option value="supported">Comfortable with some support</option><option value="independent">Swimming independently</option></select></div></div>
           <div class="matcher-step"><span>3</span><div class="field"><label for="matcher-goal">Main goal right now</label><select id="matcher-goal" required><option value="">Choose the main goal</option><option value="confidence">Build comfort and confidence</option><option value="skills">Learn core swimming skills</option><option value="technique">Improve technique and endurance</option><option value="personal">Get focused one-to-one support</option></select></div></div>
           <button class="btn btn-primary" type="submit">Show my recommendation <span aria-hidden="true">→</span></button>
-          <div class="matcher-result" id="matcher-result" role="status" aria-live="polite"><span class="matcher-result-label">Your suggested starting point</span><strong>Choose the closest answers above.</strong><p>We will explain why the pathway may suit, then carry it into your enquiry.</p></div>
+          <div class="matcher-result" id="matcher-result" tabindex="-1" role="status" aria-live="polite"><span class="matcher-result-label">Your suggested starting point</span><strong>Choose the closest answers above.</strong><p>We will explain why the pathway may suit, then carry it into your enquiry.</p></div>
         </form>
       </div>
     </section>
@@ -187,7 +188,7 @@
     </section>
 
     <section class="section"><div class="container cta-panel reveal"><div><div class="eyebrow">A personal recommendation</div><h2>Still unsure? That is completely normal.</h2><p>Tell the team what the swimmer is comfortable doing now. HV Swim can recommend the right program, venue and starting class.</p></div><div class="cta-actions"><a class="btn btn-primary" href="enquire.html">Find the right lesson</a><a class="btn btn-outline" href="tel:+61413462112">Call 0413 462 112</a></div></div></section>
-    <section class="section first-lesson-section" id="first-lesson" aria-labelledby="first-lesson-title"><div class="container first-lesson-layout"><div><div class="eyebrow">Before your first splash</div><h2 id="first-lesson-title">A little preparation.<br>A calmer first lesson.</h2><p class="lead">New places can feel like a big step. We’re here to help you and your swimmer feel ready.</p><a class="btn btn-primary" href="enquire.html">Talk to the team →</a></div><div class="first-lesson-questions">
+    <section class="section first-lesson-section" id="first-lesson" aria-labelledby="first-lesson-title"><div class="container first-lesson-layout"><div><div class="eyebrow">Before your first splash</div><h2 id="first-lesson-title">A little preparation.<br>A calmer first lesson.</h2><p class="lead">New places can feel like a big step. We’re here to help you and your swimmer feel ready.</p><fieldset class="lesson-checklist" id="lesson-checklist"><legend>Your pool-bag checklist</legend><label><input type="checkbox"> Swimwear packed</label><label><input type="checkbox"> Towel and dry clothes packed</label><label><input type="checkbox"> Confirmed venue and lesson time checked</label><label><input type="checkbox"> Class-specific equipment checked with the team</label><p id="lesson-checklist-count" role="status">0 of 4 ready</p><small>For this visit only; your checklist is not saved.</small></fieldset><div class="hero-actions"><a class="btn btn-primary" href="enquire.html">Talk to the team →</a><a class="text-link" href="locations.html">Check your venue</a></div></div><div class="first-lesson-questions">
       <details open><summary>What should we bring?</summary><p>A towel, suitable swimwear and a change of clothes are a useful starting point. Ask the team about swim nappies, goggles or anything specific to your swimmer’s class.</p></details>
       <details><summary>Where do we go when we arrive?</summary><p>Check your confirmed class venue and the <a href="locations.html">location information</a> before travelling. The team can confirm the entrance, arrival time and any individual access arrangements.</p></details>
       <details><summary>Does a parent or carer stay?</summary><p>A parent or guardian remains onsite except for Stroke Development classes. Infant aquatics involves a parent or carer in the water; confirm the arrangements for your class with the team.</p></details>
