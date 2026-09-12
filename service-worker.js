@@ -1,7 +1,7 @@
-const CORE_CACHE = 'hv-swim-v5130-core-28';
-const RUNTIME_CACHE = 'hv-swim-v5130-runtime-28';
+const CORE_CACHE = 'hv-swim-v5130-core-29';
+const RUNTIME_CACHE = 'hv-swim-v5130-runtime-29';
 const CORE_SHELL = [
-  './assets/site.css?v=6.0.0-fresh1', './assets/site.js?v=6.0.0-fresh1',
+  './assets/site.css?v=6.0.0-fresh2', './assets/site.js?v=6.0.0-fresh1',
   './assets/collection.css?v=6.0.0-fresh1',
   './assets/experience.css?v=5.13.0-ui25', './assets/experience.js?v=5.13.0-ui25',
   './offline.html', './manifest.webmanifest',

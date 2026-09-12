@@ -37,7 +37,7 @@ verified. Synthetic preview records stay in ignored `data/local-preview/`.
 
 Important worker fix: encoded API paths cannot enter navigation caches; only public HTML
 is cached, private/no-store is respected and operational APIs are network-only. Cache
-revision 28 retires earlier runtime and indefinite public-data caches. Do not restore the
+revision 29 retires earlier runtime and indefinite public-data caches. Do not restore the
 old API fallback behavior. New tests cover this explicitly.
 
 Only root edits. The protected operations workspace still uses its existing foundation;
@@ -45,6 +45,14 @@ its full visual migration is next. Public site/sign-in no longer load legacy the
 public support/experience demos. Mobile remains paused. No deployment, live messages or
 transactions are approved. New backend public allowlist includes child-safety.html.
 Local preview has been restarted with the isolated launcher on 127.0.0.1:8772.
+
+Fresh checkpoint `57699b8` is pushed. GitHub run `34703854753` passed website,
+backend, dependency audits and PostgreSQL jobs. The final icon-size correction uses
+site.css Fresh 2 / worker 29: generated sign-in icons now have explicit dimensions.
+Browser checks at actual 320px cover home/programs/venues/enquiry/shop/child safety and
+sign-in without horizontal overflow; mobile menu opens and Escape closes it. The
+viewport control affects the selected tab; inspect that tab, then reset before finishing.
+The normal preview has been restored. No real customer or financial records were changed.
 
 ## Previous checkpoint — UI25 rendering quality
 
