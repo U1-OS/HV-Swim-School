@@ -18,7 +18,8 @@ def load_dotenv(path: Path) -> None:
         os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
 
 
-load_dotenv(ROOT / ".env")
+if os.getenv("HV_LOAD_DOTENV", "true").lower() == "true":
+    load_dotenv(ROOT / ".env")
 
 DATA_DIR = Path(os.getenv("HV_DATA_DIR", str(ROOT / "data"))).expanduser().resolve()
 DB_PATH = DATA_DIR / "hv_swim.db"

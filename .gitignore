@@ -16,3 +16,6 @@ android/.gradle/
 android/local.properties
 ios/App/Pods/
 _to_delete/
+
+# Isolated synthetic local preview; never commit runtime records or keys.
+data/local-preview/
