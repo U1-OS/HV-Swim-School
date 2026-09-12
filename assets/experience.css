@@ -512,3 +512,33 @@ body .footer-col strong { color:#fff; }
 .enrolment-hero .first-lesson-link { color:#d4f2ff; font-size:.8rem; }
 .hero-trust span::after { content:none !important; }
 body[data-page="shop"] .shop-hero::after { display:none; }
+
+/* Family preparation and recommendation details */
+.matcher-answer-summary{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px}
+.matcher-answer-summary span{font-size:12px;line-height:1.5;padding:6px 10px;border:1px solid #b7d2dc;border-radius:20px;color:#234f63;background:#f5fbfd}
+.lesson-checklist{margin:28px 0;border:1px solid #bfd6df;border-radius:20px;padding:24px;background:#fff}
+.lesson-checklist legend{font-weight:800;padding:0 8px;color:#152e43}
+.lesson-checklist label{display:flex;gap:12px;align-items:center;min-height:44px;font-size:14px;line-height:1.5;cursor:pointer}
+.lesson-checklist input{width:20px;height:20px;flex-shrink:0;accent-color:#246c85}
+.lesson-checklist p{font-weight:700;color:#246c85;margin:16px 0 4px}.lesson-checklist small{color:#526a79}
+
+.enquiry-tools{display:grid;grid-template-columns:2fr 1fr;gap:16px;margin:24px 0 12px}
+.enquiry-owner-summary{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0}.enquiry-owner-summary span{background:#edf5f8;border-radius:18px;padding:6px 12px;font-size:12px;color:#234f63}
+.enquiry-followup{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:end}.enquiry-followup .field{min-width:0}.enquiry-followup select,.enquiry-followup input{width:100%;min-width:0}.enquiry-followup button{justify-self:start;grid-column:1/-1}
+.family-quick-actions{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+.family-quick-actions>a,.family-quick-actions>button{display:flex;flex-direction:column;align-items:flex-start;gap:8px;padding:22px;text-align:left;border:1px solid #c9dde5;border-radius:18px;background:#fff;color:#152e43;text-decoration:none;font:inherit;cursor:pointer}
+.family-quick-actions .ui-icon{width:24px;height:24px;color:#327e96}.family-quick-actions span{font-size:12px;color:#536c7a}.family-quick-actions>a:hover,.family-quick-actions>button:hover{border-color:#327e96;background:#f2fafc}
+@media(max-width:800px){.family-quick-actions{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:540px){.enquiry-tools,.enquiry-followup{grid-template-columns:1fr}.family-quick-actions>a,.family-quick-actions>button{padding:16px}}
+/* Explicit contrast for the guided matcher across legacy section themes. */
+body[data-page="programs"] .matcher-section{background:linear-gradient(135deg,#e9f5f9,#f8fbfc);color:#183348}
+body[data-page="programs"] .matcher-section h2{color:#152e43}
+body[data-page="programs"] .matcher-section .eyebrow,body[data-page="programs"] .matcher-result-label{color:#286981}
+body[data-page="programs"] .matcher-section .lead,body[data-page="programs"] .matcher-assurance small{color:#4d6575}
+body[data-page="programs"] .matcher-assurance{border-color:#c6dce5}
+body[data-page="programs"] .matcher-card{background:#fff;border-color:#bed5df;color:#183348;backdrop-filter:none}
+body[data-page="programs"] .matcher-card label{color:#23465c}
+body[data-page="programs"] .matcher-result,body[data-page="programs"] .matcher-result.has-result{background:#eff8fb;border-color:#b3d4df;color:#405d70}
+body[data-page="programs"] .matcher-result strong{color:#152e43;font-size:22px;line-height:1.4}
+body[data-page="programs"] .matcher-result p{color:#405d70;font-size:14px;line-height:1.7}
+body[data-page="programs"] .matcher-result-actions .text-link{color:#24637b}

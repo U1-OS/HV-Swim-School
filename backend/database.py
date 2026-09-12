@@ -686,6 +686,11 @@ def initialise_database() -> None:
             "preferred_class": "TEXT",
             "preferred_days": "TEXT",
             "contact_method": "TEXT NOT NULL DEFAULT 'email'",
+            "assigned_to": "INTEGER REFERENCES users(id)",
+            "next_action": "TEXT NOT NULL DEFAULT 'review'",
+            "follow_up_on": "TEXT",
+            "revision": "INTEGER NOT NULL DEFAULT 0",
+
         }.items():
             if column not in enquiry_columns:
                 db.execute(f"ALTER TABLE enquiries ADD COLUMN {column} {definition}")

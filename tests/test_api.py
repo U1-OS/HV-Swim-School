@@ -2474,3 +2474,37 @@ def test_pool_temperature_outside_a_plausible_range_is_rejected(client):
             headers={"X-CSRF-Token": csrf},
         )
         assert response.status_code == 422, f"{bad} was accepted as a pool temperature"
+
+
+def test_enquiry_follow_up_ownership_conflicts_and_role_boundaries(client):
+    from backend.database import db_session
+    with db_session() as db:
+        enquiry_id = db.execute("INSERT INTO enquiries(name,email,enquiry_type,created_at) VALUES(?,?,?,?)",
+                                ("QA Follow Up", "followup@example.com", "general", "2026-09-12T00:00:00+00:00")).lastrowid
+    path = f"/api/admin/enquiries/{enquiry_id}"
+    payload = {"status": "contacted", "revision": 0, "next_action": "contact", "follow_up_on": "2026-09-15"}
+    client.cookies.clear()
+    assert client.patch(path, json=payload).status_code == 401
+    csrf = sign_in(client, STAFF)
+    assert client.patch(path, json=payload, headers={"X-CSRF-Token": csrf}).status_code == 403
+    client.cookies.clear()
+    csrf = sign_in(client, ADMIN)
+    headers = {"X-CSRF-Token": csrf}
+    owners = client.get("/api/admin/enquiries").json()["owners"]
+    payload["assigned_to"] = owners[0]["id"]
+    assert client.patch(path, json=payload).status_code == 403
+    assert client.patch(path, json=payload | {"assigned_to": 999999}, headers=headers).status_code == 422
+    assert client.patch(path, json=payload | {"status": "trial_booked"}, headers=headers).status_code == 422
+    assert client.patch(path, json=payload | {"follow_up_on": "2026-02-30"}, headers=headers).status_code == 422
+    response = client.patch(path, json=payload, headers=headers)
+    assert response.status_code == 200, response.text
+    assert response.json()["revision"] == 1
+    assert client.patch(path, json=payload | {"status": "closed"}, headers=headers).status_code == 409
+    row = next(item for item in client.get("/api/admin/enquiries").json()["enquiries"] if item["id"] == enquiry_id)
+    assert row["assigned_to"] == owners[0]["id"]
+    assert row["next_action"] == "contact" and row["follow_up_on"] == "2026-09-15" and row["status"] == "contacted"
+    assert client.patch(path, json=payload | {"status": "closed", "revision": 1}, headers=headers).status_code == 200
+    with db_session() as db:
+        row = db.execute("SELECT * FROM enquiries WHERE id=?", (enquiry_id,)).fetchone()
+        assert row["next_action"] == "none" and row["follow_up_on"] is None and row["revision"] == 2
+        assert db.execute("SELECT COUNT(*) FROM audit_log WHERE action='update_enquiry_status' AND entity_id=?", (str(enquiry_id),)).fetchone()[0] == 2

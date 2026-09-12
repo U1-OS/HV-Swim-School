@@ -873,6 +873,11 @@ class EnquiryInput(BaseModel):
 
 class EnquiryStatusInput(BaseModel):
     status: Literal["new", "contacted", "trial_booked", "closed"]
+    revision: int = Field(ge=0)
+    assigned_to: int | None = Field(default=None, gt=0)
+    next_action: Literal["review", "contact", "confirm_preferences", "arrange_assessment", "confirm_placement", "none"] = "review"
+    follow_up_on: date | None = None
+
 
 
 class SiteSettingsInput(BaseModel):
@@ -4241,20 +4246,40 @@ def update_site_settings(payload: SiteSettingsInput, request: Request, user: dic
 @app.get("/api/admin/enquiries")
 def admin_enquiries(user: dict[str, Any] = Depends(require_roles("admin"))) -> dict[str, Any]:
     with db_session() as db:
-        query = """SELECT * FROM enquiries ORDER BY CASE status WHEN 'new' THEN 0 WHEN 'contacted' THEN 1 WHEN 'trial_booked' THEN 2 ELSE 3 END,created_at DESC LIMIT 250"""
-        return {"enquiries": rows(db.execute(query))}
+        query = """SELECT e.*, u.first_name AS owner_first, u.last_name AS owner_last
+                   FROM enquiries e LEFT JOIN users u ON u.id=e.assigned_to
+                   ORDER BY CASE e.status WHEN 'new' THEN 0 WHEN 'contacted' THEN 1 WHEN 'trial_booked' THEN 2 ELSE 3 END,e.created_at DESC LIMIT 250"""
+        return {"enquiries": rows(db.execute(query)), "owners": rows(db.execute(
+            "SELECT id,first_name,last_name FROM users WHERE active=1 AND role='admin' ORDER BY first_name,last_name"
+        )), "limit": 250}
 
 
 @app.patch("/api/admin/enquiries/{enquiry_id}")
 def update_enquiry(enquiry_id: int, payload: EnquiryStatusInput, request: Request, user: dict[str, Any] = Depends(require_roles("admin")), x_csrf_token: str | None = Header(default=None)) -> dict[str, Any]:
     csrf_guard(request, user, x_csrf_token)
     with db_session() as db:
-        enquiry = db.execute("SELECT id,status,name FROM enquiries WHERE id=?", (enquiry_id,)).fetchone()
+        enquiry = db.execute("SELECT * FROM enquiries WHERE id=?", (enquiry_id,)).fetchone()
         if not enquiry:
             raise HTTPException(status_code=404, detail="Enquiry not found")
-        db.execute("UPDATE enquiries SET status=? WHERE id=?", (payload.status, enquiry_id))
-        audit(db, user["id"], "update_enquiry_status", "enquiry", enquiry_id, {"from": enquiry["status"], "to": payload.status, "name": enquiry["name"]}, client_ip(request))
-        return {"saved": True, "id": enquiry_id, "status": payload.status}
+        if payload.assigned_to is not None and not db.execute(
+            "SELECT id FROM users WHERE id=? AND role='admin' AND active=1", (payload.assigned_to,)
+        ).fetchone():
+            raise HTTPException(status_code=422, detail="Choose an active management owner")
+        if payload.status == "trial_booked" and enquiry["enquiry_type"] not in {"lesson", "lesson_question", "private_lesson"}:
+            raise HTTPException(status_code=422, detail="Only lesson enquiries can have a trial booked")
+        next_action = "none" if payload.status == "closed" else payload.next_action
+        follow_up = None if payload.status == "closed" or payload.follow_up_on is None else payload.follow_up_on.isoformat()
+        changed = db.execute(
+            "UPDATE enquiries SET status=?,assigned_to=?,next_action=?,follow_up_on=?,revision=revision+1 WHERE id=? AND revision=?",
+            (payload.status, payload.assigned_to, next_action, follow_up, enquiry_id, payload.revision),
+        )
+        if changed.rowcount != 1:
+            raise HTTPException(status_code=409, detail="Another manager updated this enquiry. Reload the inbox before saving again.")
+        audit(db, user["id"], "update_enquiry_status", "enquiry", enquiry_id, {
+            "from": enquiry["status"], "to": payload.status, "assigned_to": payload.assigned_to,
+            "next_action": next_action, "follow_up_on": follow_up, "revision": payload.revision + 1,
+        }, client_ip(request))
+        return {"saved": True, "id": enquiry_id, "status": payload.status, "revision": payload.revision + 1}
 
 
 @app.get("/api/admin/staff")
