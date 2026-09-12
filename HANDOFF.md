@@ -3,11 +3,31 @@
 Andrew swaps between Claude and Codex. Read this first and rewrite it last.
 
 **Wheel:** Codex
-**Last updated:** 2026-09-12 by Codex — family journey and enquiry follow-up upgrade verified
+**Last updated:** 2026-09-13 by Codex — pagination, local email drafts and launch preparation verified
 
 The working directory was missing on arrival. Restored the exact private GitHub main
 commit `676094ff874af6c2bd6fb5ff98fef979367773bc` into the empty local Developer path.
 This restored source only; no previous private runtime database was present or recovered.
+
+## Current work — UI21 launch preparation
+
+Andrew selected all five next steps and confirmed no domain or hosting account yet.
+Repository visibility is now PUBLIC by Andrew's action. Continue pushing verified source;
+never push credentials, runtime databases or personal records. Historical private-repo
+references below describe earlier sessions.
+
+- Full-database management enquiry search/filtering and 25-record page navigation.
+- Minimal enquiry email drafts and local synthetic preview generator; no sending adapter.
+- Provider-neutral hosting and launch sequence: `deploy/LAUNCH_PREPARATION.md`.
+- Real photos, private pricing, term/arrival details and service accounts remain owner inputs.
+- Main is an ancestor of the build branch; this release brings the verified source onto main.
+- 160 backend tests passed / 1 existing skip. New coverage verifies complete enquiry
+  pagination, literal search, offset clamping and safe email draft composition.
+- Browser verified 27 synthetic matches across two pages with next/previous controls.
+- Owner-supplied registration details match the site; see BUSINESS_DETAILS.md.
+  Andrew explicitly has not bought a domain; the listed mailbox remains unverified.
+- Isolated preview contains 27 labelled QA Pagination Preview records plus the earlier
+  QA journey enquiry. These are fictional local records only.
 
 ## Repository information update
 

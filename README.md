@@ -8,8 +8,8 @@ accounts, staff operations and management follow-up.
 ## Current build
 
 The latest verified work is on [`codex/sunlit-rebuild`](https://github.com/U1-OS/HV-Swim-School/tree/codex/sunlit-rebuild).
-Presentation revision: **UI20**. This is a **local development build**, not a public launch.
-The GitHub default branch remains `main`; open the build branch for the latest source.
+Presentation revision: **UI21**. This is a **local development build**, not a public launch.
+The verified build is maintained on `main` and `codex/sunlit-rebuild`.
 
 - Responsive public website, guided lesson finder and first-lesson preparation checklist.
 - Protected family, staff and management workspaces.
@@ -19,10 +19,13 @@ The GitHub default branch remains `main`; open the build branch for the latest s
 - SQLite for local preview. Production database selection and migration remain outstanding.
 - Native mobile app paused. Live payments and public deployment require explicit approval.
 
-Every verified source update is committed and pushed to this private repository.
+Every verified source update is committed and pushed to this public source repository.
 Credentials, runtime databases and personal records stay out of Git history.
 See [HANDOFF.md](HANDOFF.md) for the current working state and
 [FAMILY_JOURNEY_UPGRADE.md](FAMILY_JOURNEY_UPGRADE.md) for verification and limitations.
+
+See [launch preparation](deploy/LAUNCH_PREPARATION.md) for the hosting specification,
+local email previews and outstanding owner decisions. No domain or host is selected yet.
 
 ## Preview on this Mac
 
@@ -188,7 +191,7 @@ python -m pytest tests/ -q
 node scripts/check-site.mjs
 ```
 
-The same backend and static-site checks run automatically for pushes and pull requests in the private GitHub repository. The native-app phase is paused and is not part of the current release gate.
+The same backend and static-site checks run automatically for pushes and pull requests in the GitHub repository. The native-app phase is paused and is not part of the current release gate.
 
 ## Generated visual assets
 

@@ -7,7 +7,7 @@ Both Claude and Codex work here. Both read this file. Keep it accurate.
 
 `~/Developer/HV-Swim-School` is the only working copy. Keep it on the Mac's local disk,
 outside iCloud Drive, Desktop and Documents. Do not recreate a second copy in Documents.
-GitHub remote: `https://github.com/U1-OS/HV-Swim-School` (private).
+GitHub remote: `https://github.com/U1-OS/HV-Swim-School` (public).
 
 Do **not** work in `~/.codex/.chatgpt-projects/.../hv_swim_v4` — that folder is a
 ChatGPT project mirror and can be wiped and replaced without warning. Its contents have
@@ -39,7 +39,7 @@ Pull before you start even if you think nothing changed — the other agent may 
 pushed since you last looked. If a pull brings in conflicts, resolve them before writing
 anything new.
 
-**Push every verified update to the private GitHub repository.** Keep credentials,
+**Push every verified update to the GitHub repository.** Keep credentials,
 databases and personal records local/private, never in Git history. A commit that is not pushed does not exist for the other agent, and
 has already been lost once on this project. Do not end a session on an unpushed commit.
 

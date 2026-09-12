@@ -9,6 +9,7 @@
   let routeGeneration = 0;
   let apiReachable = null;
   let lessonRegisterDate = '';
+  const enquiryView={q:'',view:'active',offset:0};
 
   const esc = value => String(value ?? '').replace(/[&<>'"]/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]));
   const iconNames = {'⌂':'home','▦':'calendar','◷':'clock','♡':'heart','◇':'status','♢':'bell','°C':'thermometer','▤':'document','✓':'check','◎':'status','♙':'users','◫':'layout','✉':'mail','≈':'waves','◌':'message','↗':'trend','◔':'status','$':'dollar'};
@@ -773,8 +774,9 @@
   }
 
   async function adminEnquiries(content) {
-    const data=await load('/api/admin/enquiries');
-    const counts=Object.fromEntries(['new','contacted','trial_booked','closed'].map(status=>[status,data.enquiries.filter(item=>item.status===status).length]));
+    const data=await load(`/api/admin/enquiries?${new URLSearchParams({...enquiryView,limit:25})}`);
+    enquiryView.offset=data.offset;
+    const counts=data.counts;
     const types={lesson:'Lesson enquiry',lesson_question:'Lesson question',private_lesson:'Private lessons',existing_customer:'Existing family',billing:'Billing',merchandise:'Merchandise',feedback:'Feedback',general:'General question',other:'Other question'};
     const nextActions={review:'Review enquiry',contact:'Contact family',confirm_preferences:'Confirm preferences',arrange_assessment:'Discuss an assessment',confirm_placement:'Confirm placement',none:'No next action'};
     const today=businessDateValue();
@@ -801,21 +803,16 @@
         </select></div><div class="field"><label for="enquiry-owner-${item.id}">Management owner</label><select id="enquiry-owner-${item.id}"><option value="">Unassigned</option>${data.owners.map(owner=>`<option value="${owner.id}" ${owner.id===item.assigned_to?'selected':''}>${esc(owner.first_name)} ${esc(owner.last_name)}</option>`).join('')}</select></div><div class="field"><label for="enquiry-action-${item.id}">Next action</label><select id="enquiry-action-${item.id}">${Object.entries(nextActions).map(([value,label])=>`<option value="${value}" ${item.next_action===value?'selected':''}>${label}</option>`).join('')}</select></div><div class="field"><label for="enquiry-date-${item.id}">Follow up on</label><input class="input" type="date" id="enquiry-date-${item.id}" value="${esc(item.follow_up_on||'')}"></div><button class="btn btn-blue btn-small" data-action="save-enquiry" data-enquiry-id="${item.id}" data-enquiry-revision="${item.revision}">Save follow-up</button></div>
       </article>`;
     }).join('');
-    content.innerHTML=shell('Enquiry inbox','Review lesson preferences, merchandise interest and general questions in one clear follow-up queue.',`<div class="platform-grid">${metric('New',counts.new,'Needs first response','✉')}${metric('Contacted',counts.contacted,'Conversation started','◌')}${metric('Trial booked',counts.trial_booked,'Ready to welcome','✓')}${metric('Closed',counts.closed,'Completed records','◇')}<section class="panel panel-pad p-span-12"><div class="panel-head"><div><h2>Customer enquiries</h2><p>Assign an owner and a next step. Dates are internal reminders; saving does not send a message or confirm a booking.</p></div>${chip(`${data.enquiries.length} total`,'demo')}</div><div class="enquiry-tools"><div class="field"><label for="enquiry-search">Find an enquiry</label><input class="input" type="search" id="enquiry-search" placeholder="Name, email or reference" autocomplete="off"></div><div class="field"><label for="enquiry-filter">Show</label><select id="enquiry-filter"><option value="active">Active enquiries</option><option value="new">New</option><option value="due">Follow-up due</option><option value="unassigned">Unassigned active</option><option value="closed">Closed</option><option value="all">All loaded enquiries</option></select></div></div><p id="enquiry-result-count" role="status"></p><p class="muted">Showing up to ${data.limit} enquiries, prioritising new enquiries.</p><div class="enquiry-inbox">${cards||empty('No public enquiries have been received yet.')}</div></section></div>`);
+    content.innerHTML=shell('Enquiry inbox','Review lesson preferences, merchandise interest and general questions in one clear follow-up queue.',`<div class="platform-grid">${metric('New',counts.new,'Needs first response','✉')}${metric('Contacted',counts.contacted,'Conversation started','◌')}${metric('Trial booked',counts.trial_booked,'Ready to welcome','✓')}${metric('Closed',counts.closed,'Completed records','◇')}<section class="panel panel-pad p-span-12"><div class="panel-head"><div><h2>Customer enquiries</h2><p>Assign an owner and a next step. Dates are internal reminders; saving does not send a message or confirm a booking.</p></div>${chip(`${data.total} matching`,'demo')}</div><form class="enquiry-tools" id="enquiry-search-form"><div class="field"><label for="enquiry-search">Find an enquiry</label><input class="input" type="search" id="enquiry-search" placeholder="Name, email or reference" autocomplete="off" maxlength="100" value="${esc(enquiryView.q)}"></div><div class="field"><label for="enquiry-filter">Show</label><select id="enquiry-filter"><option value="active">Active enquiries</option><option value="new">New</option><option value="due">Follow-up due</option><option value="unassigned">Unassigned active</option><option value="closed">Closed</option><option value="all">All enquiries</option></select></div><button class="btn btn-blue btn-small" type="submit">Search enquiries</button></form><p id="enquiry-result-count" role="status"></p><p class="muted">Search and filters cover every enquiry. New enquiries appear first.</p><div class="enquiry-inbox">${cards||empty('No enquiries match. Try another search or filter.')}</div><nav class="enquiry-pages" aria-label="Enquiry pages"><button class="btn btn-soft btn-small" id="enquiry-previous" ${data.offset===0?'disabled':''}>Previous page</button><span>Page ${Math.floor(data.offset/data.limit)+1} of ${Math.max(1,Math.ceil(data.total/data.limit))}</span><button class="btn btn-soft btn-small" id="enquiry-next" ${!data.has_more?'disabled':''}>Next page</button></nav></section></div>`);
     const search=document.getElementById('enquiry-search');
     const filter=document.getElementById('enquiry-filter');
-    const applyFilters=()=>{
-      const term=search.value.trim().toLowerCase();
-      let visible=0;
-      content.querySelectorAll('.enquiry-item').forEach(card=>{
-        const status=card.dataset.enquiryStatus;
-        const matches={all:true,active:status!=='closed',new:status==='new',closed:status==='closed',due:card.dataset.enquiryDue==='yes',unassigned:status!=='closed'&&!card.dataset.enquiryOwner}[filter.value];
-        card.hidden=!matches||!card.querySelector('.enquiry-item-head').textContent.toLowerCase().includes(term);
-        if(!card.hidden)visible++;
-      });
-      document.getElementById('enquiry-result-count').textContent=visible?`${visible} matching ${visible===1?'enquiry':'enquiries'}`:'No enquiries match. Try another search or filter.';
-    };
-    search.addEventListener('input',applyFilters);filter.addEventListener('change',applyFilters);applyFilters();
+    filter.value=enquiryView.view;
+    document.getElementById('enquiry-result-count').textContent=data.total?`${data.offset+1}–${data.offset+data.enquiries.length} of ${data.total} matching enquiries`:'No matching enquiries';
+    document.getElementById('enquiry-search-form').addEventListener('submit',event=>{
+      event.preventDefault();enquiryView.q=search.value.trim();enquiryView.view=filter.value;enquiryView.offset=0;renderRoute();
+    });
+    document.getElementById('enquiry-previous').addEventListener('click',()=>{enquiryView.offset=Math.max(0,data.offset-data.limit);renderRoute();});
+    document.getElementById('enquiry-next').addEventListener('click',()=>{enquiryView.offset=data.offset+data.limit;renderRoute();});
   }
 
   async function adminTimesheets(content) {

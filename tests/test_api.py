@@ -2508,3 +2508,26 @@ def test_enquiry_follow_up_ownership_conflicts_and_role_boundaries(client):
         row = db.execute("SELECT * FROM enquiries WHERE id=?", (enquiry_id,)).fetchone()
         assert row["next_action"] == "none" and row["follow_up_on"] is None and row["revision"] == 2
         assert db.execute("SELECT COUNT(*) FROM audit_log WHERE action='update_enquiry_status' AND entity_id=?", (str(enquiry_id),)).fetchone()[0] == 2
+
+
+def test_enquiry_search_pagination_covers_older_records(client):
+    from backend.database import db_session
+    client.cookies.clear()
+    sign_in(client, ADMIN)
+    with db_session() as db:
+        for index in range(32):
+            db.execute("INSERT INTO enquiries(name,email,status,created_at) VALUES(?,?,?,?)",
+                       (f"Pagination QA {index}", "paging@example.com", "new", "2026-09-12T00:00:00+00:00"))
+        old_id = db.execute("INSERT INTO enquiries(name,email,status,created_at) VALUES(?,?,?,?)",
+                            ("Old Literal % QA", "old@example.com", "closed", "2020-01-01T00:00:00+00:00")).lastrowid
+    first = client.get("/api/admin/enquiries", params={"q": "Pagination QA", "limit": 25}).json()
+    second = client.get("/api/admin/enquiries", params={"q": "Pagination QA", "limit": 25, "offset": 25}).json()
+    assert first["total"] == 32 and first["has_more"] and len(first["enquiries"]) == 25
+    assert len(second["enquiries"]) == 7 and not second["has_more"]
+    assert not ({x["id"] for x in first["enquiries"]} & {x["id"] for x in second["enquiries"]})
+    found = client.get("/api/admin/enquiries", params={"q": f"HV-ENQ-{old_id:04d}", "view": "closed"}).json()
+    assert found["total"] == 1 and found["enquiries"][0]["id"] == old_id
+    assert client.get("/api/admin/enquiries", params={"q": "%"}).json()["total"] == 1
+    assert client.get("/api/admin/enquiries", params={"q": "Pagination QA", "offset": 99999}).json()["offset"] == 25
+    for params in ({"offset": -1}, {"limit": 101}, {"view": "invalid"}):
+        assert client.get("/api/admin/enquiries", params=params).status_code == 422

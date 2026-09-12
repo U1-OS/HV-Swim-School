@@ -17,7 +17,7 @@ from typing import Annotated, Any, Literal
 from urllib.parse import parse_qs, quote, urlparse
 from zoneinfo import ZoneInfo
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response, status
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, Response, status
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -4244,14 +4244,43 @@ def update_site_settings(payload: SiteSettingsInput, request: Request, user: dic
 
 
 @app.get("/api/admin/enquiries")
-def admin_enquiries(user: dict[str, Any] = Depends(require_roles("admin"))) -> dict[str, Any]:
+def admin_enquiries(
+    user: dict[str, Any] = Depends(require_roles("admin")),
+    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=25, ge=1, le=100),
+    view: Literal["all", "active", "new", "contacted", "trial_booked", "closed", "due", "unassigned"] = "all",
+    q: str = Query(default="", max_length=100),
+) -> dict[str, Any]:
     with db_session() as db:
+        clauses, params = [], []
+        if view == "active":
+            clauses.append("e.status<>'closed'")
+        elif view == "unassigned":
+            clauses.append("e.status<>'closed' AND e.assigned_to IS NULL")
+        elif view == "due":
+            clauses.append("e.status<>'closed' AND e.follow_up_on<=?")
+            params.append(business_today().isoformat())
+        elif view != "all":
+            clauses.append("e.status=?")
+            params.append(view)
+        if q.strip():
+            # instr treats wildcard characters literally; values remain bound parameters.
+            clauses.append("instr(lower(coalesce(e.name,'')||' '||coalesce(e.swimmer_name,'')||' '||e.email||' '||CASE WHEN e.enquiry_type='merchandise' THEN 'HV-MERCH-' ELSE 'HV-ENQ-' END||printf('%04d',e.id)),lower(?))>0")
+            params.append(q.strip())
+        where = " WHERE " + " AND ".join(clauses) if clauses else ""
+        total = db.execute("SELECT COUNT(*) FROM enquiries e" + where, params).fetchone()[0]
+        # Clamp a stale final-page offset after another manager closes or edits records.
+        offset = min(offset, ((total - 1) // limit) * limit) if total else 0
         query = """SELECT e.*, u.first_name AS owner_first, u.last_name AS owner_last
-                   FROM enquiries e LEFT JOIN users u ON u.id=e.assigned_to
-                   ORDER BY CASE e.status WHEN 'new' THEN 0 WHEN 'contacted' THEN 1 WHEN 'trial_booked' THEN 2 ELSE 3 END,e.created_at DESC LIMIT 250"""
-        return {"enquiries": rows(db.execute(query)), "owners": rows(db.execute(
+                   FROM enquiries e LEFT JOIN users u ON u.id=e.assigned_to""" + where + """
+                   ORDER BY CASE e.status WHEN 'new' THEN 0 WHEN 'contacted' THEN 1 WHEN 'trial_booked' THEN 2 ELSE 3 END,
+                   e.created_at DESC,e.id DESC LIMIT ? OFFSET ?"""
+        counts = {status: 0 for status in ("new", "contacted", "trial_booked", "closed")}
+        counts.update({row["status"]: row["n"] for row in db.execute("SELECT status,COUNT(*) n FROM enquiries GROUP BY status")})
+        return {"enquiries": rows(db.execute(query, [*params, limit, offset])), "owners": rows(db.execute(
             "SELECT id,first_name,last_name FROM users WHERE active=1 AND role='admin' ORDER BY first_name,last_name"
-        )), "limit": 250}
+        )), "limit": limit, "offset": offset, "total": total, "counts": counts,
+            "has_more": offset + limit < total}
 
 
 @app.patch("/api/admin/enquiries/{enquiry_id}")

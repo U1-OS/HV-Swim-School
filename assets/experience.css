@@ -542,3 +542,5 @@ body[data-page="programs"] .matcher-result,body[data-page="programs"] .matcher-r
 body[data-page="programs"] .matcher-result strong{color:#152e43;font-size:22px;line-height:1.4}
 body[data-page="programs"] .matcher-result p{color:#405d70;font-size:14px;line-height:1.7}
 body[data-page="programs"] .matcher-result-actions .text-link{color:#24637b}
+
+.enquiry-pages{display:flex;flex-wrap:wrap;gap:16px;align-items:center;justify-content:space-between;margin-top:24px}.enquiry-tools button{justify-self:start}.enquiry-pages span{font-size:13px;color:#426175}
