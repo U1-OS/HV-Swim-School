@@ -21,7 +21,8 @@ references below describe earlier sessions.
 - Provider-neutral hosting and launch sequence: `deploy/LAUNCH_PREPARATION.md`.
 - Real photos, private pricing, term/arrival details and service accounts remain owner inputs.
 - Main is an ancestor of the build branch; this release brings the verified source onto main.
-- 160 backend tests passed / 1 existing skip. New coverage verifies complete enquiry
+- 160 backend tests passed locally / 1 existing skip. GitHub caught an existing invoice
+  test using UTC today after Melbourne midnight; the test now uses Melbourne today. New coverage verifies complete enquiry
   pagination, literal search, offset clamping and safe email draft composition.
 - Browser verified 27 synthetic matches across two pages with next/previous controls.
 - Owner-supplied registration details match the site; see BUSINESS_DETAILS.md.

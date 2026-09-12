@@ -22,6 +22,7 @@ import zlib
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
+from zoneinfo import ZoneInfo
 
 import pytest
 from fastapi.testclient import TestClient
@@ -2228,7 +2229,7 @@ def test_lesson_invoice_requires_local_review_and_never_blindly_syncs_to_xero(cl
         json={
             "customer_id": family["id"],
             "charge_ids": [charge["id"]],
-            "due_date": date.today().isoformat(),
+            "due_date": datetime.now(ZoneInfo("Australia/Melbourne")).date().isoformat(),
             "management_note": "Regression test — never visible to the family.",
         },
         headers={"X-CSRF-Token": admin_csrf},
@@ -2249,7 +2250,7 @@ def test_lesson_invoice_requires_local_review_and_never_blindly_syncs_to_xero(cl
         json={
             "customer_id": family["id"],
             "charge_ids": [charge["id"]],
-            "due_date": date.today().isoformat(),
+            "due_date": datetime.now(ZoneInfo("Australia/Melbourne")).date().isoformat(),
             "management_note": "Must be rejected.",
         },
         headers={"X-CSRF-Token": admin_csrf},
