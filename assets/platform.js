@@ -213,6 +213,9 @@
           const status = document.getElementById(`social-status-${provider.id}`);
           if (!button || !status) return;
           if (provider.configured) {
+            button.hidden = false;
+            if(social) social.hidden = false;
+            if(divider) divider.hidden = false;
             button.disabled = false;
             status.textContent = 'Family account';
             button.addEventListener('click', () => {

@@ -18,42 +18,6 @@
   let cartOpener = null;
   let productOpener = null;
 
-  const PRODUCT_DETAILS = {
-    'HV-SWIMWEAR': {material:'Chlorine-resistant performance fabric — final blend pending sample',care:'Cool fresh-water rinse after every swim; shade dry',personalisation:'HV Swim identity only; optional name placement under review'},
-    'HV-RASHIE': {material:'UPF-rated, chlorine-suitable stretch fabric — final specification pending sample',care:'Rinse in cool fresh water after use; shade dry; avoid bleach and softener',personalisation:'HV Swim chest and back placement pending stretch, UV and chlorine testing'},
-    'HV-SWIM-SHORTS': {material:'Quick-dry chlorine-suitable swim fabric with secure waist',care:'Fresh-water rinse after every lesson; shade dry',personalisation:'Small HV Swim placement pending movement and rub testing'},
-    'HV-TOWEL': {material:'Soft, absorbent pool towel — weight and embroidery pending sample',care:'Cold machine wash; avoid fabric softener for best absorbency',personalisation:'Embroidered HV Swim mark; individual name option under review'},
-    'HV-HOODED-TOWEL': {material:'Absorbent kids hooded towel or change-towel construction — final size pending sample',care:'Cold machine wash; line dry; avoid fabric softener',personalisation:'Embroidered HV Swim identity with optional first-name placement under review'},
-    'HV-MINI-HOODED-TOWEL': {material:'Soft absorbent hooded wrap with a smooth stitch backing — final fibre and weight pending sample',care:'Cold gentle wash; line dry; avoid fabric softener',personalisation:'Comfort-backed HV Swim embroidery with optional first-name stitching'},
-    'HV-BOTTLE': {material:'Insulated or BPA-free bottle specification to be confirmed',care:'Hand wash lid and seals; bottle care follows final supplier specification',personalisation:'Name field planned after dishwasher and rub testing'},
-    'HV-INSULATED-TUMBLER': {material:'Food-contact suitable insulated adult tumbler with secure lid — specification pending sample',care:'Follow final supplier instructions; wash lid components thoroughly',personalisation:'Premium HV Swim decoration pending heat, rub and wash testing'},
-    'HV-JUNIOR-WARM-CUP': {material:'Junior spill-resistant cup from a food-contact suitable supplier — lid and temperature testing required',care:'Adult to clean and inspect the lid and seal after every use',personalisation:'HV Swim identity and name option pending sample; for parent-supervised warm, never hot, drinks only'},
-    'HV-GOGGLES': {material:'Soft-seal training goggles from an approved swim supplier',care:'Rinse after use; air dry away from direct sun; do not rub lenses',personalisation:'No custom print planned; HV Swim packaging option under review'},
-    'HV-TRAINING-MITTS': {material:'Flexible silicone or rubber aquatic training mitts from a specialist swim supplier',care:'Rinse thoroughly, dry open and inspect before each use',personalisation:'No decoration planned; coached use and product-safety review required'},
-    'HV-BAG': {material:'Ventilated, quick-dry wet-gear construction',care:'Empty after lessons; wipe clean and air dry fully',personalisation:'Name panel and HV Swim mark planned'},
-    'HV-CAP': {material:'Specialist silicone swim cap',care:'Rinse, pat dry and store flat away from sharp items',personalisation:'Durable team print pending stretch and chlorine testing'},
-    'HV-KIDS-SUN-HAT': {material:'Lightweight quick-dry sun hat — coverage and UPF claim subject to supplier evidence',care:'Hand wash, reshape and shade dry',personalisation:'Embroidered HV Swim identity pending sample'},
-    'HV-STAFF-POLO': {material:'Breathable performance knit with embroidered identity',care:'Cold gentle wash; wash inside-out; shade dry',personalisation:'Role or staff name embroidery can be added after uniform approval'},
-    'HV-STAFF-TEE': {material:'Quick-dry performance tee — fabric weight and decoration pending sample',care:'Cold wash inside-out; shade dry',personalisation:'HV Swim front and optional team-role placement'},
-    'HV-STAFF-SHORTS': {material:'Lightweight performance shorts with practical secure pockets',care:'Cold gentle wash; shade dry',personalisation:'Subtle HV Swim leg placement pending wear test'},
-    'HV-TEAM-HOODIE': {material:'Mid-weight brushed fleece — final composition pending POD sample',care:'Cold wash inside-out; shade dry; do not iron decoration',personalisation:'HV Swim decoration included; individual names optional'},
-    'HV-STAFF-PUFFER-VEST': {material:'Insulated, water-resistant vest — supplier specification and warmth rating pending',care:'Follow final outerwear supplier label; close zips before washing',personalisation:'Embroidered HV Swim chest mark pending sample'},
-    'HV-STAFF-PUFFER-JACKET': {material:'Insulated, water-resistant team jacket — final construction pending quote and sample',care:'Follow final supplier care label; dry fully before storage',personalisation:'Embroidered HV Swim chest mark and optional role placement'},
-    'HV-STAFF-TRACKPANTS': {material:'Comfort-stretch team track pant with secure pockets',care:'Cold wash inside-out; shade dry',personalisation:'Subtle HV Swim leg mark pending sample'},
-    'HV-INSTRUCTOR-CAP': {material:'Lightweight adjustable performance cap',care:'Hand wash and reshape while damp',personalisation:'Embroidered HV Swim identity; instructor label under review'},
-    'HV-FAMILY-TEE': {material:'Premium soft-touch tee blank selected from an Australian-capable POD catalogue',care:'Cold wash inside-out; shade dry; do not iron decoration',personalisation:'HV Swim chest mark; optional family surname only after a sample is approved'},
-    'HV-FAMILY-CREW': {material:'Mid-weight premium crew blank — composition and Australian fulfilment pending sample',care:'Cold wash inside-out; reshape and shade dry',personalisation:'Premium HV Swim chest decoration; no individual name by default'}
-  };
-  const ROUTE_DETAILS = {
-    printify:{short:'POD · Printify',label:'Print-on-demand candidate',copy:'Prepared for Printify-to-Shopify fulfilment after the exact blank, decoration, landed cost and physical sample are approved.'},
-    printify_or_vistaprint:{short:'POD / bulk',label:'POD or bulk comparison',copy:'Printify and a manual bulk supplier are compared on quality, lead time and landed cost before one route is approved.'},
-    vistaprint:{short:'Bulk branded',label:'Manual branded production',copy:'A proofed manual quote and purchase order are required before approved stock is published in Shopify.'},
-    vistaprint_or_specialist:{short:'Premium embroidery',label:'Embroidery supplier comparison',copy:'A premium textile or specialist decorator must pass the stitch, comfort, wash and delivered-cost sample gates.'},
-    specialist_swim:{short:'Swim specialist',label:'Specialist aquatic supply',copy:'Purpose-built pool gear is sourced from a swim specialist and tested for fit, safety, chlorine and water use.'},
-    specialist_uniform:{short:'Uniform specialist',label:'Specialist teamwear supply',copy:'A controlled quote, authorised decoration and an approved physical uniform sample are required.'},
-    manual_review:{short:'Supplier review',label:'Supplier review required',copy:'The final product, production route and sample still require management approval.'}
-  };
-
   const esc = value => String(value ?? '').replace(/[&<>'"]/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]));
   const money = cents => new Intl.NumberFormat('en-AU',{style:'currency',currency:'AUD'}).format(Number(cents || 0) / 100);
   const slug = value => String(value || '').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
@@ -115,10 +79,9 @@
     if (filter === 'personalised') return /name|personal|embroider/.test(`${value} ${product.personalisation || ''}`.toLowerCase());
     return category === filter.toLowerCase();
   };
-  const routeFor = product => ROUTE_DETAILS[product.supplier_route] || ROUTE_DETAILS.manual_review;
-  const visualClass = product => `product-${slug(product.sku || product.title)} ${['Uniforms','Lifestyle'].includes(product.category)?'uniform-studio-crop':''}`;
-  const visual = product => product.image ? `<img src="${esc(product.image)}" alt="${esc(product.image_alt||product.title)}" loading="lazy" decoding="async" data-product-photo>` : `<div class="shop-product-crop ${visualClass(product)}" role="img" aria-label="${esc(product.title)} concept"><span class="shop-product-monogram" aria-hidden="true">${esc(product.emoji || 'HV')}</span></div>`;
-  const priceMarkup = (product,live=false) => Number(product.price_cents) > 0 ? `<strong>${money(product.price_cents)}</strong><small>${live?'Current price':'Indicative price'}</small>` : '<strong>Price pending</strong><small>Supplier quote required</small>';
+  const visualClass = product => ['HV-BAG','HV-BOTTLE','HV-TOWEL','HV-HOODED-TOWEL','HV-MINI-HOODED-TOWEL','HV-RASHIE','HV-SWIMWEAR','HV-CAP','HV-KIDS-SUN-HAT','HV-GOGGLES','HV-TRAINING-MITTS','HV-SWIM-SHORTS'].includes(product.sku) ? `concept-photo product-${slug(product.sku)}` : '';
+  const visual = product => product.image ? `<img src="${esc(product.image)}" alt="${esc(product.image_alt||product.title)}" loading="lazy" decoding="async" data-product-photo>` : `<div class="shop-product-crop ${visualClass(product)}" role="img" aria-label="${esc(product.title)} concept"><span class="shop-product-monogram" aria-hidden="true">HV</span></div>`;
+  const priceMarkup = (product,live=false) => !live ? '<strong>Coming soon</strong><small>Price to be confirmed</small>' : Number(product.price_cents) > 0 ? `<strong>${money(product.price_cents)}</strong><small>${live?'Current price':'Indicative price'}</small>` : '<strong>Price pending</strong><small>Supplier quote required</small>';
   const cartKey = (id,size) => `${id}::${size || 'Standard'}`;
 
   function loadCart() {
@@ -143,35 +106,6 @@
   // catalogue at render time, so a kit card can never describe something the shop does not
   // actually sell — the previous cards listed their contents in hand-written prose and had
   // already drifted from the range.
-  const KITS = [
-    { id:'first-splash', group:'kids', audience:'New swimmers', title:'First Splash Kit',
-      blurb:'The four things a nervous first-timer actually needs, so lesson one is about the water and nothing else.',
-      skus:['HV-GOGGLES','HV-CAP','HV-MINI-HOODED-TOWEL','HV-BOTTLE'] },
-    { id:'lesson-day', group:'kids', audience:'Weekly swimmers', title:'Lesson Day Kit', featured:true,
-      blurb:'A full week-in, week-out setup: in the water, out of the water, and everything wet carried home.',
-      skus:['HV-RASHIE','HV-SWIM-SHORTS','HV-GOGGLES','HV-CAP','HV-TRAINING-MITTS','HV-HOODED-TOWEL','HV-BAG','HV-BOTTLE'] },
-    { id:'summer-season', group:'kids', audience:'Outdoor season', title:'Sun & Season Kit',
-      blurb:'For the seasonal outdoor pool — sun cover, quick changes and a drink that stays cold on the grass.',
-      skus:['HV-KIDS-SUN-HAT','HV-RASHIE','HV-TOWEL','HV-BOTTLE','HV-GOGGLES'] },
-    { id:'poolside-parent', group:'families', audience:'Parents on the deck', title:'Poolside Parent Kit',
-      blurb:'Bendigo decks are cold in winter. A warm layer, a hot drink that stays hot, and a towel that is not your child\u2019s.',
-      skus:['HV-FAMILY-CREW','HV-INSULATED-TUMBLER','HV-TOWEL'] },
-    { id:'family-club', group:'families', audience:'Families + supporters', title:'Family Club Kit',
-      blurb:'Matching casual pieces for lesson-day arrivals, holiday clinics and HV Swim community events.',
-      skus:['HV-FAMILY-TEE','HV-FAMILY-CREW','HV-BOTTLE','HV-TOWEL'] },
-    { id:'instructor-uniform', group:'staff', audience:'Every instructor', title:'Instructor Uniform',
-      blurb:'The standard on-deck set. One look across the team, sun-safe, and comfortable to teach in all session.',
-      skus:['HV-STAFF-POLO','HV-STAFF-TEE','HV-STAFF-SHORTS','HV-INSTRUCTOR-CAP','HV-BOTTLE'] },
-    { id:'winter-deck', group:'staff', audience:'Cold-weather shifts', title:'Winter Deck Uniform',
-      blurb:'Layers for early starts and unheated decks, without losing the uniform look in front of families.',
-      skus:['HV-STAFF-PUFFER-VEST','HV-STAFF-PUFFER-JACKET','HV-STAFF-TRACKPANTS','HV-TEAM-HOODIE','HV-INSULATED-TUMBLER'] },
-  ];
-  const KIT_GROUPS = [
-    ['kids','For the swimmer','Built around the lesson itself, from a first nervous visit to a full weekly routine.'],
-    ['families','For parents and families','Whoever is on the deck watching, and whoever is wearing it to the shops afterwards.'],
-    ['staff','Staff uniform','What the HV Swim team wears on deck, in every season.'],
-  ];
-
   // A product photo that fails to load leaves a broken-image icon in the middle of the
   // card. Drop back to the monogram tile the product would have had with no photo at all.
   document.addEventListener('error', event => {
@@ -193,36 +127,6 @@
     holder.prepend(tile);
   }, true);
 
-  function renderKits(live = false) {
-    const wrap = document.getElementById('kit-grid');
-    if (!wrap) return;
-    const bySku = new Map(products.map(product => [String(product.sku).toUpperCase(), product]));
-    let index = 0;
-    wrap.innerHTML = KIT_GROUPS.map(([group, heading, intro]) => {
-      const cards = KITS.filter(kit => kit.group === group).map(kit => {
-        const items = kit.skus.map(sku => bySku.get(sku)).filter(Boolean);
-        // A kit is only shown once every product in it is in the catalogue.
-        if (items.length !== kit.skus.length) return '';
-        const total = items.reduce((sum, item) => sum + Number(item.price_cents || 0), 0);
-        index += 1;
-        return `<article class="kit-card${kit.featured ? ' featured' : ''}">
-          ${kit.featured ? '<span class="kit-flag">Most complete</span>' : ''}
-          <span class="kit-index">${String(index).padStart(2,'0')}</span>
-          <span class="kit-audience">${esc(kit.audience)}</span>
-          <h3>${esc(kit.title)}</h3>
-          <p class="kit-blurb">${esc(kit.blurb)}</p>
-          <ul class="kit-items">${items.map(item => `<li><span>${esc(item.title)}</span><em>${money(item.price_cents)}</em></li>`).join('')}</ul>
-          <div class="kit-foot">
-            <div><strong>${money(total)}</strong><small>${items.length} item${items.length === 1 ? '' : 's'} · components total</small></div>
-            <button type="button" class="btn btn-soft btn-small" data-kit-add="${esc(kit.id)}"${live ? "" : " disabled"}>${live ? "Choose kit products" : "Shopify setup required"}</button>
-          </div>
-        </article>`;
-      }).join('');
-      if (!cards.trim()) return '';
-      return `<section class="kit-group"><div class="kit-group-head"><h3>${esc(heading)}</h3><p>${esc(intro)}</p></div><div class="kit-cards">${cards}</div></section>`;
-    }).join('');
-  }
-
   function render() {
     const visible = visibleProducts();
     const displayed=visible.slice(0,visibleLimit);
@@ -231,10 +135,9 @@
       const sizes = sizeList(product);
       const chooseVariant = catalogueSource === 'shopify';
       const available = product.status === 'available';
-      const badge = available ? 'Available' : (chooseVariant ? 'Currently unavailable' : (product.sample_status === 'approved' ? 'Sample approved' : 'Collection concept'));
-      const addLabel = chooseVariant ? (available ? 'Choose option' : 'Unavailable') : 'Shopify setup required';
-      const route = routeFor(product);
-      return `<article class="shop-card reveal visible" data-audience="${slug(audienceFor(product))}" style="--reveal-delay:${Math.min(index*45,180)}ms"><button class="shop-product-visual" type="button" data-product-view="${esc(product.id)}" aria-label="View ${esc(product.title)}">${visual(product)}<span class="shop-product-badge">${badge}</span><span class="shop-quick-view">View details <span aria-hidden="true">→</span></span></button><div class="shop-card-copy"><div class="shop-card-heading"><span class="shop-category">${esc(product.category)}</span><span>${esc(audienceFor(product))}</span></div><span class="shop-route-chip route-${slug(product.supplier_route || 'review')}">${esc(route.short)}</span><h3>${esc(product.title)}</h3><p>${esc(product.description)}</p><div class="shop-sizes">${sizes.slice(0,4).map(size=>`<span>${esc(size)}</span>`).join('')||'<span>Final sizing pending</span>'}${sizes.length>4?`<span>+${sizes.length-4}</span>`:''}</div><div class="shop-card-foot"><div>${priceMarkup(product,chooseVariant)}</div><button type="button" class="shop-add-button" data-product-add="${esc(product.id)}" ${!chooseVariant||!available?'disabled':''}>${addLabel} <span aria-hidden="true">${chooseVariant?'→':'◇'}</span></button></div></div></article>`;
+      const badge = chooseVariant && available ? 'Available' : (chooseVariant ? 'Currently unavailable' : (product.sample_status === 'approved' ? 'Sample approved' : 'Collection concept'));
+      const addLabel = chooseVariant ? (available ? 'Choose option' : 'Unavailable') : 'Coming soon';
+      return `<article class="shop-card reveal visible" data-audience="${slug(audienceFor(product))}" style="--reveal-delay:${Math.min(index*45,180)}ms"><button class="shop-product-visual" type="button" data-product-view="${esc(product.id)}" aria-label="View ${esc(product.title)}">${visual(product)}<span class="shop-product-badge">${badge}</span><span class="shop-quick-view">View details <span aria-hidden="true">→</span></span></button><div class="shop-card-copy"><div class="shop-card-heading"><span class="shop-category">${esc(product.category)}</span><span>${esc(audienceFor(product))}</span></div><h3>${esc(product.title)}</h3><p>${esc(chooseVariant ? product.description : "A collection concept. Final details and availability will be confirmed before ordering opens.")}</p><div class="shop-sizes">${(chooseVariant ? sizes : []).slice(0,4).map(size=>`<span>${esc(size)}</span>`).join('')||'<span>Final sizing to follow</span>'}${chooseVariant && sizes.length>4?`<span>+${sizes.length-4}</span>`:''}</div><div class="shop-card-foot"><div>${priceMarkup(product,chooseVariant)}</div><button type="button" class="shop-add-button" data-product-add="${esc(product.id)}" ${!chooseVariant||!available?'disabled':''}>${addLabel} <span aria-hidden="true">${chooseVariant?'→':'◇'}</span></button></div></div></article>`;
     }).join('') || '<div class="empty-state"><strong>Nothing matches that search.</strong><p>Try a different category, or clear the search to see the whole collection.</p><button type="button" class="btn btn-outline btn-small" data-clear-search>Show everything</button></div>';
     const loadMore=document.getElementById('shop-load-more');
     const loadMoreCopy=document.getElementById('shop-load-more-copy');
@@ -264,17 +167,6 @@
     return true;
   }
 
-  function addKit(kitId) {
-    if (catalogueSource === 'shopify') {
-      const status=document.getElementById('kit-builder-status');
-      if(status){status.classList.remove('complete');status.innerHTML='<span>→</span><p><strong>Choose options from the live collection.</strong> Sizes and variants must be selected for each product before it can be added to the shopping bag.</p>';}
-      document.getElementById('collection')?.scrollIntoView({behavior:'smooth',block:'start'});
-      return;
-    }
-    const status=document.getElementById('kit-builder-status');
-    if(status){status.classList.remove('complete');status.innerHTML='<span>→</span><p><strong>Shopify setup is required.</strong> This kit is a product plan only and cannot be saved or purchased yet.</p>';}
-  }
-
   function renderCart() {
     const itemCount = cart.reduce((sum,item)=>sum+Number(item.quantity||0),0);
     const subtotal = cart.reduce((sum,item)=>sum+Number(item.quantity||0)*Number(item.price_cents||0),0);
@@ -290,7 +182,7 @@
     const action=document.getElementById('cart-primary-action');
     const needsReselection=catalogueSource==='shopify'&&cart.some(item=>!item.variant_id);
     action.textContent=catalogueSource==='shopify'?'Sign in to continue':'Shopify setup required';
-    action.href=catalogueSource==='shopify'?'login.html':'shop.html#production-routes';
+    action.href=catalogueSource==='shopify'?'login.html':'shop.html#collection';
     action.classList.toggle('disabled',!cart.length||needsReselection);
     action.setAttribute('aria-disabled',String(!cart.length||needsReselection));
     if(needsReselection){
@@ -328,7 +220,6 @@
     const product=products.find(item=>String(item.id)===String(id));
     if (!product) return;
     const sizes=sizeList(product);
-    const detail=PRODUCT_DETAILS[product.sku]||{material:'Final material specification pending supplier approval',care:'Care instructions published after physical sample approval',personalisation:'Personalisation options to be confirmed'};
     const dialog=document.getElementById('product-dialog');
     productOpener=opener instanceof HTMLElement?opener:null;
     const live=catalogueSource==='shopify';
@@ -336,9 +227,8 @@
     const options=live
       ? `<option value="">Choose an option</option>${(product.variants||[]).map(variant=>`<option value="${esc(variant.id)}" ${variant.availableForSale?'':'disabled'}>${esc(variant.title==='Default Title'?'Standard':variant.title)}${variant.availableForSale?'':' — unavailable'}</option>`).join('')}`
       : (sizes.length?sizes:['Standard']).map(size=>`<option value="${esc(size)}">${esc(size)}</option>`).join('');
-    const dialogPrice=Number(product.price_cents)>0?money(product.price_cents):'Price pending';
-    const route=routeFor(product);
-    document.getElementById('product-dialog-content').innerHTML=`<div class="dialog-product-visual">${visual(product)}<span class="dialog-concept-label">${live?'HV Swim approved range':'Product plan · sample pending'}</span></div><div class="dialog-product-copy"><div class="dialog-product-meta"><span class="shop-category">${esc(product.category)}</span><span>${esc(audienceFor(product))}</span></div><span class="shop-route-chip route-${slug(product.supplier_route || 'review')}">${esc(route.short)}</span><h2 id="product-dialog-title">${esc(product.title)}</h2><strong class="dialog-price">${dialogPrice}</strong><p>${esc(product.description)}</p><dl class="product-specs"><div><dt>Material direction</dt><dd>${esc(detail.material)}</dd></div><div><dt>Care</dt><dd>${esc(detail.care)}</dd></div><div><dt>Personalisation</dt><dd>${esc(product.personalisation || detail.personalisation)}</dd></div><div><dt>${esc(route.label)}</dt><dd>${esc(route.copy)}</dd></div></dl>${live?`<div class="product-dialog-options"><div class="product-option"><label for="dialog-size">Select option</label><select id="dialog-size" required>${options}</select></div><div class="product-option"><label for="dialog-quantity">Quantity</label><select id="dialog-quantity">${[1,2,3,4,5].map(value=>`<option value="${value}">${value}</option>`).join('')}</select></div></div>`:''}<p class="wizard-error" id="dialog-option-error" role="alert" hidden>Please choose an available option.</p><div class="info-note"><strong>${live?'Live catalogue':'Shopify setup required'}:</strong> ${live?(available?'Availability and options come from the approved Shopify catalogue.':'This product is currently unavailable in Shopify. You can still review its details and check again later.'):'This specification is for production planning. It cannot be saved, ordered or paid for until samples are approved and Shopify is connected.'}</div><button class="btn btn-primary" type="button" data-dialog-add="${esc(product.id)}" ${available?'':'disabled'}>${live?(available?'Add selected option':'Currently unavailable'):'Shopify setup required'}</button></div>`;
+    const dialogPrice=live && Number(product.price_cents)>0?money(product.price_cents):'Price to be confirmed';
+    document.getElementById('product-dialog-content').innerHTML=`<div class="dialog-product-visual">${visual(product)}<span class="dialog-concept-label">${live?'HV Swim approved range':'Illustrative collection concept'}</span></div><div class="dialog-product-copy"><div class="dialog-product-meta"><span class="shop-category">${esc(product.category)}</span><span>${esc(audienceFor(product))}</span></div><h2 id="product-dialog-title">${esc(product.title)}</h2><strong class="dialog-price">${dialogPrice}</strong><p>${esc(live ? product.description : "This collection concept is being considered for the HV Swim range. Final materials, sizing, care instructions and prices will be published with approved products.")}</p>${live?`<div class="product-dialog-options"><div class="product-option"><label for="dialog-size">Select option</label><select id="dialog-size" required>${options}</select></div><div class="product-option"><label for="dialog-quantity">Quantity</label><select id="dialog-quantity">${[1,2,3,4,5].map(value=>`<option value="${value}">${value}</option>`).join('')}</select></div></div>`:''}<p class="wizard-error" id="dialog-option-error" role="alert" hidden>Please choose an available option.</p><div class="info-note"><strong>${live?'Live catalogue':'Collection preview'}:</strong> ${live?(available?'Availability and options come from the approved Shopify catalogue.':'This product is currently unavailable in Shopify. You can still review its details and check again later.'):'Ordering is not available yet. You can ask the team about the collection; an enquiry is not a purchase.'}</div><button class="btn btn-primary" type="button" data-dialog-add="${esc(product.id)}" ${available?'':'disabled'}>${live?(available?'Add selected option':'Currently unavailable'):'Coming soon'}</button>${!live?`<a class="text-link" href="enquire.html?merch=${encodeURIComponent(product.title)}">Ask about this item →</a>`:''}</div>`;
     dialog.showModal();
   }
 
@@ -351,14 +241,13 @@
       item.setAttribute('aria-pressed',String(selected));
     });
     render();
-    if(scroll)document.getElementById('collection')?.scrollIntoView({behavior:'smooth',block:'start'});
+    if(scroll)document.getElementById('collection')?.scrollIntoView({behavior:document.documentElement.dataset.motion === 'off' || matchMedia('(prefers-reduced-motion:reduce)').matches ? 'instant' : 'smooth',block:'start'});
   }
   document.querySelectorAll('[data-shop-filter]').forEach(button=>button.addEventListener('click',()=>setActiveFilter(button.dataset.shopFilter)));
   document.querySelectorAll('[data-collection-filter]').forEach(button=>button.addEventListener('click',event=>{
     if(button.matches('a'))event.preventDefault();
     setActiveFilter(button.dataset.collectionFilter,true);
   }));
-  document.getElementById('kit-grid')?.addEventListener('click',event=>{const button=event.target.closest('[data-kit-add]');if(button)addKit(button.dataset.kitAdd);});
   document.getElementById('shop-search')?.addEventListener('input',event=>{searchTerm=event.target.value.trim().toLowerCase();visibleLimit=pageSize;render();});
   document.getElementById('shop-sort')?.addEventListener('change',event=>{sortOrder=event.target.value;visibleLimit=pageSize;render();});
   document.getElementById('shop-load-more-button')?.addEventListener('click',()=>{const firstNewIndex=visibleLimit;visibleLimit+=pageSize;render();grid.querySelectorAll('[data-product-view]')[firstNewIndex]?.focus();});
@@ -441,21 +330,22 @@
     catalogueSource=payload.source;
     products=(payload.products||[]).map(product=>normalise(product,payload.source));
     const live=payload.source==='shopify';
-    const catalogueCount=products.length;
-    const sourceLabel=live?'Live Shopify catalogue':`${catalogueCount}-product plan · ordering unavailable`;
+    const sort = document.getElementById('shop-sort');
+    if(live && sort && !sort.querySelector('[value="price-low"]')) {
+      sort.insertAdjacentHTML('beforeend','<option value="price-low">Price low to high</option><option value="price-high">Price high to low</option>');
+    }
+    const sourceLabel=live?'Live Shopify catalogue':'Collection preview · ordering unavailable';
     document.getElementById('shop-source').innerHTML=`<span class="status ${live?'open':'changed'}">${sourceLabel}</span>`;
     document.getElementById('cart-mode-status').className=`status ${live?'open':'changed'}`;
     document.getElementById('cart-mode-status').textContent=live?'Shopify catalogue connected':'Shopify setup required';
     document.getElementById('cart-mode-copy').textContent=live?'Only sampled and approved Shopify products are visible. Sign in to continue to the shopping bag.':'Product specifications are visible, but cart and checkout are unavailable.';
     document.querySelectorAll('[data-cart-open]').forEach(button=>button.hidden=!live);
     if(!live){cart=[];saveCart();closeCart();}
-    render(); renderKits(catalogueSource === 'shopify'); renderCart();
+    render(); renderCart();
   }).catch(()=>{
     grid.innerHTML='<div class="empty-state"><strong>The collection is not loading right now.</strong><p>This is a temporary problem on our side. The range is still there — get in touch and the team can talk you through it.</p><a class="btn btn-blue btn-small" href="enquire.html">Talk to the team <span aria-hidden="true">&rarr;</span></a></div>';
     document.getElementById('shop-result-count').textContent='Catalogue temporarily unavailable';
     document.getElementById('shop-source').innerHTML='<span class="status closed">Catalogue unavailable</span>';
     document.getElementById('shop-load-more').hidden=true;
-    const kitWrap=document.getElementById('kit-grid');
-    if(kitWrap) kitWrap.innerHTML='<div class="empty-state"><strong>Kit plans need the product list.</strong><p>The kits are built from the live range, so they cannot be shown while the collection is unavailable. Get in touch and the team can talk you through what each kit includes.</p><a class="btn btn-blue btn-small" href="enquire.html">Talk to the team <span aria-hidden="true">&rarr;</span></a></div>';
   }).finally(()=>grid.setAttribute('aria-busy','false'));
 })();

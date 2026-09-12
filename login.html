@@ -5,46 +5,47 @@
   <meta name="description" content="Secure sign in for the HV Swim Bendigo family, staff and management platform.">
   <title>Sign in | HV Swim Bendigo</title>
   <link rel="icon" href="assets/app-icon-v3-64.png"><link rel="apple-touch-icon" href="assets/app-icon-v3-180.png"><link rel="manifest" href="manifest.webmanifest">
-  <link rel="stylesheet" href="assets/styles.css?v=5.13.0-ui25"><link rel="stylesheet" href="assets/platform.css?v=5.13.0-ui25"><link rel="stylesheet" href="assets/support.css?v=5.13.0-ui25"><script defer src="assets/platform.js?v=5.13.0-ui25"></script><script defer src="assets/support.js?v=5.13.0-ui25"></script>
-  <link rel="stylesheet" href="assets/experience.css?v=5.13.0-ui25">
-  <script defer src="assets/experience.js?v=5.13.0-ui25"></script>
+  <link rel="stylesheet" href="assets/site.css?v=6.0.0-fresh1">
+  <link rel="stylesheet" href="assets/auth.css?v=6.0.0-fresh1">
+  <script defer src="assets/site.js?v=6.0.0-fresh1"></script>
+  <script defer src="assets/platform.js?v=6.0.0-fresh1"></script>
 </head>
 <body data-platform-page="login">
   <a class="skip-link" href="#main-content">Skip to main content</a>
   <main id="main-content" class="auth-page">
     <section class="auth-visual">
-      <a class="brand" href="index.html"><img src="assets/hv-swim-logo-v3.png" alt="HV Swim Bendigo"><span class="brand-copy"><strong>HV Swim Bendigo</strong><span>Connected platform</span></span></a>
-      <div class="auth-copy"><div class="eyebrow">One secure place</div><h1>Every swim day, connected.</h1><p>Families manage lessons. Staff run the pool deck. HV Swim managers see the whole operation — with every role protected by its own account.</p><div class="auth-proof" aria-label="Platform areas"><span>Family lessons</span><span>Pool-deck tools</span><span>Management operations</span></div></div>
-      <p class="auth-footer">HV Swim Bendigo <span aria-hidden="true">·</span> Every role protected by its own account</p>
+      <a class="brand" href="index.html"><img src="assets/hv-swim-logo-v3.png" alt="HV Swim Bendigo"><span class="brand-copy"><strong>HV Swim Bendigo</strong><span>Your HV Swim workspace</span></span></a>
+      <div class="auth-copy"><div class="eyebrow">One secure place</div><h1>A familiar place.<br>Every swim day.</h1><p>Your lessons, your progress and a direct connection to the team. Sign in to the workspace that belongs to your account.</p><div class="auth-proof" aria-label="Platform areas"><span>Family lessons</span><span>Pool-deck tools</span><span>Management operations</span></div></div>
+      <div class="auth-footer"><a href="index.html">← Back to the website</a><button class="motion-control" type="button" data-motion-toggle aria-pressed="false">Pause motion</button></div>
     </section>
     <section class="auth-panel">
       <div class="auth-card" aria-labelledby="login-context-heading">
         <div class="eyebrow" id="login-context-eyebrow">Welcome back</div><h2 id="login-context-heading">Sign in to HV Swim.</h2><p class="fine" id="login-context-copy" style="margin-top:11px">Families, staff and managers all sign in here. You will only see what your own account covers.</p>
         <div class="auth-error" id="login-error" role="alert"></div>
-        <section class="social-signin" id="social-signin" aria-labelledby="social-signin-heading">
+        <section class="social-signin" id="social-signin" hidden aria-labelledby="social-signin-heading">
           <div class="social-signin-head"><strong id="social-signin-heading">Family sign up or sign in</strong><span>New</span></div>
           <p>Use a Gmail/Google account or an Apple/iCloud account. New sign-ups create a secure family account.</p>
           <div class="social-buttons">
-            <button class="social-button" type="button" data-oauth-provider="google" disabled aria-describedby="social-status-google">
+            <button class="social-button" type="button" data-oauth-provider="google" hidden disabled aria-describedby="social-status-google">
               <span class="provider-mark provider-google" aria-hidden="true">G</span><span>Continue with Google</span><small id="social-status-google">Checking…</small>
             </button>
-            <button class="social-button" type="button" data-oauth-provider="apple" disabled aria-describedby="social-status-apple">
+            <button class="social-button" type="button" data-oauth-provider="apple" hidden disabled aria-describedby="social-status-apple">
               <svg class="provider-mark provider-apple" viewBox="0 0 24 24" aria-hidden="true"><path d="M17.1 12.6c0-2.5 2-3.7 2.1-3.8-1.2-1.7-3-1.9-3.7-1.9-1.6-.2-3 .9-3.8.9-.8 0-2-1-3.3-.9-1.7 0-3.3 1-4.2 2.6-1.8 3.1-.5 7.8 1.3 10.3.9 1.2 1.9 2.6 3.3 2.5 1.3-.1 1.8-.8 3.5-.8 1.6 0 2.1.8 3.5.8 1.5 0 2.4-1.3 3.2-2.5 1-1.4 1.4-2.9 1.4-3-.1 0-3.3-1.3-3.3-4.2ZM14.5 5.3c.7-.9 1.2-2.1 1.1-3.3-1 .1-2.3.7-3.1 1.6-.7.8-1.3 2-1.2 3.2 1.2.1 2.4-.6 3.2-1.5Z"/></svg><span>Continue with Apple</span><small id="social-status-apple">Checking…</small>
             </button>
           </div>
           <p class="social-account-note"><strong>Staff and management:</strong> use your invited HV Swim work account below.</p>
-          <p class="social-legal">By continuing, you agree to the <a href="terms.html">terms</a> and acknowledge the <a href="privacy.html">privacy policy</a>.</p>
+          <p class="social-legal">Read the <a href="terms.html">website terms</a> and <a href="privacy.html">privacy policy</a>. Creating an account does not enrol a swimmer.</p>
         </section>
-        <div class="signin-divider" id="signin-divider"><span>or use email and password</span></div>
+        <div class="signin-divider" id="signin-divider" hidden><span>or use email and password</span></div>
         <form class="auth-form" id="login-form" method="post" action="/api/auth/login">
           <div class="field"><label for="login-email">Email</label><input class="input" id="login-email" name="email" type="email" autocomplete="username" required></div>
           <div class="field"><label for="login-password">Password</label><div class="password-wrap"><input class="input" id="login-password" name="password" type="password" autocomplete="current-password" required minlength="8"><button class="password-toggle" type="button" id="password-toggle">Show</button></div></div>
           <label class="field"><span>Authenticator code <small>if enabled</small></span><input class="input" id="login-code" name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" placeholder="Six-digit code"></label>
           <button class="btn btn-blue" type="submit" id="login-submit">Sign in securely</button>
         </form>
-        <details class="wf-recovery"><summary>Forgotten your password?</summary><form id="recovery-form" class="auth-form"><label class="field"><span>Account email</span><input class="input" name="email" type="email" autocomplete="email" required></label><button class="btn btn-soft" type="submit">Request recovery</button><p data-recovery-message role="status"></p></form></details>
-        <section id="redeem-section" hidden><h2>Secure your account</h2><p>This private link sets your password. You’ll sign in afterwards.</p><form id="redeem-form" class="auth-form"><label class="field"><span>New password (12 characters minimum)</span><input class="input" name="password" type="password" minlength="12" maxlength="200" autocomplete="new-password" required></label><button class="btn btn-blue" type="submit">Set password</button><p data-redeem-message role="status"></p></form></section>
-        <div id="demo-section" hidden><div class="demo-divider"><span>Preview a workspace</span></div><div class="demo-accounts" id="demo-accounts"><button class="demo-account" type="button" data-demo-role="customer"><span class="demo-account-icon" aria-hidden="true">♡</span><span><strong>Family</strong><span>Lessons &amp; swimmers</span></span></button><button class="demo-account" type="button" data-demo-role="staff"><span class="demo-account-icon" aria-hidden="true">°C</span><span><strong>Staff</strong><span>Pool-deck tools</span></span></button><button class="demo-account" type="button" data-demo-role="admin"><span class="demo-account-icon" aria-hidden="true">◇</span><span><strong>Management</strong><span>Website &amp; operations</span></span></button></div></div>
+        <details class="wf-recovery"><summary>Forgotten your password?</summary><form id="recovery-form" class="auth-form" method="post" action="/api/auth/recovery"><label class="field"><span>Account email</span><input class="input" name="email" type="email" autocomplete="email" required></label><button class="btn btn-soft" type="submit">Request recovery</button><p data-recovery-message role="status"></p></form></details>
+        <section id="redeem-section" hidden><h2>Secure your account</h2><p>This private link sets your password. You’ll sign in afterwards.</p><form id="redeem-form" class="auth-form" method="post" action="/api/auth/redeem"><label class="field"><span>New password (12 characters minimum)</span><input class="input" name="password" type="password" minlength="12" maxlength="200" autocomplete="new-password" required></label><button class="btn btn-blue" type="submit">Set password</button><p data-redeem-message role="status"></p></form></section>
+        <div id="demo-section" hidden><p class="micro">Local preview · The workspaces below contain synthetic records only.</p><div class="demo-divider"><span>Preview a workspace</span></div><div class="demo-accounts" id="demo-accounts"><button class="demo-account" type="button" data-demo-role="customer"><span class="demo-account-icon" aria-hidden="true">♡</span><span><strong>Family</strong><span>Lessons &amp; swimmers</span></span></button><button class="demo-account" type="button" data-demo-role="staff"><span class="demo-account-icon" aria-hidden="true">°C</span><span><strong>Staff</strong><span>Pool-deck tools</span></span></button><button class="demo-account" type="button" data-demo-role="admin"><span class="demo-account-icon" aria-hidden="true">◇</span><span><strong>Management</strong><span>Website &amp; operations</span></span></button></div></div>
         <div class="data-boundary"><strong>Your details are protected.</strong> Access to family, staff and management information is controlled by your account permissions. Sign out when using a shared device.</div>
         <p class="micro" style="margin-top:18px;text-align:center"><a class="text-link" href="index.html">Return to public website</a></p>
       </div>

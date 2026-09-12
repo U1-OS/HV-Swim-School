@@ -1,10 +1,11 @@
-const CORE_CACHE = 'hv-swim-v5130-core-26';
-const RUNTIME_CACHE = 'hv-swim-v5130-runtime-26';
-const PUBLIC_DATA_CACHE = 'hv-swim-v5130-public-data-22';
+const CORE_CACHE = 'hv-swim-v5130-core-28';
+const RUNTIME_CACHE = 'hv-swim-v5130-runtime-28';
 const CORE_SHELL = [
+  './assets/site.css?v=6.0.0-fresh1', './assets/site.js?v=6.0.0-fresh1',
+  './assets/collection.css?v=6.0.0-fresh1',
   './assets/experience.css?v=5.13.0-ui25', './assets/experience.js?v=5.13.0-ui25',
   './offline.html', './manifest.webmanifest',
-  './assets/styles.css?v=5.13.0-ui25', './assets/app.js?v=5.13.0-ui25',
+  './assets/styles.css?v=5.13.0-ui25', './assets/app.js?v=6.0.0-fresh1',
   './assets/support.css?v=5.13.0-ui25', './assets/support.js?v=5.13.0-ui25',
   './assets/icons.svg', './assets/brand-water-waves.svg', './assets/hv-swim-logo-v3.png',
   './assets/fonts/manrope-latin-variable.woff2',
@@ -18,7 +19,7 @@ self.addEventListener('install', event => {
 });
 
 self.addEventListener('activate', event => {
-  const active = new Set([CORE_CACHE, RUNTIME_CACHE, PUBLIC_DATA_CACHE]);
+  const active = new Set([CORE_CACHE, RUNTIME_CACHE]);
   event.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(key => !active.has(key)).map(key => caches.delete(key)))).then(() => self.clients.claim()));
 });
 
@@ -36,7 +37,7 @@ self.addEventListener('notificationclick', event => {
 });
 
 const cacheSuccessful = async (cacheName, request, response) => {
-  if (response.ok && response.type === 'basic') {
+  if (response.ok && response.type === 'basic' && !/(?:no-store|private)/i.test(response.headers.get('Cache-Control') || '')) {
     try { const cache = await caches.open(cacheName); await cache.put(request, response.clone()); } catch (_) {}
   }
   return response;
@@ -47,32 +48,27 @@ self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
   if (url.origin !== self.location.origin) return;
 
-  if (url.pathname.startsWith('/api/')) {
-    const publicPaths = new Set(['/api/health','/api/public/site-settings','/api/public/locations','/api/public/weather','/api/classes','/api/products']);
-    if (url.pathname === '/api/public/alerts') {
-      event.respondWith(fetch(event.request, { cache:'no-store' }).catch(() => new Response(JSON.stringify({alerts:[]}), {status:503,headers:{'Content-Type':'application/json'}})));
-      return;
-    }
-    if (publicPaths.has(url.pathname)) {
-      event.respondWith((async () => {
-        try {
-          const response = await fetch(event.request);
-          if (response.ok) { try { const cache = await caches.open(PUBLIC_DATA_CACHE); await cache.put(event.request, response.clone()); } catch (_) {} }
-          return response;
-        } catch (_) {
-          return (await caches.match(event.request)) || new Response(JSON.stringify({detail:'Live data needs an internet connection'}), {status:503,headers:{'Content-Type':'application/json'}});
-        }
-      })());
-      return;
-    }
-    event.respondWith(fetch(event.request).catch(() => new Response(JSON.stringify({detail:'Sign-in and account changes need an internet connection'}), {status:503,headers:{'Content-Type':'application/json'}})));
+  let pathname;
+  try { pathname = decodeURIComponent(url.pathname); } catch (_) { return; }
+  if (pathname.startsWith('/api/')) {
+    // Operational data must never be presented as current from an old offline cache.
+    // This includes availability, venue status, publication gates and product stock.
+    event.respondWith(fetch(event.request).catch(() => new Response(JSON.stringify({detail:'Current information and account changes need an internet connection'}), {status:503,headers:{'Content-Type':'application/json'}})));
     return;
   }
 
   if (event.request.mode === 'navigate') {
     event.respondWith((async () => {
-      try { return await cacheSuccessful(RUNTIME_CACHE, event.request, await fetch(event.request)); }
-      catch (_) { return (await caches.match(event.request)) || (await caches.match('./offline.html')); }
+      const publicPages = new Set(['/', '/index.html', '/about.html', '/programs.html', '/locations.html', '/enquire.html', '/shop.html', '/privacy.html', '/cookies.html', '/terms.html', '/photo-consent.html', '/child-safety.html', '/security.html', '/accessibility.html', '/offline.html', '/404.html']);
+      try {
+        const response = await fetch(event.request);
+        if (publicPages.has(pathname) && /text\/html/i.test(response.headers.get('Content-Type') || '')) {
+          return await cacheSuccessful(RUNTIME_CACHE,event.request,response);
+        }
+        return response;
+      } catch (_) {
+        return (publicPages.has(pathname) && await caches.match(event.request)) || await caches.match('./offline.html');
+      }
     })());
     return;
   }

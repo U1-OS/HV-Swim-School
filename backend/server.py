@@ -5933,6 +5933,7 @@ PUBLIC_ROOT_FILES = frozenset(
         "manifest.webmanifest",
         "offline.html",
         "photo-consent.html",
+        "child-safety.html",
         "platform.html",
         "privacy.html",
         "cookies.html",

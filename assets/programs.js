@@ -102,44 +102,4 @@
     document.getElementById('lesson-checklist-count').textContent = `${count} of 4 ready${count === 4 ? ' · You’re prepared. See you poolside!' : ''}`;
   });
 
-  // Interactive Term Fee & Absence Credit Calculator
-  const weeksSlider = document.getElementById('calc-weeks-slider');
-  const weeksDisplay = document.getElementById('calc-weeks-display');
-  const totalDisplay = document.getElementById('calc-total-display');
-  const summaryLessons = document.getElementById('calc-summary-lessons');
-  const enquireBtn = document.getElementById('calc-enquire-btn');
-  const optionBtns = document.querySelectorAll('.calc-option-btn');
-
-  let currentRate = 22.50;
-  let currentFormat = 'Standard Lesson';
-
-  const updateCalculator = () => {
-    if (!weeksSlider || !totalDisplay) return;
-    const weeks = parseInt(weeksSlider.value, 10) || 10;
-    const total = currentRate === null ? null : weeks * currentRate;
-    if (weeksDisplay) weeksDisplay.textContent = `${weeks} Weeks`;
-    if (totalDisplay) totalDisplay.textContent = total === null ? 'By enquiry' : money(total);
-    if (summaryLessons) summaryLessons.textContent = total === null ? 'Private lesson pricing confirmed personally' : `${weeks} lessons @ ${money(currentRate)} each`;
-    if (enquireBtn) {
-      const query = new URLSearchParams({
-        term_weeks: weeks,
-        lesson_format: currentFormat,
-        ...(total === null ? {} : {estimated_total: total.toFixed(2)})
-      });
-      enquireBtn.href = `enquire.html?${query}`;
-    }
-  };
-
-  weeksSlider?.addEventListener('input', updateCalculator);
-  optionBtns.forEach(btn => {
-    btn.addEventListener('click', () => {
-      optionBtns.forEach(b => { b.classList.remove('active'); b.setAttribute('aria-pressed', 'false'); });
-      btn.classList.add('active');
-      btn.setAttribute('aria-pressed', 'true');
-      currentRate = btn.dataset.rate ? Number(btn.dataset.rate) : null;
-      currentFormat = btn.querySelector('strong')?.textContent.trim() || 'Standard Lesson';
-      updateCalculator();
-    });
-  });
-  updateCalculator();
 })();

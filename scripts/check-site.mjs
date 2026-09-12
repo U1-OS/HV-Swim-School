@@ -79,6 +79,27 @@ for (const file of [...pages, ...scripts.map((f) => join('assets', f))]) {
   }
 }
 
+// Fresh public pages must actually load their own styles. Legacy sheets elsewhere in
+// the repository cannot conceal a missing rule in the new public design.
+const freshPages = ['index.html','programs.html','locations.html','about.html','enquire.html',
+  'shop.html','privacy.html','cookies.html','security.html','accessibility.html','terms.html',
+  'photo-consent.html','child-safety.html','404.html','offline.html','login.html'];
+for (const page of freshPages) {
+  const html = read(page);
+  if (!html.includes('assets/site.css?') || !html.includes('assets/site.js?')) fail('fresh shell', `${page} is missing the new shared foundation`);
+  if (/assets\/(?:styles|experience|support|shop-v55)\.(?:css|js)/.test(html)) fail('fresh shell', `${page} still loads retired public presentation`);
+  const cssFiles = [...html.matchAll(/href="(assets\/[^"?]+\.css)/g)].map(m => m[1]);
+  const loadedCss = cssFiles.filter(f => existsSync(join(root,f))).map(read).join('\n');
+  const loadedClasses = new Set([...loadedCss.matchAll(/\.([a-zA-Z][\w-]*)/g)].map(m => m[1]));
+  for (const [,list] of html.matchAll(/class="([^"${}]+)"/g)) {
+    for (const name of list.split(/\s+/)) {
+      if (name && !loadedClasses.has(name)) fail('fresh style', `${page} uses .${name} without a loaded rule`);
+    }
+  }
+}
+const enquirySource = read('enquire.html');
+if (!/<form[^>]+id="enrolment-wizard"[^>]+method="post"[^>]+action="\/api\/public\/enquiries"/.test(enquirySource)) fail('enquiry safety','form fallback must never put personal values in a GET URL');
+
 // 4. No script reaches for an element id that exists on no page.
 for (const file of scripts) {
   const source = read(join('assets', file));

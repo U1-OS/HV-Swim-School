@@ -45,8 +45,9 @@ jobs:
       - run: node scripts/check-site.mjs
       - run: node tests/test_logout.mjs
       - run: node tests/test_login.mjs
+      - run: node tests/test_site.mjs
+      - run: node tests/test_service_worker.mjs
       - run: node tests/test_experience.mjs
-      - run: node tests/test_aquatic_scene.mjs
       - run: node tests/test_platform_dates.mjs
       - run: node tests/test_lesson_pathway.mjs
 

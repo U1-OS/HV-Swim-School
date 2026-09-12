@@ -86,8 +86,6 @@
       const payload=await fetchJSON('/api/public/association-badges',{headers:{Accept:'application/json'}});
       if(!payload.published||!Array.isArray(payload.badges)||payload.badges.length!==3)return;
       const cards=payload.badges.map(badge=>`<a class="credential-card" href="${escapePublic(badge.directory_url)}" target="_blank" rel="noopener"><span class="directory-card-mark issued" aria-hidden="true"><img src="${escapePublic(badge.artwork_url)}" alt=""></span><span><strong>${escapePublic(badge.display_name)}</strong><small>View the current public organisation record</small><em class="credential-state listed">Verified through ${escapePublic(new Intl.DateTimeFormat('en-AU',{day:'numeric',month:'short',year:'numeric'}).format(new Date(`${badge.valid_until}T00:00:00`)))}</em></span></a>`).join('');
-      const publicGrid=document.getElementById('association-badge-list');
-      if(publicGrid)publicGrid.innerHTML=cards;
       const footerLinks=document.querySelector('.footer-association-links');
       if(footerLinks)footerLinks.innerHTML=payload.badges.map(badge=>`<a href="${escapePublic(badge.directory_url)}" target="_blank" rel="noopener"><img src="${escapePublic(badge.artwork_url)}" alt="${escapePublic(badge.display_name)}"><span>View current record</span><em>Verified to ${escapePublic(badge.valid_until)}</em></a>`).join('');
       featureNodes.forEach(node=>{node.hidden=false;});
@@ -531,18 +529,4 @@
   // Preview-centre shortcuts provide the supplied test-account guidance.
   document.querySelectorAll('[data-demo-action]').forEach(button => button.addEventListener('click', () => showToast(button.dataset.demoAction || 'This action is available in the live connected build.')));
 
-  // Interactive FAQ filter
-  const faqSearch = document.getElementById('faq-search');
-  if (faqSearch) {
-    const faqDetails = document.querySelectorAll('.faq-list details');
-    faqSearch.addEventListener('input', () => {
-      const q = faqSearch.value.trim().toLowerCase();
-      faqDetails.forEach(detail => {
-        const text = detail.textContent.toLowerCase();
-        const matches = !q || text.includes(q);
-        detail.hidden = !matches;
-        if (q && matches) detail.open = true;
-      });
-    });
-  }
 })();

@@ -33,7 +33,7 @@
     ['#enrolment-success .success-next','<div><strong>1</strong><span>Your message is saved</span></div><div><strong>2</strong><span>The team reviews your question</span></div><div><strong>3</strong><span>We follow up personally</span></div>']
   ].map(([selector,contact])=>{const element=document.querySelector(selector);return {element,contact,lesson:element?.innerHTML};});
   const lessonEnquiry=()=>['lesson','lesson_question','private_lesson'].includes(enquiryType.value);
-  const scrollBehavior=()=>window.matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth';
+  const scrollBehavior=()=>document.documentElement.dataset.motion==='off'||window.matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth';
   const DRAFT_KEY='hv-swim-enquiry-preferences-v1';
   let currentStep=1;
   let classes=[];

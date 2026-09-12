@@ -3,13 +3,50 @@
 Andrew swaps between Claude and Codex. Read this first and rewrite it last.
 
 **Wheel:** Codex
-**Last updated:** 2026-09-13 by Codex — UI25 sharp-rendering checkpoint; master brief remains in progress
+**Last updated:** 2026-09-13 by Codex — fresh rebuild explicitly authorised; branch codex/fresh-brand-rebuild
 
 The working directory was missing on arrival. Restored the exact private GitHub main
 commit `676094ff874af6c2bd6fb5ff98fef979367773bc` into the empty local Developer path.
 This restored source only; no previous private runtime database was present or recovered.
 
-## Current work — UI25 rendering quality
+## Current direction — FRESH REBUILD authorised
+
+Andrew explicitly said: “take this as a new rebuild, remove all unwanted old items,
+base it off today fresh build.” This supersedes further incremental theme patches.
+The UI25 checkpoint is safely pushed as `1f714c2` on `codex/sunlit-rebuild`.
+Active work is now `codex/fresh-brand-rebuild` in the SAME sole working copy.
+
+Read `FRESH_REBUILD.md`. Replace the public frontend with one clean design system,
+retain the verified backend and protected business workflows, and remove stale public
+widgets/3D demos/overlapping styles. Keep navy, blue, cyan, gold and white from the logo;
+crisp static text and restrained vector water motion. No new clone or second working copy.
+No live data destruction, public deployment, financial activation or outgoing messages.
+The full prior source is recoverable through Git; do not duplicate it into served folders.
+
+Root Codex is the only editor. Audit agents are read-only. Current implementation and
+verification progress will be updated below before each pushed checkpoint.
+
+## Fresh 1 — public rebuild implemented and verified
+
+The 16-page public/sign-in rebuild is implemented on `codex/fresh-brand-rebuild`.
+Read `FRESH_REBUILD.md` for removed components, preserved workflows and exact verification.
+Seven Node suites and mandatory static checks pass. Backend: 181 passed / 2 skipped.
+Browser: 15 public pages at 390px without overflow; matcher handoff, general contact,
+synthetic enquiry `HV-ENQ-0030`, collection search/dialog, saved motion and family sign-in
+verified. Synthetic preview records stay in ignored `data/local-preview/`.
+
+Important worker fix: encoded API paths cannot enter navigation caches; only public HTML
+is cached, private/no-store is respected and operational APIs are network-only. Cache
+revision 28 retires earlier runtime and indefinite public-data caches. Do not restore the
+old API fallback behavior. New tests cover this explicitly.
+
+Only root edits. The protected operations workspace still uses its existing foundation;
+its full visual migration is next. Public site/sign-in no longer load legacy themes or
+public support/experience demos. Mobile remains paused. No deployment, live messages or
+transactions are approved. New backend public allowlist includes child-safety.html.
+Local preview has been restarted with the isolated launcher on 127.0.0.1:8772.
+
+## Previous checkpoint — UI25 rendering quality
 
 Andrew then reported pixelation and asked for premium quality. Root removed the coarse
 WebGL layer from the homepage (its antialiasing was off and DPR capped at 1.5), stopped
@@ -118,7 +155,7 @@ references below describe earlier sessions.
 Andrew reaffirmed that verified work must always be uploaded to private GitHub.
 Updated the repository About description and topics, plus the current branch README,
 to describe the website, protected portals, enquiry workflow and gated integrations.
-The default branch remains `main`; the latest build is `codex/sunlit-rebuild`.
+Historical note: the default branch remained `main`; the latest build then was `codex/sunlit-rebuild`. Current work is `codex/fresh-brand-rebuild`.
 No public deployment or visibility change is part of this metadata update.
 
 ## Latest release — UI20 family journey and enquiry follow-up

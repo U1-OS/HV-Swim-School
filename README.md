@@ -7,9 +7,14 @@ accounts, staff operations and management follow-up.
 
 ## Current build
 
-The latest verified work is on [`codex/sunlit-rebuild`](https://github.com/U1-OS/HV-Swim-School/tree/codex/sunlit-rebuild).
-Presentation revision: **UI25**. This is a **local development build**, not a public launch.
-The verified build is maintained on `main` and `codex/sunlit-rebuild`.
+The fresh rebuild is on [`codex/fresh-brand-rebuild`](https://github.com/U1-OS/HV-Swim-School/tree/codex/fresh-brand-rebuild).
+Presentation revision: **Fresh 1 · 13 September 2026**. This is a **local development build**, not a public launch.
+The prior UI25 checkpoint remains on `codex/sunlit-rebuild` as `1f714c2`.
+
+The public site and sign-in now use a clean design foundation. Public pages no longer
+load the old layered themes, support launcher or 3D demonstrations. The protected
+operations workspace keeps its established behavior and styles during its separate migration.
+Read [FRESH_REBUILD.md](FRESH_REBUILD.md) for exact changes, checks and remaining work.
 
 - Logo-led navy, blue and gold website with gentle moving water, animated branding and accessible motion controls.
 - Responsive guided lesson finder and first-lesson preparation checklist.
