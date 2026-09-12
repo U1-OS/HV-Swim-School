@@ -80,10 +80,12 @@ Do not enable debug tooling, bind the API on a public interface without a proxy,
 `.env` inside the image. Keep `HV_APP_ENV=production` on live hosts so demo accounts and
 OpenAPI docs stay disabled.
 
-SQLite is the implemented adapter. The project requires a separate production database
-architecture decision before real child, family or payroll records are imported. Setting
-DATABASE_URL does not implement PostgreSQL: unsupported settings fail closed. Database
-adapter/migration implementation and backup/restore testing follow that decision.
+SQLite is the local preview adapter. PostgreSQL and an empty-schema migration are
+implemented and contract-tested. Production/staging startup requires a remote PostgreSQL URL
+with `sslmode=verify-full`, separate deployment keys, a valid HTTPS origin and a clean
+database. Choose the managed provider and rehearse migration, PostgreSQL backups/PITR,
+private uploads and key recovery before real child, family or payroll records are imported.
+The bundled encrypted full-data recovery utility currently supports SQLite only.
 
 ## Decisions and owner actions
 

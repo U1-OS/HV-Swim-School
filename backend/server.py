@@ -19,6 +19,7 @@ from urllib.parse import parse_qs, quote, urlparse
 from zoneinfo import ZoneInfo
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, Response, status
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -155,9 +156,25 @@ def fulfilment_mode_for_route(route: str) -> str:
     return SUPPLIER_ROUTE_DETAILS.get(route, SUPPLIER_ROUTE_DETAILS["manual_review"])["automation"]
 
 
+def validate_https_url(value: str, name: str, *, origin_only: bool = False) -> None:
+    try:
+        parsed = urlparse(value)
+        invalid = (
+            parsed.scheme != "https" or not parsed.hostname or parsed.username is not None
+            or parsed.password is not None or parsed.fragment or parsed.port == 0
+            or any(character.isspace() or character in "\\" for character in value)
+            or (origin_only and (parsed.path not in ("", "/") or parsed.query))
+        )
+    except ValueError:
+        invalid = True
+    if invalid:
+        raise RuntimeError(f"{name} must be a valid HTTPS {'origin' if origin_only else 'URL'} without credentials")
+
+
 def validate_production_config(candidate=settings) -> None:
+    if candidate.app_env.lower() not in {"development", "test", "staging", "production"}:
+        raise RuntimeError("HV_APP_ENV is not a recognised environment")
     if candidate.database_url:
-        from urllib.parse import urlparse,parse_qs
         parsed=urlparse(candidate.database_url)
         if parsed.scheme not in ('postgres','postgresql'):
             raise RuntimeError('DATABASE_URL must be a supported PostgreSQL URL')
@@ -172,13 +189,15 @@ def validate_production_config(candidate=settings) -> None:
     }
     if candidate.session_secret in insecure_secrets or len(candidate.session_secret) < 32:
         raise RuntimeError("HV_SESSION_SECRET must be a unique random value of at least 32 characters")
-    if len(candidate.data_encryption_key) < 32 or candidate.data_encryption_key == candidate.session_secret:
+    insecure_secrets.add("replace-with-a-separate-random-data-encryption-key")
+    if candidate.data_encryption_key in insecure_secrets or len(candidate.data_encryption_key) < 32 or candidate.data_encryption_key == candidate.session_secret:
         raise RuntimeError("HV_DATA_ENCRYPTION_KEY must be a separate random value of at least 32 characters")
-    if not candidate.public_url.startswith("https://"):
-        raise RuntimeError("HV_PUBLIC_URL must use HTTPS in production")
+    validate_https_url(candidate.public_url, "HV_PUBLIC_URL", origin_only=True)
+    if not candidate.database_url:
+        raise RuntimeError("HV_DATABASE_URL must select managed PostgreSQL in production")
     xero_configured = bool(candidate.xero_client_id and candidate.xero_client_secret and candidate.xero_redirect_uri)
-    if xero_configured and not candidate.xero_redirect_uri.startswith("https://"):
-        raise RuntimeError("XERO_REDIRECT_URI must use HTTPS in production")
+    if xero_configured:
+        validate_https_url(candidate.xero_redirect_uri, "XERO_REDIRECT_URI")
     if candidate.xero_sync_enabled and not xero_configured:
         raise RuntimeError("XERO_SYNC_ENABLED requires the complete Xero OAuth configuration")
     if candidate.xero_sync_enabled and (
@@ -201,20 +220,20 @@ def validate_production_config(candidate=settings) -> None:
         or not urlparse(f"https://{shopify_domain}").hostname
     ):
         raise RuntimeError("SHOPIFY_STORE_DOMAIN must be a hostname without a scheme or path")
-    if candidate.pool_sensor_url and not candidate.pool_sensor_url.startswith("https://"):
-        raise RuntimeError("POOL_SENSOR_URL must use HTTPS in production")
+    if candidate.pool_sensor_url:
+        validate_https_url(candidate.pool_sensor_url, "POOL_SENSOR_URL")
     google_fields = (candidate.google_client_id, candidate.google_client_secret)
     if any(google_fields) and not all(google_fields):
         raise RuntimeError("GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET must be configured together")
     google_redirect = candidate.google_redirect_uri or f"{candidate.public_url}/api/auth/oauth/google/callback"
-    if all(google_fields) and not google_redirect.startswith("https://"):
-        raise RuntimeError("GOOGLE_REDIRECT_URI must use HTTPS in production")
+    if all(google_fields):
+        validate_https_url(google_redirect, "GOOGLE_REDIRECT_URI")
     apple_fields = (candidate.apple_client_id, candidate.apple_client_secret)
     if any(apple_fields) and not all(apple_fields):
         raise RuntimeError("APPLE_CLIENT_ID and APPLE_CLIENT_SECRET must be configured together")
     apple_redirect = candidate.apple_redirect_uri or f"{candidate.public_url}/api/auth/oauth/apple/callback"
-    if all(apple_fields) and not apple_redirect.startswith("https://"):
-        raise RuntimeError("APPLE_REDIRECT_URI must use HTTPS in production")
+    if all(apple_fields):
+        validate_https_url(apple_redirect, "APPLE_REDIRECT_URI")
     if not candidate.trusted_proxies:
         raise RuntimeError(
             "HV_TRUSTED_PROXIES must list every reverse-proxy address that terminates HTTPS "
@@ -2017,7 +2036,7 @@ def csv_download(filename: str, headings: list[str], records: list[list[Any]]) -
         safe = []
         for value in record:
             text = "" if value is None else str(value)
-            safe.append("'" + text if text.startswith(("=", "+", "-", "@", "\t", "\r")) else text)
+            safe.append(workforce.safe_cell(text))
         writer.writerow(safe)
     return Response(output.getvalue(), media_type="text/csv; charset=utf-8", headers={"Content-Disposition": f'attachment; filename="{filename}"'})
 
@@ -2206,6 +2225,7 @@ async def complete_oauth_login(
     response = RedirectResponse(url="/platform.html?account=connected", status_code=303)
     response.delete_cookie(oauth_browser_cookie(provider),path="/",secure=settings.production)
     with db_session() as db:
+        db.execute("BEGIN IMMEDIATE")
         identity = db.execute(
             "SELECT * FROM oauth_identities WHERE provider=? AND subject=?",
             (provider, subject),
@@ -2224,6 +2244,8 @@ async def complete_oauth_login(
                 return oauth_error_redirect("account_unavailable")
             if user and user["role"] != "customer":
                 return oauth_error_redirect("team_account_requires_approval")
+            if user:
+                return oauth_error_redirect("account_link_required")
             if not user:
                 cursor = db.execute(
                     """INSERT INTO users(
@@ -4521,6 +4543,9 @@ def update_account_status(account_id: int, payload: AccountStatusInput, request:
     if account_id == user["id"] and not payload.active:
         raise HTTPException(status_code=400, detail="You cannot deactivate the account you are currently using")
     with db_session() as db:
+        db.execute("BEGIN IMMEDIATE")
+        if not db.execute("SELECT 1 FROM users WHERE id=? AND active=1 AND role='admin'", (user["id"],)).fetchone():
+            raise HTTPException(403, "Management access is no longer active")
         account = db.execute("SELECT id,email,role,active FROM users WHERE id=?", (account_id,)).fetchone()
         if not account:
             raise HTTPException(status_code=404, detail="Account not found")
@@ -5752,10 +5777,28 @@ def update_product(product_id: int, payload: ProductUpdateInput, request: Reques
 @app.post("/api/products/cart")
 async def create_cart(payload: CartInput, request: Request, user: dict[str, Any] = Depends(session_user), x_csrf_token: str | None = Header(default=None)) -> dict[str, Any]:
     csrf_guard(request, user, x_csrf_token)
+    # Recheck the local launch gates on the server. A hidden catalogue card does
+    # not prevent a caller submitting a known/unapproved Shopify variant directly.
+    if not settings.commerce_live_approved or not shopify_ready():
+        raise HTTPException(409, "The shop is not ready to accept orders")
+    with db_session() as db:
+        enabled = public_feature_controls(db)["merch_home"]["effective_enabled"]
+        approved = {str(item["shopify_gid"]): item for item in rows(db.execute("SELECT * FROM products"))
+                    if item["status"] == "available" and not product_launch_blockers(item)
+                    and (item.get("audience") != "staff" or user["role"] == "admin")}
+    if not enabled or not approved:
+        raise HTTPException(409, "The shop is not ready to accept orders")
     try:
+        live = await shopify_products()
+        match = next((product for product in live if str(product.get("id")) in approved
+                      and any(str(edge.get("node", {}).get("id")) == payload.variant_id
+                              and edge.get("node", {}).get("availableForSale") is True
+                              for edge in product.get("variants", {}).get("edges", []))), None)
+        if match is None:
+            raise HTTPException(409, "This option is not approved and available for purchase")
         return {"cart": await shopify_create_cart(payload.variant_id, payload.quantity)}
-    except RuntimeError as exc:
-        raise HTTPException(status_code=409, detail=str(exc))
+    except HTTPException:
+        raise
     except Exception:
         raise HTTPException(status_code=502, detail="Shopify cart could not be created")
 
@@ -5982,6 +6025,14 @@ workforce.register(app, session_user, csrf_guard)
 def unknown_api_route(unmatched_path: str) -> None:
     """Keep unmatched API requests JSON even though the static site has an HTML 404."""
     raise HTTPException(status_code=404, detail="Not Found")
+
+
+@app.exception_handler(RequestValidationError)
+async def invalid_request(request: Request, exc: RequestValidationError):
+    # Pydantic includes rejected input by default, which can echo passwords, tokens,
+    # health narratives or an entire malformed body into browser/proxy error capture.
+    errors = [{key: error[key] for key in ("type", "loc", "msg") if key in error} for error in exc.errors()]
+    return JSONResponse({"detail": errors}, status_code=422)
 
 
 @app.exception_handler(StarletteHTTPException)
