@@ -1,6 +1,28 @@
-# HV Swim Bendigo V5.13.0 Premium Platform
+# HV Swim School Bendigo
 
-Premium public website and connected operations platform for HV Swim Bendigo. The build combines a polished responsive front end with a FastAPI service, role-based accounts and a SQLite preview database. SQLite is not approved for the final production deployment that will store customer, child or payroll data.
+A welcoming, accessible website and protected operations platform for HV Swim School
+in California Gully, Bendigo, Victoria. Families can explore programs, find a suitable
+starting point and enquire about lessons. The connected workspaces support family
+accounts, staff operations and management follow-up.
+
+## Current build
+
+The latest verified work is on [`codex/sunlit-rebuild`](https://github.com/U1-OS/HV-Swim-School/tree/codex/sunlit-rebuild).
+Presentation revision: **UI20**. This is a **local development build**, not a public launch.
+The GitHub default branch remains `main`; open the build branch for the latest source.
+
+- Responsive public website, guided lesson finder and first-lesson preparation checklist.
+- Protected family, staff and management workspaces.
+- Enquiry ownership, follow-up dates, next actions and protection against conflicting edits.
+- Lesson billing integration with Xero and an approval-gated Shopify merchandise catalogue.
+- Static HTML, CSS and JavaScript with a Python FastAPI backend; no frontend build required.
+- SQLite for local preview. Production database selection and migration remain outstanding.
+- Native mobile app paused. Live payments and public deployment require explicit approval.
+
+Every verified source update is committed and pushed to this private repository.
+Credentials, runtime databases and personal records stay out of Git history.
+See [HANDOFF.md](HANDOFF.md) for the current working state and
+[FAMILY_JOURNEY_UPGRADE.md](FAMILY_JOURNEY_UPGRADE.md) for verification and limitations.
 
 ## Preview on this Mac
 

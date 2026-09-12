@@ -9,6 +9,14 @@ The working directory was missing on arrival. Restored the exact private GitHub 
 commit `676094ff874af6c2bd6fb5ff98fef979367773bc` into the empty local Developer path.
 This restored source only; no previous private runtime database was present or recovered.
 
+## Repository information update
+
+Andrew reaffirmed that verified work must always be uploaded to private GitHub.
+Updated the repository About description and topics, plus the current branch README,
+to describe the website, protected portals, enquiry workflow and gated integrations.
+The default branch remains `main`; the latest build is `codex/sunlit-rebuild`.
+No public deployment or visibility change is part of this metadata update.
+
 ## Latest release — UI20 family journey and enquiry follow-up
 
 Read `FAMILY_JOURNEY_UPGRADE.md` for changes, verification and remaining limitations.
