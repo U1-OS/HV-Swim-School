@@ -8,7 +8,7 @@ accounts, staff operations and management follow-up.
 ## Current build
 
 The latest verified work is on [`codex/sunlit-rebuild`](https://github.com/U1-OS/HV-Swim-School/tree/codex/sunlit-rebuild).
-Presentation revision: **UI24**. This is a **local development build**, not a public launch.
+Presentation revision: **UI25**. This is a **local development build**, not a public launch.
 The verified build is maintained on `main` and `codex/sunlit-rebuild`.
 
 - Logo-led navy, blue and gold website with gentle moving water, animated branding and accessible motion controls.

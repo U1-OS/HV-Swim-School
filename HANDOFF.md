@@ -3,13 +3,29 @@
 Andrew swaps between Claude and Codex. Read this first and rewrite it last.
 
 **Wheel:** Codex
-**Last updated:** 2026-09-13 by Codex — UI24 logo-led blue/gold design checkpoint; master brief remains in progress
+**Last updated:** 2026-09-13 by Codex — UI25 sharp-rendering checkpoint; master brief remains in progress
 
 The working directory was missing on arrival. Restored the exact private GitHub main
 commit `676094ff874af6c2bd6fb5ff98fef979367773bc` into the empty local Developer path.
 This restored source only; no previous private runtime database was present or recovered.
 
-## Current work — UI24 brand colour and motion checkpoint
+## Current work — UI25 rendering quality
+
+Andrew then reported pixelation and asked for premium quality. Root removed the coarse
+WebGL layer from the homepage (its antialiasing was off and DPR capped at 1.5), stopped
+whole-card pointer tilting and all text reveal transforms, disabled synthetic font weight,
+and removed unnecessary backdrop compositing from text surfaces. Hero photography now
+uses a less aggressive 4:3 desktop / 1.15 mobile crop, preserving more source detail.
+Metadata and card paragraphs are larger. Logo animation starts fully visible even in a
+background tab and its slow float uses whole-pixel increments. CSS/SVG water still moves.
+
+UI24 `fcc481c` is pushed. UI25 uses new asset/cache versions and continues on the same
+branch. Preview tests must reset viewport overrides; old browser tabs can retain unusual
+sizes, so judge sharpness using a fresh tab at the normal preview size as well. Browser
+checked the current font is loaded, hero text opacity 1 / transform none and canvas count 0.
+Do not describe this as every production test or every master-brief feature completed.
+
+## Previous checkpoint — UI24 brand colour and motion
 
 Andrew rejected the green/teal direction and explicitly requested the colours of the
 existing logo, an animated/moving logo and a moving background. The interface now uses

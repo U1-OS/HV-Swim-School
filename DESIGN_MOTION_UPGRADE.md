@@ -1,4 +1,4 @@
-# Logo-led colour and motion — UI24
+# Logo-led colour, motion and sharpness — UI25
 
 Date: 13 September 2026. Owner direction: use the existing logo’s navy, blue, cyan,
 gold and white; remove the green/teal interface and add a moving logo/background.
@@ -55,3 +55,21 @@ No public deployment or live transactions are authorised by this checkpoint.
 
 These existing images were not regenerated or recoloured. Professional vector artwork
 and physical samples remain prerequisites for bulk merchandise production.
+
+## UI25 follow-up: reported pixelation
+
+The homepage no longer loads `aquatic-scene.js`. Its old 28/48-cell mesh, antialiasing-off
+context and 1.5 DPR cap were unsuitable once made visually prominent. The legacy module
+remains source-only; the local vector background supplies the requested movement.
+
+Whole-card mouse tilting and text reveal transforms are removed. Text-bearing cards,
+forms and support controls stay static; pure artwork still moves. The hero image uses
+its existing 1536×1024 source with a shallower crop to avoid unnecessary Retina upscaling.
+No artificial upscaling or claim of a higher-resolution photograph was introduced.
+Useful metadata is larger and synthetic font weight is disabled. Logo entrance opacity
+starts at 1 to remain visible when background-tab animation is paused.
+
+Browser checks: loaded Manrope font, hero opacity 1, hero transform none, zero WebGL
+canvases on the homepage. Native-size preview was opened after responsive test overrides
+were reset. The campaign images remain illustrative; real approved business photography
+and final native-device accessibility/production checks remain prerequisites for launch.

@@ -1,11 +1,11 @@
-const CORE_CACHE = 'hv-swim-v5130-core-25';
-const RUNTIME_CACHE = 'hv-swim-v5130-runtime-25';
+const CORE_CACHE = 'hv-swim-v5130-core-26';
+const RUNTIME_CACHE = 'hv-swim-v5130-runtime-26';
 const PUBLIC_DATA_CACHE = 'hv-swim-v5130-public-data-22';
 const CORE_SHELL = [
-  './assets/experience.css?v=5.13.0-ui24', './assets/experience.js?v=5.13.0-ui24',
+  './assets/experience.css?v=5.13.0-ui25', './assets/experience.js?v=5.13.0-ui25',
   './offline.html', './manifest.webmanifest',
-  './assets/styles.css?v=5.13.0-ui24', './assets/app.js?v=5.13.0-ui24',
-  './assets/support.css?v=5.13.0-ui24', './assets/support.js?v=5.13.0-ui24',
+  './assets/styles.css?v=5.13.0-ui25', './assets/app.js?v=5.13.0-ui25',
+  './assets/support.css?v=5.13.0-ui25', './assets/support.js?v=5.13.0-ui25',
   './assets/icons.svg', './assets/brand-water-waves.svg', './assets/hv-swim-logo-v3.png',
   './assets/fonts/manrope-latin-variable.woff2',
   './assets/app-icon-v3-64.png', './assets/app-icon-v3-192.png',

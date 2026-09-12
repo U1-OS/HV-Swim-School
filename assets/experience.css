@@ -551,8 +551,8 @@ body[data-page="programs"] .matcher-result-actions .text-link{color:#24637b}
 
 /* Official logo stays intact: movement belongs to its presentation, not its artwork. */
 @keyframes hv-logo-arrive {
-  0% { opacity:0; transform:translateY(9px) scale(.97); }
-  55% { opacity:1; transform:translateY(-3px) scale(1); }
+  0% { opacity:1; transform:translateY(4px); }
+  55% { opacity:1; transform:translateY(-2px); }
   78% { transform:translateY(2px); }
   100% { opacity:1; transform:translateY(0); }
 }
@@ -830,3 +830,35 @@ body .approach-card-top small { color:#72d8ff; }
 body .kit-group-head p { color:#b9cce4; }
 html body[data-page="shop"] .shop-toolbar button { color:#d5e6f6; background:#123259; border-color:#486f9c; }
 html body[data-page="shop"] .shop-toolbar button:is(.active,:hover) { color:#061a3b; background:#ffc928; border-color:#ffc928; }
+
+/* Sharp rendering: keep interface text static and reserve continuous motion for artwork. */
+html body { font-synthesis:none; }
+html body .reveal,html body .reveal.visible { opacity:1!important; transform:none!important; animation:none!important; transition:none!important; }
+html body :is(.program-card,.shop-card,.collection-nav-card,.panel,.availability-card,.community-card,.approach-card,.guide-card,.kit-card):is(:hover,[data-depth-active]) { transform:none!important; }
+html body :is(.hv-support-launcher,.wizard-step.active) { animation:none; transform:none; }
+html body :is(.hv-support-launcher,.btn):hover { transform:none; }
+html body :is(.site-header,.site-header.scrolled,.availability-card,.feature-strip>.card) { backdrop-filter:none; -webkit-backdrop-filter:none; }
+html body :is(.hero-copy,.hero-trust span,.hero .btn-outline) { backdrop-filter:none; -webkit-backdrop-filter:none; }
+html body :is(.btn,.nav-links a,.eyebrow,.tag,.program-num,.scene-kicker,.scene-index,.hero-trust span) { font-weight:700; }
+html body :is(.program-card,.approach-card,.availability-card,.guide-card,.community-card) p { font-size:.94rem; line-height:1.7; }
+html body :is(.program-num,.scene-kicker,.scene-index,.scene-disclosure,.scene-drag-hint,.sunlit-photo-credit,.sunlit-portrait figcaption>span) { font-size:.75rem; line-height:1.6; }
+html body[data-page="home"] .immersive-hero .intro { font-size:1.0625rem; line-height:1.8; color:#c8d8eb; }
+html body[data-page="home"] .immersive-hero .hero-trust span { font-size:.8rem; color:#c8d8eb; }
+html body .sunlit-portrait { height:auto; aspect-ratio:4/3; border-radius:64px 24px 24px; }
+html body .sunlit-portrait>img { display:block; height:100%; width:100%; }
+html body .sunlit-portrait figcaption { left:28px; bottom:43px; }
+html body .sunlit-portrait figcaption strong { font-size:clamp(1.5rem,2.6vw,2.5rem); }
+html body .sunlit-caption-label { display:none; }
+html body .sunlit-photo-credit { left:28px; bottom:14px; font-size:.6875rem; }
+html body .brand img { height:auto; aspect-ratio:3/2; }
+@media(prefers-reduced-motion:no-preference) {
+  html:not([data-motion="off"]) :is(.brand,.platform-logo-mark,.auth-logo) img { animation:hv-logo-arrive 1.2s ease both,hv-logo-float 8s steps(4,end) 1.2s infinite; }
+}
+@media(max-width:720px) {
+  html body .sunlit-portrait { aspect-ratio:1.15; border-top-left-radius:48px; }
+  html body[data-page="home"] .immersive-hero h1 { font-size:clamp(2.75rem,10.5vw,4.25rem); line-height:1.07; letter-spacing:-.05em; }
+  html body :is(.scene-kicker,.scene-index) { font-size:.6875rem; }
+  html body .scene-heading { gap:12px; flex-wrap:wrap; }
+  html body .sunlit-portrait figcaption { left:22px; right:20px; }
+  html body .sunlit-photo-credit { left:22px; }
+}

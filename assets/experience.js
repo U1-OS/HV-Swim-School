@@ -2,7 +2,6 @@
   'use strict';
   const root = document.documentElement;
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
-  const finePointer = matchMedia('(hover: hover) and (pointer: fine)');
   const key = 'hv-swim-motion';
   let paused = false;
   try { paused = localStorage.getItem(key) === 'off'; } catch (_) { /* Private browsing still works. */ }
@@ -141,30 +140,8 @@
     scene.querySelectorAll('[data-bottle-colour]').forEach(item => item.setAttribute('aria-pressed', String(item === button)));
   }));
 
-  // Event delegation also covers cards loaded by the existing catalogue API.
-  let depthTarget = null, depthFrame = 0, point = null;
-  function clearDepth() {
-    depthTarget?.removeAttribute('data-depth-active');
-    depthTarget = null;
-  }
-  document.addEventListener('pointermove', event => {
-    if (!finePointer.matches || motionOff()) return;
-    const card = event.target.closest('.program-card,.collection-nav-card,.shop-card:not(.loading-card)');
-    if (card !== depthTarget) { clearDepth(); depthTarget = card; }
-    if (!card) return;
-    point = [event.clientX, event.clientY];
-    if (depthFrame) return;
-    depthFrame = requestAnimationFrame(() => {
-      depthFrame = 0;
-      if (!depthTarget || motionOff()) return;
-      const rect = depthTarget.getBoundingClientRect();
-      depthTarget.style.setProperty('--depth-x', `${clamp((.5-(point[1]-rect.top)/rect.height)*5,-3,3)}deg`);
-      depthTarget.style.setProperty('--depth-y', `${clamp(((point[0]-rect.left)/rect.width-.5)*5,-3,3)}deg`);
-      depthTarget.dataset.depthActive = '';
-    });
-  }, {passive:true});
-  document.documentElement.addEventListener('pointerleave', clearDepth);
-  window.addEventListener('blur', clearDepth);
+  // Keep text-bearing cards on the normal text rasterisation path. Decorative water
+  // and the dedicated pool/bottle illustrations own movement; cards never tilt.
   if (document.querySelector('.site-header')) {
     const progress = document.createElement('div');
     progress.className = 'reading-progress';
