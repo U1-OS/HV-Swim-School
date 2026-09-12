@@ -95,7 +95,7 @@ def _data_secret_box() -> SecretBox:
 
 def encrypt_sensitive(value: str | None) -> str | None:
     """Authenticated field encryption for medical, allergy and emergency-contact text."""
-    if value is None or value == "" or value.startswith(SENSITIVE_VALUE_PREFIX):
+    if value is None or value == "":
         return value
     encrypted = bytes(_data_secret_box().encrypt(value.encode("utf-8")))
     return SENSITIVE_VALUE_PREFIX + base64.urlsafe_b64encode(encrypted).decode("ascii")

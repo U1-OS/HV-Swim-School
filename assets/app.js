@@ -430,21 +430,21 @@
     document.querySelectorAll('[data-weather-summary]').forEach(el => el.textContent = `${summary}${Number.isFinite(apparent) ? ` · feels ${Math.round(apparent)}°C` : ''}`);
     document.querySelectorAll('[data-weather-icon]').forEach(el => el.innerHTML = iconSvg(icon));
     document.querySelectorAll('[data-weather-wind]').forEach(el => el.textContent = Number.isFinite(wind) ? `${Math.round(wind)} km/h` : 'Unavailable');
-    document.querySelectorAll('[data-weather-updated]').forEach(el => el.textContent = `${cached ? 'Cached' : 'Live'} · ${formatTime(new Date())}`);
+    document.querySelectorAll('[data-weather-updated]').forEach(el => el.textContent = `${cached || data.cached || data.stale ? 'Cached' : 'Updated'} · ${data.observed_at ? formatTime(new Date(data.observed_at)) : 'time unavailable'}`);
   }
   async function fetchWeather(force=false) {
     let cached;
     try { cached = JSON.parse(localStorage.getItem(WEATHER_KEY)); } catch (_) {}
-    if (!force && cached && Date.now() - cached.savedAt < 15 * 60 * 1000) { renderWeather(cached.data, true); return; }
+    if (!force && cached?.data?.observed_at && Date.now()-new Date(cached.data.observed_at).getTime()<15*60*1000 && Date.now() - cached.savedAt < 15 * 60 * 1000) { renderWeather(cached.data, true); return; }
     try {
       const payload = await fetchJSON('/api/public/weather', { headers:{ Accept:'application/json' } });
-      const data = { current:payload.current };
+      const data = payload;
       // Caching is a convenience. If storage is unavailable the fetch still succeeded,
       // so the reading must still be shown rather than falling through to the error path.
       try { localStorage.setItem(WEATHER_KEY, JSON.stringify({ savedAt:Date.now(), data })); } catch (_) {}
       renderWeather(data, false);
     } catch (_) {
-      if (cached?.data) { renderWeather(cached.data, true); }
+      if (cached?.data?.observed_at && Date.now()-new Date(cached.data.observed_at).getTime()<60*60*1000) { renderWeather(cached.data, true); }
       else {
         document.querySelectorAll('[data-weather-temp]').forEach(el => el.textContent = '—');
         document.querySelectorAll('[data-weather-summary]').forEach(el => el.textContent = 'Weather feed unavailable');
@@ -513,8 +513,19 @@
       frame.setAttribute('allowfullscreen', 'true');
       frame.setAttribute('scrolling', 'yes');
       feed.classList.add('is-loaded');
-      feed.replaceChildren(frame);
+      const hide=document.createElement('button');
+      hide.type='button';hide.className='btn btn-soft btn-small';hide.textContent='Hide Facebook posts';
+      hide.addEventListener('click',()=>{frame.remove();hide.remove();feed.classList.remove('is-loaded');feed.append(button);button.focus();});
+      feed.replaceChildren(hide,frame);
     });
+  });
+
+  document.querySelector('[data-clear-preferences]')?.addEventListener('click',()=>{
+    try {
+      ['hv-swim-motion','hv-swim-v4-weather-cache','hv-swim-last-device-alert','hv-swim-shopify-cart-v1'].forEach(key=>localStorage.removeItem(key));
+      sessionStorage.removeItem('hv-swim-enquiry-preferences-v1');
+      document.querySelector('[data-preferences-status]').textContent='Saved preferences cleared. Your sign-in and account records are unchanged.';
+    } catch (_) { document.querySelector('[data-preferences-status]').textContent='Your browser blocked access to storage. Use its site-data settings to clear saved preferences.'; }
   });
 
   // Preview-centre shortcuts provide the supplied test-account guidance.

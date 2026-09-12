@@ -2,11 +2,11 @@
 // Requires agent-browser via pnpm. Sign into the isolated preview before portal checks.
 // node scripts/browser-qa.mjs public|admin|staff|customer
 import {spawnSync} from 'node:child_process';
-const base='http://127.0.0.1:8768';
+const base=process.env.HV_QA_BASE_URL||'http://127.0.0.1:8772';
 const role=process.argv[2]||'public';
 const routes={
-  public:['index.html','about.html','programs.html','locations.html','enquire.html','shop.html','login.html'],
-  admin:['overview','tickets','enrolments','accounts','enquiries','incidents','terms','register','timesheets','roster','classes','achievements','compliance','billing','integrations','merch','website','locations','associations','notifications','audit'],
+  public:['index.html','about.html','programs.html','locations.html','enquire.html','shop.html','login.html','privacy.html','terms.html','cookies.html','security.html','accessibility.html','photo-consent.html'],
+  admin:['overview','tickets','enrolments','accounts','enquiries','incidents','terms','calendar','mail','launch','register','timesheets','roster','classes','achievements','compliance','billing','integrations','merch','website','locations','associations','notifications','audit'],
   staff:['overview','register','roster','pool','incidents','tickets','achievements','timesheets','qualifications','merch','notifications'],
   customer:['overview','classes','bookings','billing','absences','swimmers','achievements','incidents','messages','shop','notifications']
 };

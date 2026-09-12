@@ -15,3 +15,6 @@ eval-type-backport>=0.2.2
 # Transitive helpers kept at or above their patched releases.
 click>=8.1.7
 python-dotenv>=1.0.1
+
+# Optional managed production storage driver; SQLite remains the local preview default.
+psycopg[binary]>=3.3.5,<4

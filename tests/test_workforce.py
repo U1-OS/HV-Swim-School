@@ -71,9 +71,9 @@ def test_unsupported_database_url_fails_closed(client):
     from backend.config import settings
     from backend.server import validate_production_config
 
-    with pytest.raises(RuntimeError, match="unsupported"):
+    with pytest.raises(RuntimeError, match="supported PostgreSQL"):
         validate_production_config(
-            replace(settings, database_url="postgresql://not-a-real-database")
+            replace(settings, database_url="mysql://not-a-real-database")
         )
 
 

@@ -118,3 +118,10 @@ if __name__ == "__main__":
             print(f"FAIL  {name}  {problem}")
     print(f"\n{'all checks passed' if not failures else f'{failures} failing'}")
     sys.exit(1 if failures else 0)
+
+
+def test_user_text_resembling_ciphertext_is_always_encrypted():
+    value='enc:v1:malformed-user-text'
+    encrypted=encrypt_sensitive(value)
+    assert encrypted!=value
+    assert decrypt_sensitive(encrypted)==value
