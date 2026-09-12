@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="640" viewBox="0 0 1440 640" fill="none" preserveAspectRatio="none">
+  <path d="M0 260C240 85 480 435 720 260S1200 85 1440 260V640H0Z" fill="#008CCB" fill-opacity=".12"/>
+  <path d="M0 340C240 515 480 165 720 340S1200 515 1440 340V640H0Z" fill="#19C8F4" fill-opacity=".09"/>
+  <g stroke="#19C8F4" stroke-width="1.5">
+    <path d="M0 260C240 85 480 435 720 260S1200 85 1440 260" opacity=".7"/>
+    <path d="M0 285C240 110 480 460 720 285S1200 110 1440 285" opacity=".4"/>
+    <path d="M0 310C240 135 480 485 720 310S1200 135 1440 310" opacity=".2"/>
+    <path d="M0 340C240 515 480 165 720 340S1200 515 1440 340" opacity=".5"/>
+    <path d="M0 365C240 540 480 190 720 365S1200 540 1440 365" opacity=".25"/>
+  </g>
+</svg>

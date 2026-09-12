@@ -1,6 +1,6 @@
 # HV Swim Bendigo brand guide
 
-V5.11.0 refines the existing HV Swim identity rather than replacing it. The rising sun,
+UI24 follows Andrew’s explicit direction to build the website around the existing HV Swim logo. The rising sun,
 freestyle swimmer, layered wave, navy/cyan/gold palette and `HV SWIM BENDIGO` name remain
 the recognisable core.
 
@@ -51,6 +51,18 @@ instead. Keep the symbol at least 24 CSS pixels wide.
 - On busy photography, place the mark on a solid navy panel or use the white monochrome
   proof after approval.
 - App icons must remain opaque and keep critical artwork inside the mask-safe area.
+
+## Digital motion
+
+The interface follows the palette above, with blue-tinted navy surfaces and pale-blue
+supporting text. Gold identifies the primary action; cyan accents the water and headings.
+Do not reintroduce the rejected green/teal interface theme.
+
+Movement belongs to the logo element, not an edited image: gentle arrival and vertical
+float, keeping the original aspect ratio and artwork. Decorative water layers use local
+SVG paths and CSS transforms. The visible motion control persists across pages; reduced
+motion on the device takes precedence, hidden tabs pause animations, and print hides them.
+No flashing, full-page parallax or moving form fields are part of this direction.
 
 ## Merchandise boundary
 

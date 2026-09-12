@@ -3,13 +3,37 @@
 Andrew swaps between Claude and Codex. Read this first and rewrite it last.
 
 **Wheel:** Codex
-**Last updated:** 2026-09-13 by Codex — operations/security checkpoint; master brief implementation continues
+**Last updated:** 2026-09-13 by Codex — UI24 logo-led blue/gold design checkpoint; master brief remains in progress
 
 The working directory was missing on arrival. Restored the exact private GitHub main
 commit `676094ff874af6c2bd6fb5ff98fef979367773bc` into the empty local Developer path.
 This restored source only; no previous private runtime database was present or recovered.
 
-## Current work — UI22 operations and security foundation
+## Current work — UI24 brand colour and motion checkpoint
+
+Andrew rejected the green/teal direction and explicitly requested the colours of the
+existing logo, an animated/moving logo and a moving background. The interface now uses
+HV navy `#061A3B`, ocean blue `#008CCB`, cyan `#19C8F4`, gold `#FFC928` and white.
+The supplied logo artwork remains intact. A 1.7-second arrival and gentle 6-second float
+animate its presentation; two CSS background layers add flowing blue water. The existing
+optional WebGL hero is more visible. A visible 44px motion control shares the saved pause,
+OS reduced-motion and hidden-tab behaviour with existing controls. Mobile controls are
+spatially clear of the booking bar and hidden under navigation/cart overlays.
+
+Cross-page review corrected dark-theme contrast in program comparison/checklists,
+enquiry choices/review/success, support dialogs, About cards, venue tables and shop
+controls. A synthetic four-step enquiry completed locally as `HV-ENQ-0029`; no outgoing
+message or payment was sent. Its test address is reserved `example.com`. Runtime records
+stay ignored. See `DESIGN_MOTION_UPGRADE.md` for scope and evidence.
+
+The original logo download is `assets/hv-swim-logo-v3-master.png` (transparent master),
+with the smaller website PNG at `assets/hv-swim-logo-v3.png`. Both were linked to Andrew.
+
+The UI22 GitHub checks passed independently: run `34700306682`, website/backend/PostgreSQL.
+The wider master brief below is still unfinished; do not call this a complete rebuild,
+public launch, full accessibility certification or independent penetration test.
+
+## Previous checkpoint — UI22 operations and security foundation
 
 Andrew authorised all six operational improvements, security/legal hardening and then
 provided the full master rebuild brief. **Bendigo, Victoria explicitly reconfirmed**;
@@ -35,7 +59,9 @@ absence credits and stale browser weather. No independent production pentest has
 
 - Finish focused security/operational regression evidence and browser checks; retain exact
   commands/results in the upgrade report. Add PostgreSQL CI and full uploaded-file recovery.
-- Consolidate premium dark theme across every public/portal state; preserve working flows.
+- Continue deep portal-state visual QA using the confirmed blue/gold dark palette; public
+  enquiry, support, program comparison and first-lesson contrast checks are complete.
+  Some older low-priority portal states may still contain legacy surface colours.
 - Extend enquiries with immutable notes/call events, consent evidence and registration
   resource versioning/secure expiry-aware manual issue/copy workflow; reuse support messaging.
 - Scheduled management announcements/ticker/archive; bounded CMS for programs, FAQ,

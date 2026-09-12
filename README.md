@@ -8,21 +8,23 @@ accounts, staff operations and management follow-up.
 ## Current build
 
 The latest verified work is on [`codex/sunlit-rebuild`](https://github.com/U1-OS/HV-Swim-School/tree/codex/sunlit-rebuild).
-Presentation revision: **UI21**. This is a **local development build**, not a public launch.
+Presentation revision: **UI24**. This is a **local development build**, not a public launch.
 The verified build is maintained on `main` and `codex/sunlit-rebuild`.
 
-- Responsive public website, guided lesson finder and first-lesson preparation checklist.
+- Logo-led navy, blue and gold website with gentle moving water, animated branding and accessible motion controls.
+- Responsive guided lesson finder and first-lesson preparation checklist.
 - Protected family, staff and management workspaces.
 - Enquiry ownership, follow-up dates, next actions and protection against conflicting edits.
 - Lesson billing integration with Xero and an approval-gated Shopify merchandise catalogue.
 - Static HTML, CSS and JavaScript with a Python FastAPI backend; no frontend build required.
-- SQLite for local preview. Production database selection and migration remain outstanding.
+- SQLite for local preview; PostgreSQL adapter and verified empty-schema migration are implemented. Production provisioning and migration remain owner-controlled.
 - Native mobile app paused. Live payments and public deployment require explicit approval.
 
 Every verified source update is committed and pushed to this public source repository.
 Credentials, runtime databases and personal records stay out of Git history.
 See [HANDOFF.md](HANDOFF.md) for the current working state and
-[FAMILY_JOURNEY_UPGRADE.md](FAMILY_JOURNEY_UPGRADE.md) for verification and limitations.
+[DESIGN_MOTION_UPGRADE.md](DESIGN_MOTION_UPGRADE.md) and
+[OPERATIONS_SECURITY_UPGRADE.md](OPERATIONS_SECURITY_UPGRADE.md) for current verification and limitations.
 
 See [launch preparation](deploy/LAUNCH_PREPARATION.md) for the hosting specification,
 local email previews and outstanding owner decisions. No domain or host is selected yet.

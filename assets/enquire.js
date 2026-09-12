@@ -158,7 +158,7 @@
       if(programScore)return programScore;
       return Number(!locationMatch(a))-Number(!locationMatch(b));
     });
-    target.innerHTML=`<label class="wizard-class-card flexible"><input type="radio" name="class_choice" value="Flexible—team recommendation"><span class="class-choice-check">✓</span><div><span class="class-match-label">Best fit</span><strong>Keep me flexible</strong><small>Let HV Swim recommend the program, class and time.</small></div></label>`+sorted.map(item=>{
+    target.innerHTML=`<label class="wizard-class-card flexible"><input type="radio" name="class_choice" value="Flexible—team recommendation"><span class="class-choice-check" aria-hidden="true">✓</span><div><span class="class-match-label">Best fit</span><strong>Keep me flexible</strong><small>Let HV Swim recommend the program, class and time.</small></div></label>`+sorted.map(item=>{
       const available=Number(item.available||0);
       const time=classTime(item.start_time);
       const value=`${item.title} · ${days[item.weekday]} ${time} · ${item.location_name}`;
@@ -166,7 +166,7 @@
       const selected=(queryClass&&value.toLowerCase().includes(queryClass.toLowerCase().replace(' at ',' · ')))||(!queryClass&&elements.preferredClass.value===value);
       const preferredVenue=locationMatch(item);
       const matchLabel=isMatch&&preferredVenue?'Program + venue match':(preferredVenue?'Preferred venue':(isMatch?'Suggested match':'Other pathway'));
-      return `<label class="wizard-class-card ${isMatch?'recommended':''}"><input type="radio" name="class_choice" value="${esc(value)}" ${selected?'checked':''}><span class="class-choice-check">✓</span><div><span class="class-match-label">${matchLabel}</span><strong>${esc(item.title)}</strong><small>${esc(days[item.weekday])} · ${esc(time)} · ${esc(item.location_name)}</small><p><b>${/private/i.test(item.title)?'Private pricing by enquiry':`${money(item.price)} indicative`}</b><em class="${available?'available':'waitlist'}">${available?`${available} ${available===1?'place':'places'} showing`:'Waitlist'}</em></p></div></label>`;
+      return `<label class="wizard-class-card ${isMatch?'recommended':''}"><input type="radio" name="class_choice" value="${esc(value)}" ${selected?'checked':''}><span class="class-choice-check" aria-hidden="true">✓</span><div><span class="class-match-label">${matchLabel}</span><strong>${esc(item.title)}</strong><small>${esc(days[item.weekday])} · ${esc(time)} · ${esc(item.location_name)}</small><p><b>${/private/i.test(item.title)?'Private pricing by enquiry':`${money(item.price)} indicative`}</b><em class="${available?'available':'waitlist'}">${available?`${available} ${available===1?'place':'places'} showing`:'Waitlist'}</em></p></div></label>`;
     }).join('');
     const selected=target.querySelector('[name="class_choice"]:checked');
     if(selected)elements.preferredClass.value=selected.value;
@@ -224,7 +224,7 @@
     }catch(problem){elements.error.textContent=`${problem.message} Please try again or call 0413 462 112.`;elements.submit.disabled=false;elements.submit.innerHTML='Send secure enquiry <span aria-hidden="true">→</span>';}
   });
 
-  request('/api/classes',{headers:{Accept:'application/json'}}).then(payload=>{classes=payload.classes||[];renderClasses();}).catch(()=>{document.getElementById('wizard-class-grid').innerHTML='<label class="wizard-class-card flexible"><input type="radio" name="class_choice" value="Flexible—team recommendation"><span class="class-choice-check">✓</span><div><span class="class-match-label">Timetable unavailable</span><strong>Keep me flexible</strong><small>The team will check the current classes and recommend a suitable time when they reply.</small></div></label>';});
+  request('/api/classes',{headers:{Accept:'application/json'}}).then(payload=>{classes=payload.classes||[];renderClasses();}).catch(()=>{document.getElementById('wizard-class-grid').innerHTML='<label class="wizard-class-card flexible"><input type="radio" name="class_choice" value="Flexible—team recommendation"><span class="class-choice-check" aria-hidden="true">✓</span><div><span class="class-match-label">Timetable unavailable</span><strong>Keep me flexible</strong><small>The team will check the current classes and recommend a suitable time when they reply.</small></div></label>';});
 
   document.querySelectorAll('.wizard-heading h2').forEach(heading=>heading.tabIndex=-1);
   function updateEnquiryType(){

@@ -21,11 +21,19 @@
     row.append(text, button);
     footer.append(row);
   }
+  if (document.body) {
+    const dock = document.createElement('button');
+    dock.type = 'button';
+    dock.className = 'motion-preference motion-dock';
+    dock.dataset.motionToggle = '';
+    document.body.append(dock);
+  }
   function syncMotion() {
     root.dataset.motion = motionOff() ? 'off' : 'on';
     document.querySelectorAll('[data-motion-toggle]').forEach(button => {
       button.textContent = reduced.matches ? 'Reduced motion' : paused ? 'Enable motion' : 'Pause motion';
       button.setAttribute('aria-pressed', String(motionOff()));
+      button.setAttribute('aria-label', button.textContent);
       button.disabled = reduced.matches;
       button.title = reduced.matches ? 'Following your device’s reduced-motion setting.' : 'Control decorative movement across the website.';
     });
@@ -123,7 +131,7 @@
     }
     body.append(faces);
   });
-  const colours = {navy:['#123b55','Midnight navy'],aqua:['#368f8e','Poolside aqua'],sand:['#b49b66','Warm sand']};
+  const colours = {navy:['#123b55','Midnight navy'],aqua:['#008ccb','Ocean blue'],sand:['#b49b66','Warm sand']};
   document.querySelectorAll('[data-bottle-colour]').forEach(button => button.addEventListener('click', () => {
     const selected = colours[button.dataset.bottleColour];
     if (!selected) return;
