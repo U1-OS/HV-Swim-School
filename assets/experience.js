@@ -157,7 +157,19 @@
   }, {passive:true});
   document.documentElement.addEventListener('pointerleave', clearDepth);
   window.addEventListener('blur', clearDepth);
-  if (document.querySelector('.site-header')) {
+  const publicRoot = document.body;
+  const isPublic = publicRoot && !publicRoot.matches('[data-platform-page],.platform-page');
+  if (isPublic && typeof document.createElement === 'function') {
+    publicRoot.dataset.theme = 'night-water';
+    if (!publicRoot.querySelector('.site-aurora')) {
+      const aurora = document.createElement('div');
+      aurora.className = 'site-aurora';
+      aurora.setAttribute('aria-hidden', 'true');
+      publicRoot.prepend(aurora);
+    }
+  }
+
+  if (document.querySelector('.site-header') && document.body && typeof document.createElement === 'function') {
     const progress = document.createElement('div');
     progress.className = 'reading-progress';
     progress.setAttribute('aria-hidden','true');

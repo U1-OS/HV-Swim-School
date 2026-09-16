@@ -2,23 +2,34 @@
 
 Andrew swaps between Claude and Codex. Read this first and rewrite it last.
 
-**Wheel:** Cursor Cloud Agent
-**Last updated:** 2026-09-16 — PR #4 merged on main; PR #17 public-site upgrade (a11y, SEO, CSS tokens, WebP, PWA) rebased onto main
+**Wheel:** Cursor Cloud Agent (Night Water)
+**Last updated:** 2026-09-16 — draft PR #18 Night Water public rebuild on `cursor/dark-rebuild-22d6`
 
-## Current work — public-site upgrade
+## Current work — Night Water public rebuild
 
-Branch `cursor/public-site-upgrade-6638` rebased onto latest `main` (`8931b9d`). In-place public HTML/CSS/JS upgrade; **backend/ was not touched**. A former instructor stays off the site.
+Branch `cursor/dark-rebuild-22d6` from latest `origin/main` (`d9575a9`, merge of PR #3). Dark, logo-themed public presentation; **backend/ was not touched**. A former instructor stays off the site.
 
-- PWA: sign-in and role shells are network-only; runtime cache buckets are generation 24.
-- Accessibility: enquiry errors `aria-describedby`, login recovery `for`/`id`, skip-links `:focus-visible`, table `scope`, decorative marks hidden from AT.
-- SEO: relative canonical + `og:url` on public pages (absolute URLs still come from `build-sitemap.mjs` once a domain exists). Portal shells have `noindex,nofollow`. JSON-LD is `SportsActivityLocation` + `LocalBusiness` aligned with `BUSINESS_DETAILS.md` (entity, ABN digits in `taxID`, Wood Street, email).
-- CSS: one `:root` token set from `BRAND_GUIDE.md` (`#061A3B`, `#008CCB`, `#19C8F4`, `#FFC928`). Public `!important` override fights removed; reduced-motion and `[hidden]` keep `!important` on purpose.
-- Images: photo WebP + JPEG/PNG fallback; logos are lossless WebP. Asset query is `5.13.0-ui22`.
-- Static server: `python3 -m http.server 3000 --bind 0.0.0.0` (tmux `hv-swim-static-3000`). Chrome on `DISPLAY=:1` stays on the homepage.
+- New `assets/dark-public.css` Night Water layer loaded last on public pages. Tokens from `BRAND_GUIDE.md`: navy/black canvas, gold CTAs (`#FFC928`), cyan accents (`#19C8F4`). Scoped `body:not([data-platform-page]):not(.platform-page)` so staff/family portals keep operational contrast. Login is restyled dark but usable.
+- Leftover sunlit surfaces (program trust strip, fee calculator, merch/pool explorers, shop toolbar, FAQ open state, wizard success/error) now sit on the dark glass system. Gold `::selection`. Trust-item captions `display:block` so “Due on enrolment” does not concatenate.
+- `assets/experience.js` injects a reduced-motion-aware gold/cyan aurora on public pages only; `createElement` is guarded so `tests/test_experience.mjs` still passes.
+- Asset query `5.13.0-ui23`. PWA CORE/RUNTIME/PUBLIC_DATA caches generation 25; `dark-public.css` is in CORE_SHELL.
+- Copy and business details unchanged (HVS BENDIGO PTY LTD, Wood Street, Laura-led teaching, $22.50). No staff names reintroduced.
+- Static server: `python3 -m http.server 3000 --bind 0.0.0.0` (tmux `hv-swim-static-3000`). Chrome on `DISPLAY=:1` stays maximised on `http://127.0.0.1:3000/index.html`.
+- After shots: `/cursor/stores/bc-b1f5564c-7e5b-4036-bcec-0b643b33099a/media/dark-rebuild/` (desktop + mobile for public pages, plus enquire wizard and programs/shop mid-scroll).
 
 ### Next up
 
-Andrew review of the draft PR. When a production domain is bought, run `node scripts/build-sitemap.mjs https://<domain>` so canonicals, `og:image` and `robots.txt` Sitemap become absolute. Do not restore removed staff names. Do not enable live integrations without approval.
+Andrew review of draft PR https://github.com/U1-OS/HV-Swim-School/pull/18. Shop remains “in preparation” until samples/Shopify. When a production domain is bought, run `node scripts/build-sitemap.mjs https://<domain>`. Do not restore removed staff names. Do not enable live integrations without approval.
+
+## Previous work — public-site upgrade (PR #17)
+
+Merged to main. In-place public HTML/CSS/JS upgrade; backend not touched.
+
+- PWA: sign-in and role shells are network-only; runtime cache buckets were generation 24 (now 25 on the Night Water branch).
+- Accessibility: enquiry errors `aria-describedby`, login recovery `for`/`id`, skip-links `:focus-visible`, table `scope`, decorative marks hidden from AT.
+- SEO: relative canonical + `og:url` on public pages (absolute URLs still come from `build-sitemap.mjs` once a domain exists). Portal shells have `noindex,nofollow`. JSON-LD is `SportsActivityLocation` + `LocalBusiness` aligned with `BUSINESS_DETAILS.md`.
+- CSS: one `:root` token set from `BRAND_GUIDE.md` (`#061A3B`, `#008CCB`, `#19C8F4`, `#FFC928`).
+- Images: photo WebP + JPEG/PNG fallback; logos are lossless WebP. Asset query was `5.13.0-ui22`.
 
 ## Previous work — UI21 launch preparation
 
