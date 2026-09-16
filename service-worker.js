@@ -1,6 +1,7 @@
-const CORE_CACHE = 'hv-swim-v5130-core-22';
-const RUNTIME_CACHE = 'hv-swim-v5130-runtime-22';
-const PUBLIC_DATA_CACHE = 'hv-swim-v5130-public-data-22';
+const CORE_CACHE = 'hv-swim-v5130-core-23';
+const RUNTIME_CACHE = 'hv-swim-v5130-runtime-23';
+const PUBLIC_DATA_CACHE = 'hv-swim-v5130-public-data-23';
+const PRIVATE_NAV = /\/(?:login|platform|admin|staff|customer|START_HERE)\.html$/i;
 const CORE_SHELL = [
   './assets/experience.css?v=5.13.0-ui21', './assets/experience.js?v=5.13.0-ui21',
   './offline.html', './manifest.webmanifest',
@@ -71,6 +72,11 @@ self.addEventListener('fetch', event => {
 
   if (event.request.mode === 'navigate') {
     event.respondWith((async () => {
+      // Sign-in and role shells must never be served from the runtime cache.
+      if (PRIVATE_NAV.test(url.pathname)) {
+        try { return await fetch(event.request, { cache: 'no-store' }); }
+        catch (_) { return (await caches.match('./offline.html')) || Response.error(); }
+      }
       try { return await cacheSuccessful(RUNTIME_CACHE, event.request, await fetch(event.request)); }
       catch (_) { return (await caches.match(event.request)) || (await caches.match('./offline.html')); }
     })());
