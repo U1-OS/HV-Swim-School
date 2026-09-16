@@ -1,0 +1,31 @@
+# Example for a single Linux host: nginx terminates TLS and forwards to loopback Uvicorn.
+# Install app under /opt/hv-swim, secrets in /etc/hv-swim/hv-swim.env (mode 600, root-owned).
+#
+#   sudo cp deploy/systemd/hv-swim.service.example /etc/systemd/system/hv-swim.service
+#   sudo cp deploy/nginx/hv-swim-host.conf.example /etc/nginx/sites-available/hv-swim
+#   sudo systemctl enable --now hv-swim nginx
+
+[Unit]
+Description=HV Swim Bendigo API and static site
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=hvswim
+Group=hvswim
+WorkingDirectory=/opt/hv-swim
+EnvironmentFile=/etc/hv-swim/hv-swim.env
+Environment=HV_LOAD_DOTENV=false
+ExecStart=/opt/hv-swim/deploy/entrypoint.sh
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/hv-swim
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

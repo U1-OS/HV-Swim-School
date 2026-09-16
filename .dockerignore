@@ -1,0 +1,15 @@
+.env
+.venv/
+.venv312/
+__pycache__/
+*.pyc
+data/
+node_modules/
+www/
+.git/
+.github/
+android/
+ios/
+*.zip
+_to_delete/
+.firecrawl/
