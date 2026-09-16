@@ -3,7 +3,7 @@
 Andrew swaps between Claude and Codex. Read this first and rewrite it last.
 
 **Wheel:** Cursor Cloud Agent (Studio rebuild)
-**Last updated:** 2026-09-16 — draft PR #19 clean studio public rebuild on `cursor/clean-bold-rebuild-cadf`
+**Last updated:** 2026-09-17 — draft PR #19; CI flake fix on lesson-register test (Melbourne date)
 
 ## Current work — clean studio public rebuild
 
@@ -18,6 +18,7 @@ Andrew rejected merged PR #18 Night Water (“it looks shit”). Branch `cursor/
 - Copy and business details unchanged (HVS BENDIGO PTY LTD, Wood Street, Laura-led teaching, $22.50). No staff names reintroduced.
 - Static server: `python3 -m http.server 3000 --bind 0.0.0.0` (tmux `hv-swim-static-3000`). Chrome on `DISPLAY=:1` stays on `http://127.0.0.1:3000/index.html`.
 - After shots: `/cursor/stores/bc-b1f5564c-7e5b-4036-bcec-0b643b33099a/media/clean-rebuild/` (desktop + mobile for public pages, enquire step 2, programs/shop mid-scroll, login).
+- CI run 35105771925 failed `test_lesson_register_enforces_assignment_parent_and_photo_rules`: not the CSS branch — `next_occurrence` can equal Melbourne `business_today()` while POST only rejects dates *after* today. Test now posts a weekday strictly in the future; parent/photo assertions unchanged.
 
 ### Next up
 
