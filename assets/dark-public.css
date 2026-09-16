@@ -889,3 +889,127 @@ html[data-motion="off"] .site-aurora::after {
   animation: none !important;
   display: none;
 }
+
+/* Leftover light campaign surfaces from the previous sunlit layer */
+body:not([data-platform-page]):not(.platform-page) .program-anchor-bar {
+  color: #d5e6f4;
+  background: rgba(5, 12, 24, 0.88);
+  border-bottom: 1px solid var(--glass-border);
+  backdrop-filter: blur(16px);
+}
+body:not([data-platform-page]):not(.platform-page) .program-anchor-bar a { color: #c5d7ea; }
+body:not([data-platform-page]):not(.platform-page) .program-anchor-bar a:hover { color: var(--gold); }
+body:not([data-platform-page]):not(.platform-page) .program-terms-strip {
+  background: #07111f;
+  border-block-color: rgba(255, 201, 40, 0.14);
+}
+body:not([data-platform-page]):not(.platform-page) .program-terms-strip .trust-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: var(--glass);
+  border-color: var(--glass-border);
+  color: var(--ink);
+  box-shadow: none;
+}
+body:not([data-platform-page]):not(.platform-page) .program-terms-strip .trust-icon {
+  display: grid;
+  place-items: center;
+  color: #061a3b;
+  background: var(--gold);
+  border-radius: 10px;
+  font-weight: 800;
+}
+body:not([data-platform-page]):not(.platform-page) .program-terms-strip .trust-item p span {
+  display: block;
+  color: var(--muted);
+}
+body:not([data-platform-page]):not(.platform-page) .calc-option-btn {
+  color: #e8f4ff;
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.14);
+}
+body:not([data-platform-page]):not(.platform-page) .calc-option-btn small { color: var(--muted); }
+body:not([data-platform-page]):not(.platform-page) .calc-option-btn.active {
+  color: #061a3b;
+  background: var(--gold);
+  border-color: var(--gold);
+  box-shadow: none;
+}
+body:not([data-platform-page]):not(.platform-page) .calc-option-btn.active small { color: #3d4e22; }
+body:not([data-platform-page]):not(.platform-page) .faq-list details[open] {
+  background: rgba(25, 200, 244, 0.08);
+  border-color: rgba(25, 200, 244, 0.24);
+}
+body:not([data-platform-page]):not(.platform-page) .faq-list details[open] summary { color: #f4f8fc; }
+body:not([data-platform-page]):not(.platform-page) .calculator-section {
+  background:
+    radial-gradient(circle at 10% 20%, rgba(25, 200, 244, 0.1), transparent 30rem),
+    #07111f;
+}
+body:not([data-platform-page]):not(.platform-page) .calc-card {
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow);
+}
+body:not([data-platform-page]):not(.platform-page) .calc-slider-head strong,
+body:not([data-platform-page]):not(.platform-page) .calc-slider-head span {
+  color: #f4f8fc;
+}
+body:not([data-platform-page]):not(.platform-page) .calc-slider-head span { color: var(--gold); }
+body:not([data-platform-page]):not(.platform-page) .program-table-wrap {
+  background: var(--glass);
+  border-color: var(--glass-border);
+}
+body:not([data-platform-page]):not(.platform-page) .program-table th {
+  color: var(--gold);
+  background: rgba(255, 201, 40, 0.08);
+}
+body:not([data-platform-page]):not(.platform-page) .program-table td {
+  color: #c5d7ea;
+  border-top-color: rgba(255, 255, 255, 0.08);
+}
+body:not([data-platform-page]):not(.platform-page) .program-table td strong { color: #f4f8fc; }
+body:not([data-platform-page]):not(.platform-page) .program-table td a { color: var(--cyan); }
+body .pool-explorer,
+body .merch-explorer,
+body[data-page="shop"] .merch-explorer,
+body[data-page="home"] .pool-explorer {
+  background:
+    radial-gradient(circle at 50% 0, rgba(25, 200, 244, 0.12), transparent 50%),
+    #071424;
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow);
+}
+body[data-page="shop"] .shop-toolbar button {
+  color: #d5e6f4;
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.14);
+}
+body[data-page="shop"] .shop-toolbar button.active,
+body[data-page="shop"] .shop-toolbar button:hover {
+  color: #061a3b;
+  background: var(--gold);
+  border-color: var(--gold);
+}
+body[data-page="shop"] .towel-spotlight {
+  background:
+    radial-gradient(ellipse at 80% 0, rgba(255, 201, 40, 0.08), transparent 48%),
+    #07111f;
+}
+body:not([data-platform-page]):not(.platform-page) .condition-fallback {
+  color: #061a3b;
+  background: rgba(255, 255, 255, 0.88);
+}
+body:not([data-platform-page]):not(.platform-page) .wizard-error {
+  color: #ffd0d4;
+}
+body:not([data-platform-page]):not(.platform-page) .enrolment-success {
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  color: var(--ink);
+}
+body:not([data-platform-page]):not(.platform-page) ::selection {
+  color: #061a3b;
+  background: var(--gold);
+}
