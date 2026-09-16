@@ -564,6 +564,7 @@ CREATE INDEX IF NOT EXISTS idx_qualifications_expiry ON qualifications(expiry_da
 -- grow with traffic, so they need covering indexes.
 CREATE INDEX IF NOT EXISTS idx_audit_action_ip ON audit_log(action, ip_address, created_at);
 CREATE INDEX IF NOT EXISTS idx_login_attempts_lookup ON login_attempts(email, ip_address, created_at);
+CREATE INDEX IF NOT EXISTS idx_login_attempts_ip ON login_attempts(ip_address, created_at);
 CREATE INDEX IF NOT EXISTS idx_login_attempts_created_at ON login_attempts(created_at);
 """
 

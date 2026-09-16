@@ -951,10 +951,43 @@ class CartInput(BaseModel):
 
 LOGIN_ATTEMPT_RETENTION_DAYS = 30
 OAUTH_ATTEMPT_MINUTES = 10
+LOGIN_LOCKOUT_MINUTES = 15
+LOGIN_SPRAY_WINDOW_MINUTES = 60
+# One account guessed from one address: the targeted attack.
+LOGIN_FAILURE_LIMIT_ACCOUNT_AND_IP = 10
+# Any number of accounts guessed from one address: password spraying. Without this a
+# single machine can try one common password against every account and never be throttled.
+LOGIN_FAILURE_LIMIT_IP = 20
+# One account guessed from any number of addresses: the same spray run through proxies.
+LOGIN_FAILURE_LIMIT_ACCOUNT = 25
+LOGIN_THROTTLE_MESSAGE = "Too many sign-in attempts. Try again in 15 minutes."
 
 
 def login_attempt_cutoff() -> str:
     return (datetime.now(timezone.utc) - timedelta(days=LOGIN_ATTEMPT_RETENTION_DAYS)).isoformat()
+
+
+def login_throttle_reason(db: sqlite3.Connection, email: str, ip: str) -> str | None:
+    """Return which failure budget is exhausted, or None when the attempt may proceed.
+
+    Three counters rather than one. The original (email, ip) pair stops a single account
+    being ground down, but it is blind to the attack that matters most here: one machine
+    trying one likely password against every address it can guess.
+    """
+    now = datetime.now(timezone.utc)
+    lockout_cutoff = (now - timedelta(minutes=LOGIN_LOCKOUT_MINUTES)).isoformat()
+    spray_cutoff = (now - timedelta(minutes=LOGIN_SPRAY_WINDOW_MINUTES)).isoformat()
+
+    def failures(clause: str, params: tuple[Any, ...]) -> int:
+        return db.execute(f"SELECT COUNT(*) FROM login_attempts WHERE success=0 AND {clause}", params).fetchone()[0]
+
+    if failures("email=? AND ip_address=? AND created_at>?", (email, ip, lockout_cutoff)) >= LOGIN_FAILURE_LIMIT_ACCOUNT_AND_IP:
+        return "account_and_ip"
+    if failures("ip_address=? AND created_at>?", (ip, lockout_cutoff)) >= LOGIN_FAILURE_LIMIT_IP:
+        return "ip"
+    if failures("email=? AND created_at>?", (email, spray_cutoff)) >= LOGIN_FAILURE_LIMIT_ACCOUNT:
+        return "account"
+    return None
 
 
 def issue_session(
@@ -2284,12 +2317,16 @@ def login(payload: LoginInput, request: Request, response: Response) -> dict[str
     if settings.production and email.endswith("@hvswim.demo"):
         raise HTTPException(status_code=401, detail="Email or password is incorrect")
     ip = client_ip(request)
-    cutoff = (datetime.now(timezone.utc) - timedelta(minutes=15)).isoformat()
     with db_session() as db:
         db.execute("DELETE FROM login_attempts WHERE created_at<=?", (login_attempt_cutoff(),))
-        failures = db.execute("SELECT COUNT(*) FROM login_attempts WHERE email=? AND ip_address=? AND success=0 AND created_at>?", (email, ip, cutoff)).fetchone()[0]
-        if failures >= 10:
-            raise HTTPException(status_code=429, detail="Too many sign-in attempts. Try again in 15 minutes.")
+        throttled = login_throttle_reason(db, email, ip)
+        if throttled:
+            retry_after = LOGIN_SPRAY_WINDOW_MINUTES if throttled == "account" else LOGIN_LOCKOUT_MINUTES
+            raise HTTPException(
+                status_code=429,
+                detail=LOGIN_THROTTLE_MESSAGE,
+                headers={"Retry-After": str(retry_after * 60)},
+            )
         user = db.execute("SELECT * FROM users WHERE email=? AND active=1", (email,)).fetchone()
         success = bool(user and password_verify(payload.password, user["password_hash"]) and identity.verify_mfa(db, user, payload.code))
         db.execute("INSERT INTO login_attempts(email,ip_address,success,created_at) VALUES(?,?,?,?)", (email, ip, int(success), now_iso()))
