@@ -86,6 +86,11 @@ class Settings:
     sms_api_key: str = os.getenv("SMS_API_KEY", "")
     web_push_public_key: str = os.getenv("WEB_PUSH_PUBLIC_KEY", "")
     web_push_private_key: str = os.getenv("WEB_PUSH_PRIVATE_KEY", "")
+    trusted_proxies: tuple[str, ...] = tuple(
+        item.strip()
+        for item in os.getenv("HV_TRUSTED_PROXIES", "").split(",")
+        if item.strip()
+    )
 
     @property
     def production(self) -> bool:
@@ -93,4 +98,7 @@ class Settings:
 
 
 settings = Settings()
-DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+from .filesystem import ensure_private_directory  # noqa: E402
+
+ensure_private_directory(DATA_DIR)

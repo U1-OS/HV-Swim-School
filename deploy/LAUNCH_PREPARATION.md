@@ -29,6 +29,25 @@ certificates, private documents and integration keys must not be served as stati
 The repository's API server already restricts its public file surface; preserve that
 boundary when adding a proxy. Do not point a generic public file server at the repo root.
 
+### Reverse proxy and client IP
+
+Production startup refuses to run until `HV_TRUSTED_PROXIES` lists every proxy address
+that terminates HTTPS in front of the API (comma-separated IPs or hostnames that resolve
+to the proxy). The API reads the leftmost `X-Forwarded-For` hop only when the immediate
+peer matches that list, so sign-in throttling, enquiry limits and audit entries keep the
+real client address instead of collapsing to the proxy.
+
+Run Uvicorn behind the proxy with explicit header trust, for example:
+
+`uvicorn backend.server:app --host 127.0.0.1 --port 8000 --proxy-headers --forwarded-allow-ips=203.0.113.50`
+
+Use the proxy's actual address in both `HV_TRUSTED_PROXIES` and `--forwarded-allow-ips`.
+Never use `*` for forwarded allow lists. Loopback preview launchers omit these flags because
+they bind to localhost only.
+
+`HV_DATA_DIR` must be owned by the service account with directory mode `700` and database or
+uploaded document mode `600`; the application sets these modes on startup and after writes.
+
 SQLite is the implemented adapter. The project requires a separate production database
 architecture decision before real child, family or payroll records are imported. Setting
 DATABASE_URL does not implement PostgreSQL: unsupported settings fail closed. Database

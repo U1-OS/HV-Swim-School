@@ -65,6 +65,18 @@ def sign_in(client, credentials):
     return response.json()["csrf_token"]
 
 
+def clear_login_attempts():
+    """Every test in this module shares one client address, and so one failure budget.
+
+    A test that deliberately exhausts a sign-in limit must hand the budget back, or the
+    next test that signs in legitimately is throttled for reasons of its own making.
+    """
+    from backend.database import db_session
+
+    with db_session() as db:
+        db.execute("DELETE FROM login_attempts")
+
+
 def make_test_png_base64(width=64, height=64):
     """Create a small valid RGBA PNG with only the Python standard library."""
     def chunk(kind, data):
@@ -772,12 +784,159 @@ def test_unknown_and_known_emails_give_the_same_error(client):
 
 def test_repeated_failures_are_rate_limited(client):
     client.cookies.clear()
+    clear_login_attempts()
     email = "spray-target@example.com"
     statuses = [
         client.post("/api/auth/login", json={"email": email, "password": "WrongPassword1!"}).status_code
         for _ in range(12)
     ]
     assert 429 in statuses, "sign-in attempts are not rate limited"
+    clear_login_attempts()
+
+
+def test_password_spraying_across_accounts_is_rate_limited_per_address(client):
+    """One machine, one password, many accounts — the case the per-account lockout misses.
+
+    Each address below is tried once, so the (email, address) counter never reaches its
+    limit. Only an address-scoped counter stops this.
+    """
+    from backend import server
+
+    client.cookies.clear()
+    clear_login_attempts()
+    attempts = server.LOGIN_FAILURE_LIMIT_IP + 2
+    statuses = [
+        client.post(
+            "/api/auth/login",
+            json={"email": f"sprayed-{index}@example.com", "password": "SeasonalGuess1!"},
+        ).status_code
+        for index in range(attempts)
+    ]
+    assert statuses[: server.LOGIN_FAILURE_LIMIT_IP] == [401] * server.LOGIN_FAILURE_LIMIT_IP
+    assert statuses[server.LOGIN_FAILURE_LIMIT_IP :] == [429, 429], statuses
+    # The address is now blocked outright, not merely for the addresses it guessed at.
+    blocked = client.post("/api/auth/login", json={"email": FAMILY[0], "password": FAMILY[1]})
+    assert blocked.status_code == 429
+    assert blocked.headers["Retry-After"] == str(server.LOGIN_LOCKOUT_MINUTES * 60)
+    clear_login_attempts()
+    assert client.post("/api/auth/login", json={"email": FAMILY[0], "password": FAMILY[1]}).status_code == 200
+    client.cookies.clear()
+
+
+def test_trusted_proxy_forwarded_ips_get_independent_login_buckets(client, monkeypatch):
+    """With HV_TRUSTED_PROXIES configured, rate limits key on the forwarded client address."""
+    from dataclasses import replace
+
+    from backend import server
+
+    client.cookies.clear()
+    clear_login_attempts()
+    monkeypatch.setattr(
+        server,
+        "settings",
+        replace(server.settings, trusted_proxies=("testclient",)),
+    )
+    first = client.post(
+        "/api/auth/login",
+        json={"email": "forwarded-a@example.com", "password": "WrongPassword1!"},
+        headers={"X-Forwarded-For": "198.51.100.11"},
+    )
+    second = client.post(
+        "/api/auth/login",
+        json={"email": "forwarded-b@example.com", "password": "WrongPassword1!"},
+        headers={"X-Forwarded-For": "198.51.100.12"},
+    )
+    assert first.status_code == second.status_code == 401
+    clear_login_attempts()
+
+
+def test_untrusted_clients_cannot_spoof_forwarded_ip_for_rate_limits(client, monkeypatch):
+    from dataclasses import replace
+
+    from backend import server
+
+    client.cookies.clear()
+    clear_login_attempts()
+    monkeypatch.setattr(server, "settings", replace(server.settings, trusted_proxies=()))
+    statuses = [
+        client.post(
+            "/api/auth/login",
+            json={"email": f"spoofed-{index}@example.com", "password": "WrongPassword1!"},
+            headers={"X-Forwarded-For": f"203.0.113.{index}"},
+        ).status_code
+        for index in range(server.LOGIN_FAILURE_LIMIT_IP + 1)
+    ]
+    assert statuses[-1] == 429
+    clear_login_attempts()
+
+
+def test_production_admin_must_enroll_mfa_before_management_workspace(client, monkeypatch):
+    from dataclasses import replace
+
+    from backend import identity, server
+
+    client.cookies.clear()
+    csrf = sign_in(client, ADMIN)
+    prod = replace(
+        server.settings,
+        app_env="production",
+        trusted_proxies=("testclient",),
+        session_secret="a-unique-production-secret-with-32-plus-characters",
+        data_encryption_key="a-separate-production-data-key-with-32-plus-characters",
+        public_url="https://swim.example.test",
+    )
+    from backend import config
+
+    monkeypatch.setattr(config, "settings", prod)
+    monkeypatch.setattr(server, "settings", prod)
+    blocked = client.get("/api/admin/metrics")
+    assert blocked.status_code == 403
+    assert "authenticator" in blocked.json()["detail"].lower()
+    assert client.get("/api/auth/me").status_code == 200
+    setup = client.post(
+        "/api/account/mfa/setup",
+        json={"password": ADMIN[1]},
+        headers={"X-CSRF-Token": csrf},
+    )
+    assert setup.status_code == 200, setup.text
+    secret = setup.json()["secret"]
+    counter = identity.current_counter()
+    code = identity.totp(secret, counter)
+    assert (
+        client.post(
+            "/api/account/mfa/confirm",
+            json={"password": ADMIN[1], "code": code},
+            headers={"X-CSRF-Token": csrf},
+        ).status_code
+        == 200
+    )
+    assert client.get("/api/admin/metrics").status_code == 200
+    client.cookies.clear()
+    from backend.database import db_session
+
+    with db_session() as db:
+        admin_id = db.execute("SELECT id FROM users WHERE email=?", (ADMIN[0],)).fetchone()["id"]
+        db.execute("UPDATE users SET mfa_enabled=0 WHERE id=?", (admin_id,))
+        db.execute("DELETE FROM account_mfa WHERE user_id=?", (admin_id,))
+
+
+def test_one_account_guessed_from_many_addresses_is_rate_limited(client):
+    """The same spray run through a proxy pool, arriving one failure per address."""
+    from backend import server
+    from backend.database import db_session
+    from backend.security import now_iso
+
+    clear_login_attempts()
+    with db_session() as db:
+        for index in range(server.LOGIN_FAILURE_LIMIT_ACCOUNT):
+            db.execute(
+                "INSERT INTO login_attempts(email,ip_address,success,created_at) VALUES(?,?,0,?)",
+                ("distributed-target@example.com", f"203.0.113.{index}", now_iso()),
+            )
+    with db_session() as db:
+        assert server.login_throttle_reason(db, "distributed-target@example.com", "198.51.100.7") == "account"
+        assert server.login_throttle_reason(db, "another-account@example.com", "198.51.100.7") is None
+    clear_login_attempts()
 
 
 def test_old_login_attempts_are_pruned_even_when_login_fails(client):

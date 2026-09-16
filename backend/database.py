@@ -7,6 +7,7 @@ from datetime import date, datetime, timedelta, timezone
 from typing import Generator, Iterable
 
 from .config import DB_PATH, settings
+from .filesystem import ensure_private_directory, harden_database_files
 from .security import SENSITIVE_VALUE_PREFIX, business_today, encrypt_sensitive, now_iso, password_hash
 
 
@@ -564,12 +565,15 @@ CREATE INDEX IF NOT EXISTS idx_qualifications_expiry ON qualifications(expiry_da
 -- grow with traffic, so they need covering indexes.
 CREATE INDEX IF NOT EXISTS idx_audit_action_ip ON audit_log(action, ip_address, created_at);
 CREATE INDEX IF NOT EXISTS idx_login_attempts_lookup ON login_attempts(email, ip_address, created_at);
+CREATE INDEX IF NOT EXISTS idx_login_attempts_ip ON login_attempts(ip_address, created_at);
 CREATE INDEX IF NOT EXISTS idx_login_attempts_created_at ON login_attempts(created_at);
 """
 
 
 def connect() -> sqlite3.Connection:
+    ensure_private_directory(DB_PATH.parent)
     connection = sqlite3.connect(DB_PATH, timeout=15, check_same_thread=False)
+    harden_database_files(DB_PATH)
     connection.row_factory = sqlite3.Row
     connection.execute("PRAGMA foreign_keys=ON")
     connection.execute("PRAGMA busy_timeout=15000")
@@ -647,6 +651,7 @@ def migrate_legacy_bookings_table(db: sqlite3.Connection) -> None:
 
 
 def initialise_database() -> None:
+    ensure_private_directory(DB_PATH.parent)
     with db_session() as db:
         # WAL allows readers to continue while a short management write is committed.
         # The explicit busy timeout above turns brief write contention into a bounded wait
