@@ -8,25 +8,28 @@
 }
 
 :root {
-  --ink: #06142d;
-  --navy: #071d42;
+  /* Brand tokens — BRAND_GUIDE.md. One source of truth; later stylesheets must not redeclare these. */
+  --ink: #061a3b;
+  --navy: #061a3b;
   --navy-2: #0a2858;
-  --blue: #0066ff;
+  --blue: #008ccb;
+  --ocean: #008ccb;
   --cyan: #19c8f4;
   --cyan-soft: #dff8ff;
-  --gold: #ffc107;
+  --gold: #ffc928;
   --orange: #ff8a18;
   --white: #ffffff;
-  --paper: #f5f8fc;
-  --muted: #60708a;
-  --line: #dce6f1;
+  --paper: #f5fafc;
+  --muted: #4c657b;
+  --line: #d9e6ed;
   --green: #22a06b;
   --red: #d94c56;
-  --shadow: 0 24px 70px rgba(3, 21, 51, .12);
-  --shadow-sm: 0 12px 34px rgba(3, 21, 51, .08);
-  --radius: 26px;
+  --shadow: 0 20px 60px #061a3b0c;
+  --shadow-sm: 0 8px 25px #1538420b;
+  --radius: 24px;
   --radius-sm: 16px;
-  --container: min(1180px, calc(100% - 40px));
+  --container: min(1280px, calc(100% - 80px));
+  --aqua-soft: #e6f6fa;
 }
 
 * { box-sizing: border-box; }
@@ -807,7 +810,19 @@ p { margin: 0; }
 .consent-check input { margin-top:3px; accent-color:#0878a8; }
 .wizard-error { min-height:24px; margin-top:13px; color:#a23b47; font-size:.65rem; font-weight:750; }
 /* "Please fill in X" has to actually point at something, so mark the field it means. */
-.field-invalid, input.field-invalid, select.field-invalid, textarea.field-invalid { border-color:#c0414f !important; box-shadow:0 0 0 3px rgba(192,65,79,.14); }
+.field-invalid,
+input.field-invalid,
+select.field-invalid,
+textarea.field-invalid,
+.input.field-invalid:focus,
+select.field-invalid:focus,
+textarea.field-invalid:focus,
+body:not([data-platform-page]) .input.field-invalid:focus,
+body:not([data-platform-page]) select.field-invalid:focus,
+body:not([data-platform-page]) textarea.field-invalid:focus {
+  border-color: #c0414f;
+  box-shadow: 0 0 0 3px rgba(192, 65, 79, .14);
+}
 fieldset.field-invalid { border-radius:13px; outline:2px solid #c0414f; outline-offset:4px; }
 .wizard-actions { display:flex; justify-content:space-between; gap:12px; margin-top:10px; padding-top:20px; border-top:1px solid var(--line); }
 .wizard-actions .btn:last-child { margin-left:auto; }
@@ -1295,28 +1310,14 @@ textarea { min-height:82px; padding-top:11px; resize:vertical; }
    screens or their interaction states.
    -------------------------------------------------------------------------- */
 body:not([data-platform-page]) {
-  --ink:#071a33;
-  --navy:#061a38;
-  --navy-2:#0a2b55;
-  --blue:#0868e8;
-  --cyan:#35c8e8;
-  --cyan-soft:#e4f8fc;
-  --gold:#ffc94d;
-  --paper:#f4f7fa;
-  --muted:#5d7185;
-  --line:#dbe5ed;
-  --shadow:0 24px 65px rgba(5,30,61,.1);
-  --shadow-sm:0 10px 34px rgba(5,30,61,.075);
-  --radius:24px;
-  --radius-sm:15px;
-  color:var(--ink);
+  color: var(--ink);
   background:
-    radial-gradient(circle at 96% 8%,rgba(53,200,232,.055),transparent 24rem),
+    radial-gradient(circle at 96% 8%, rgba(25, 200, 244, .055), transparent 24rem),
     var(--paper);
-  font-family:"Manrope",ui-sans-serif,"Segoe UI",system-ui,sans-serif;
-  font-size:16px;
-  line-height:1.65;
-  text-rendering:optimizeLegibility;
+  font-family: "Manrope", ui-sans-serif, "Segoe UI", system-ui, sans-serif;
+  font-size: 16px;
+  line-height: 1.65;
+  text-rendering: optimizeLegibility;
 }
 body:not([data-platform-page]) ::selection { color:#031a38; background:#9ceaf8; }
 body:not([data-platform-page]) h1,
@@ -1819,7 +1820,6 @@ body:not([data-platform-page]) .program-card:nth-child(4)::before { background:r
 .facebook-section-compact .facebook-feed-card { min-height:330px; }
 .country-acknowledgement { padding-block:52px; }
 .footer-business-identity { padding:18px 0 0; border-top:1px solid rgba(255,255,255,.1); color:#9fb5c8; font-size:.58rem; line-height:1.5; }
-[hidden] { display:none !important; }
 @media(max-width:700px) {
   body:not([data-platform-page]) .location-detail .location-visual { min-width:0; min-height:320px; display:block; padding:22px; }
   body:not([data-platform-page]) .location-detail .condition-fallback { position:absolute; top:104px; left:22px; right:22px; width:auto; max-width:none; }
@@ -1835,10 +1835,10 @@ body:not([data-platform-page]) .program-card:nth-child(4)::before { background:r
 }
 
 @media print {
-  body:not([data-platform-page]) .reveal { opacity:1!important; transform:none!important; animation:none!important; }
+  body:not([data-platform-page]) .reveal { opacity:1; transform:none; animation:none; }
   body:not([data-platform-page]) .site-header { position:static; }
   body:not([data-platform-page]) .mobile-book-bar,
-  body:not([data-platform-page]) .shop-mobile-bar { display:none!important; }
+  body:not([data-platform-page]) .shop-mobile-bar { display:none; }
 }
 
 /* V5.4 — truthful live states, distinct campaign imagery and a stronger trust-led footer. */
@@ -2148,14 +2148,6 @@ body:not([data-platform-page]) .country-copy a:hover { color:white; }
 }
 
 /* V5.10 premium public UI: a restrained editorial layer shared by every public page. */
-:root {
-  --paper:#f2f6f9;
-  --line:#d8e4ec;
-  --shadow:0 26px 72px rgba(3,24,52,.13);
-  --shadow-sm:0 13px 38px rgba(3,24,52,.085);
-  --radius:28px;
-  --container:min(1220px,calc(100% - 48px));
-}
 body:not([data-platform-page]) {
   background:radial-gradient(circle at 9% 19%,rgba(25,200,244,.055),transparent 25rem),linear-gradient(180deg,#f6f9fb 0,#f2f6f9 38%,#f5f8fa 100%);
 }
@@ -2332,7 +2324,7 @@ body:not([data-platform-page]) .site-footer { border-top:1px solid rgba(118,208,
   transform: translateX(100%);
 }
 .btn:active {
-  transform: scale(0.97) !important;
+  transform: scale(0.97);
 }
 
 /* Interactive Term Fee & Absence Credit Calculator */

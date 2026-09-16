@@ -1,18 +1,12 @@
 /* HV Swim / Make waves. Shared presentation; existing workflow styles remain authoritative. */
-:root {
-  --paper:#f5fafc; --ink:#061a3b; --muted:#536980; --line:#dce6f1;
-  --gold:#ffc928; --cyan:#19c8f4; --radius:24px;
-  --shadow:0 22px 60px #15384212; --shadow-sm:0 8px 25px #1538420b;
-  --container:min(1280px,calc(100% - 80px));
-}
 html { scroll-padding-top:120px; }
 body { background:var(--paper); }
 body h1 { text-transform:none; font-weight:750; letter-spacing:-.055em; }
 body h2 { font-weight:750; letter-spacing:-.045em; line-height:1.12; }
 body h3 { line-height:1.25; letter-spacing:-.025em; }
 body .btn { min-height:48px; border-radius:12px; font-weight:800; box-shadow:none; transition:background .2s,box-shadow .2s,transform .2s; }
-body .btn-primary { color:#152e36; background:#ffcf52; border:1px solid #ffcf52; box-shadow:0 3px 0 #d8ad3d; }
-body .btn-primary:hover { color:#152e36; background:#ffdb7b; box-shadow:0 5px 0 #d8ad3d,0 10px 25px #bb932329; transform:translateY(-2px); }
+body .btn-primary { color:var(--ink); background:var(--gold); border:1px solid var(--gold); box-shadow:0 3px 0 #d8ad3d; }
+body .btn-primary:hover { color:var(--ink); background:#ffdb7b; box-shadow:0 5px 0 #d8ad3d,0 10px 25px #bb932329; transform:translateY(-2px); }
 body .btn-blue { background:#125b66; border-color:#125b66; }
 body .btn-soft { color:#145763; background:#e8f3ef; border:1px solid #d7e8e1; }
 body .eyebrow { font-size:.7rem; font-weight:800; letter-spacing:.14em; }
@@ -341,13 +335,13 @@ body[data-platform-page="app"] .platform-head h1{font-size:clamp(1.9rem,3.3vw,2.
 @media(max-width:380px){.wf-filters{grid-template-columns:1fr}.wf-metrics{gap:10px}.wf-metrics .panel-pad{padding:16px}.wf-metrics strong{font-size:1.4rem}.wf-shift{padding:20px}.wf-person summary{flex-direction:column;align-items:flex-start}}
 @media(prefers-reduced-motion:reduce){.aquatic-canvas{display:none}}
 
-/* Sunlit edition. Shared tokens and deliberately composed public journeys. */
-:root { --ink:#061a3b; --muted:#4c657b; --line:#d9e6ed; --gold:#ffc928; --aqua-soft:#e6f6fa; --shadow:0 20px 60px #061a3b0c; }
+/* Sunlit edition. Shared tokens live in styles.css :root; this layer composes public journeys. */
 body { color:var(--ink); }
 body .section { padding-block:96px; }
 body .btn { border-radius:999px; min-height:48px; padding-inline:24px; font-size:.84rem; }
 body .btn-primary { background:var(--gold); border-color:var(--gold); color:var(--ink); box-shadow:none; }
 body .btn-primary:hover { background:#ffda68; color:var(--ink); box-shadow:0 8px 22px #a17b1620; }
+body .btn:active, body .btn-primary:active { transform: scale(0.97); }
 body .btn-blue { background:#075b85; border-color:#075b85; }
 body .btn-soft { color:#075277; background:#e5f3f8; border-color:#cbe2ec; }
 body .eyebrow { font-size:.72rem; letter-spacing:.13em; color:#086181; }
@@ -504,13 +498,11 @@ body .footer-col strong { color:#fff; }
   .explore-layout .scene-scale { --scene-scale:.56; }
   .sunlit-portrait { height:340px; }
   body[data-page="home"] .immersive-hero h1 { font-size:2.9rem; }
-  .sunlit-caption-label { font-size:.62rem!important; }
+  .sunlit-portrait figcaption .sunlit-caption-label { font-size:.62rem; }
 }
 @media(prefers-reduced-motion:reduce) { .aquatic-canvas { display:none; } }
 /* Conditional content must not be resurrected by component display rules. */
-[hidden] { display:none !important; }
 .enrolment-hero .first-lesson-link { color:#d4f2ff; font-size:.8rem; }
-.hero-trust span::after { content:none !important; }
 body[data-page="shop"] .shop-hero::after { display:none; }
 
 /* Family preparation and recommendation details */
