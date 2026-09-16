@@ -15,31 +15,31 @@ importers:
     dependencies:
       '@capacitor/android':
         specifier: ^8.0.0
-        version: 8.5.0(@capacitor/core@8.5.0)
+        version: 8.5.0(@capacitor/core@8.5.2)
       '@capacitor/app':
         specifier: ^8.0.0
-        version: 8.1.1(@capacitor/core@8.5.0)
+        version: 8.1.1(@capacitor/core@8.5.2)
       '@capacitor/core':
-        specifier: ^8.0.0
-        version: 8.5.0
+        specifier: ^8.5.2
+        version: 8.5.2
       '@capacitor/geolocation':
         specifier: ^8.0.0
-        version: 8.2.2(@capacitor/core@8.5.0)
+        version: 8.2.2(@capacitor/core@8.5.2)
       '@capacitor/haptics':
         specifier: ^8.0.0
-        version: 8.0.2(@capacitor/core@8.5.0)
+        version: 8.0.2(@capacitor/core@8.5.2)
       '@capacitor/ios':
         specifier: ^8.0.0
-        version: 8.5.0(@capacitor/core@8.5.0)
+        version: 8.5.0(@capacitor/core@8.5.2)
       '@capacitor/network':
         specifier: ^8.0.0
-        version: 8.0.1(@capacitor/core@8.5.0)
+        version: 8.0.1(@capacitor/core@8.5.2)
       '@capacitor/splash-screen':
         specifier: ^8.0.0
-        version: 8.0.2(@capacitor/core@8.5.0)
+        version: 8.0.2(@capacitor/core@8.5.2)
       '@capacitor/status-bar':
         specifier: ^8.0.0
-        version: 8.0.3(@capacitor/core@8.5.0)
+        version: 8.0.3(@capacitor/core@8.5.2)
     devDependencies:
       '@capacitor/assets':
         specifier: ^3.0.5
@@ -75,8 +75,8 @@ packages:
     engines: {node: '>=22.0.0'}
     hasBin: true
 
-  '@capacitor/core@8.5.0':
-    resolution: {integrity: sha512-Ca4krtqH1hothjtBIwf2J2TW7IhYq1ujp8QeItTiJohNsqij8ja2DYYH3DU0l8RmxCWaBAFTGA2TgOgOMCSNsQ==}
+  '@capacitor/core@8.5.2':
+    resolution: {integrity: sha512-agnQbGdhGw/KZFuLf7H9SY2o+oE7upkr/WPQsYaokXP6f9chaE8iVmbKkfN6SVl4w3pmz7oZ3Ur1hbkmy1hx+w==}
 
   '@capacitor/geolocation@8.2.2':
     resolution: {integrity: sha512-X8ryw6CfL4LspJnnfVL4++DUKKZVfdUIA9JljWVRljEDIQxZQZtz6xf7qstht+ymc+le6oa5EaUChVA6KsCYlA==}
@@ -871,13 +871,13 @@ packages:
 
 snapshots:
 
-  '@capacitor/android@8.5.0(@capacitor/core@8.5.0)':
+  '@capacitor/android@8.5.0(@capacitor/core@8.5.2)':
     dependencies:
-      '@capacitor/core': 8.5.0
+      '@capacitor/core': 8.5.2
 
-  '@capacitor/app@8.1.1(@capacitor/core@8.5.0)':
+  '@capacitor/app@8.1.1(@capacitor/core@8.5.2)':
     dependencies:
-      '@capacitor/core': 8.5.0
+      '@capacitor/core': 8.5.2
 
   '@capacitor/assets@3.0.5(@types/node@26.4.0)':
     dependencies:
@@ -943,34 +943,34 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@capacitor/core@8.5.0':
+  '@capacitor/core@8.5.2':
     dependencies:
       tslib: 2.8.1
 
-  '@capacitor/geolocation@8.2.2(@capacitor/core@8.5.0)':
+  '@capacitor/geolocation@8.2.2(@capacitor/core@8.5.2)':
     dependencies:
-      '@capacitor/core': 8.5.0
+      '@capacitor/core': 8.5.2
       '@capacitor/synapse': 1.0.4
 
-  '@capacitor/haptics@8.0.2(@capacitor/core@8.5.0)':
+  '@capacitor/haptics@8.0.2(@capacitor/core@8.5.2)':
     dependencies:
-      '@capacitor/core': 8.5.0
+      '@capacitor/core': 8.5.2
 
-  '@capacitor/ios@8.5.0(@capacitor/core@8.5.0)':
+  '@capacitor/ios@8.5.0(@capacitor/core@8.5.2)':
     dependencies:
-      '@capacitor/core': 8.5.0
+      '@capacitor/core': 8.5.2
 
-  '@capacitor/network@8.0.1(@capacitor/core@8.5.0)':
+  '@capacitor/network@8.0.1(@capacitor/core@8.5.2)':
     dependencies:
-      '@capacitor/core': 8.5.0
+      '@capacitor/core': 8.5.2
 
-  '@capacitor/splash-screen@8.0.2(@capacitor/core@8.5.0)':
+  '@capacitor/splash-screen@8.0.2(@capacitor/core@8.5.2)':
     dependencies:
-      '@capacitor/core': 8.5.0
+      '@capacitor/core': 8.5.2
 
-  '@capacitor/status-bar@8.0.3(@capacitor/core@8.5.0)':
+  '@capacitor/status-bar@8.0.3(@capacitor/core@8.5.2)':
     dependencies:
-      '@capacitor/core': 8.5.0
+      '@capacitor/core': 8.5.2
 
   '@capacitor/synapse@1.0.4': {}
 
@@ -1123,7 +1123,7 @@ snapshots:
       debug: 4.3.4
       signal-exit: 3.0.7
       tree-kill: 1.2.2
-      tslib: 2.6.2
+      tslib: 2.8.1
     transitivePeerDependencies:
       - supports-color
 
@@ -1141,7 +1141,7 @@ snapshots:
   '@ionic/utils-stream@3.1.6':
     dependencies:
       debug: 4.3.4
-      tslib: 2.6.2
+      tslib: 2.8.1
     transitivePeerDependencies:
       - supports-color
 
@@ -1161,7 +1161,7 @@ snapshots:
       '@ionic/utils-terminal': 2.3.4
       cross-spawn: 7.0.6
       debug: 4.3.4
-      tslib: 2.6.2
+      tslib: 2.8.1
     transitivePeerDependencies:
       - supports-color
 
@@ -1186,7 +1186,7 @@ snapshots:
       slice-ansi: 4.0.0
       string-width: 4.2.3
       strip-ansi: 6.0.1
-      tslib: 2.6.2
+      tslib: 2.8.1
       untildify: 4.0.0
       wrap-ansi: 7.0.0
     transitivePeerDependencies:
