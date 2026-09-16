@@ -21,6 +21,7 @@ def production_settings(**changes):
         "xero_redirect_uri": "https://swim.example.test/api/integrations/xero/callback",
         "bootstrap_admin_email": "",
         "bootstrap_admin_password": "",
+        "trusted_proxies": ("203.0.113.50",),
     }
     values.update(changes)
     return replace(config.settings, **values)
@@ -59,6 +60,11 @@ def test_production_requires_a_separate_customer_data_encryption_key():
         server.validate_production_config(
             production_settings(data_encryption_key="a-unique-production-secret-with-32-plus-characters")
         )
+
+
+def test_production_requires_trusted_reverse_proxy_configuration():
+    with pytest.raises(RuntimeError, match="HV_TRUSTED_PROXIES"):
+        server.validate_production_config(production_settings(trusted_proxies=()))
 
 
 def test_production_requires_https_for_public_and_xero_urls():
@@ -127,6 +133,16 @@ def test_production_rejects_incomplete_or_insecure_social_signin_configuration()
                 apple_redirect_uri="http://swim.example.test/api/auth/oauth/apple/callback",
             )
         )
+
+
+def test_data_directory_and_database_use_restrictive_permissions(tmp_path, monkeypatch):
+    import stat
+
+    db_path = tmp_path / "secure-data" / "hv_swim.db"
+    monkeypatch.setattr(database, "DB_PATH", db_path)
+    database.initialise_database()
+    assert stat.S_IMODE(db_path.parent.stat().st_mode) == 0o700
+    assert stat.S_IMODE(db_path.stat().st_mode) == 0o600
 
 
 def test_empty_production_database_requires_and_uses_one_time_admin_bootstrap(tmp_path, monkeypatch):
