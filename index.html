@@ -8,6 +8,7 @@
   <meta property="og:title" content="HV Swim Bendigo | Confidence starts in the water">
   <meta property="og:description" content="Personal, inclusive swimming lessons from four months to adults in Bendigo.">
   <meta property="og:type" content="website">
+  <meta property="og:url" content="index.html">
   <meta property="og:site_name" content="HV Swim Bendigo">
   <meta property="og:locale" content="en_AU">
   <meta property="og:image" content="assets/og-share-v3.jpg">
@@ -17,10 +18,12 @@
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="HV Swim Bendigo | Confidence starts in the water">
   <meta name="twitter:description" content="Personal, inclusive swimming lessons from four months to adults in Bendigo.">
-  <meta name="twitter:image" content="assets/og-share-v3.jpg">  <title>HV Swim Bendigo | Confidence starts in the water</title>
+  <meta name="twitter:image" content="assets/og-share-v3.jpg">  <link rel="canonical" href="index.html">
+  <title>HV Swim Bendigo | Confidence starts in the water</title>
   <link rel="icon" href="assets/app-icon-v3-64.png">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="assets/app-icon-v3-180.png">
+  <link rel="preload" href="assets/fonts/manrope-latin-variable.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="assets/styles.css?v=5.13.0-ui21">
   <link rel="stylesheet" href="assets/support.css?v=5.13.0-ui21">
   <script defer src="assets/app.js?v=5.13.0-ui21"></script>
@@ -28,12 +31,13 @@
   <script defer src="assets/public-api.js?v=5.13.0-ui21"></script>
   <script type="application/ld+json">{
   "@context": "https://schema.org",
-  "@type": "SportsActivityLocation",
+  "@type": ["SportsActivityLocation", "LocalBusiness"],
   "name": "HV Swim Bendigo",
   "legalName": "HVS BENDIGO PTY LTD",
-  "taxID": "ABN 46 687 937 962",
+  "taxID": "46687937962",
+  "identifier": {"@type": "PropertyValue", "name": "ABN", "value": "46 687 937 962"},
   "description": "Confidence-first swimming lessons for infants, children, teens and adults in Bendigo.",
-  "telephone": "+61 413 462 112",
+  "telephone": "+61413462112",
   "email": "bendigo@hvswimschool.com",
   "address": {
     "@type": "PostalAddress",
@@ -43,13 +47,8 @@
     "postalCode": "3556",
     "addressCountry": "AU"
   },
-  "areaServed": {
-    "@type": "City",
-    "name": "Bendigo"
-  },
-  "sameAs": [
-    "https://www.facebook.com/hvswimschoolbendigo"
-  ]
+  "areaServed": {"@type": "City", "name": "Bendigo"},
+  "sameAs": ["https://www.facebook.com/hvswimschoolbendigo"]
 }</script>
   <link rel="stylesheet" href="assets/experience.css?v=5.13.0-ui21">
   <script defer src="assets/experience.js?v=5.13.0-ui21"></script>
@@ -118,7 +117,7 @@
       </aside>
     </section>
 
-    <div class="container feature-strip reveal">
+    <div class="container feature-strip reveal" role="region" aria-label="Program benefits">
       <div class="card">
         <div class="feature-item"><span class="icon-box" aria-hidden="true">≈</span><div><strong>Water-safety first</strong><span>Skills that support confidence for life</span></div></div>
         <div class="feature-item"><span class="icon-box" aria-hidden="true">1:1</span><div><strong>Personal teaching</strong><span>Small groups and private tuition</span></div></div>
@@ -185,7 +184,7 @@
               <div class="pool-float float-gold"><span></span></div><div class="pool-float float-coral"><span></span></div><div class="pool-float float-aqua"><span></span></div>
               <div class="pool-board board-one"></div><div class="pool-board board-two"></div>
               <div class="pool-ladder"></div>
-              <div class="pool-sign"><img src="assets/hv-swim-mark-v3.png" width="65" height="65" alt=""><span>Every splash<br>is a start.</span></div>
+              <div class="pool-sign"><img src="assets/hv-swim-mark-v3.png" width="65" height="65" alt="" aria-hidden="true"><span>Every splash<br>is a start.</span></div>
             </div></div>
             <span class="scene-spark spark-one" aria-hidden="true">✦</span><span class="scene-spark spark-two" aria-hidden="true">✦</span>
             <span class="scene-drag-hint" id="pool-controls-help">Drag to explore · arrow keys to rotate</span>
