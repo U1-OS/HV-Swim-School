@@ -3,13 +3,25 @@
 Andrew swaps between Claude and Codex. Read this first and rewrite it last.
 
 **Wheel:** Cursor Cloud Agent
-**Last updated:** 2026-09-16 — PR #4 merged (session idle limits, enquiry encryption/retention, admin step-up on create-account and temporary-password; portal UI wired in `assets/platform.js`)
+**Last updated:** 2026-09-16 — PR #4 merged on main; PR #17 public-site upgrade (a11y, SEO, CSS tokens, WebP, PWA) rebased onto main
 
-The working directory was missing on arrival. Restored the exact private GitHub main
-commit `676094ff874af6c2bd6fb5ff98fef979367773bc` into the empty local Developer path.
-This restored source only; no previous private runtime database was present or recovered.
+## Current work — public-site upgrade
 
-## Current work — UI21 launch preparation
+Branch `cursor/public-site-upgrade-6638` rebased onto latest `main` (`8931b9d`). In-place public HTML/CSS/JS upgrade; **backend/ was not touched**. A former instructor stays off the site.
+
+- PWA: sign-in and role shells are network-only; runtime cache buckets are generation 24.
+- Accessibility: enquiry errors `aria-describedby`, login recovery `for`/`id`, skip-links `:focus-visible`, table `scope`, decorative marks hidden from AT.
+- SEO: relative canonical + `og:url` on public pages (absolute URLs still come from `build-sitemap.mjs` once a domain exists). Portal shells have `noindex,nofollow`. JSON-LD is `SportsActivityLocation` + `LocalBusiness` aligned with `BUSINESS_DETAILS.md` (entity, ABN digits in `taxID`, Wood Street, email).
+- CSS: one `:root` token set from `BRAND_GUIDE.md` (`#061A3B`, `#008CCB`, `#19C8F4`, `#FFC928`). Public `!important` override fights removed; reduced-motion and `[hidden]` keep `!important` on purpose.
+- Images: photo WebP + JPEG/PNG fallback; logos are lossless WebP. Asset query is `5.13.0-ui22`.
+- Static server: `python3 -m http.server 3000 --bind 0.0.0.0` (tmux `hv-swim-static-3000`). Chrome on `DISPLAY=:1` stays on the homepage.
+
+### Next up
+
+Andrew review of the draft PR. When a production domain is bought, run `node scripts/build-sitemap.mjs https://<domain>` so canonicals, `og:image` and `robots.txt` Sitemap become absolute. Do not restore removed staff names. Do not enable live integrations without approval.
+
+## Previous work — UI21 launch preparation
+
 
 Andrew selected all five next steps and confirmed no domain or hosting account yet.
 Repository visibility is now PUBLIC by Andrew's action. Continue pushing verified source;

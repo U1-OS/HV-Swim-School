@@ -181,13 +181,26 @@
     const submitLabel = context?.submit || 'Sign in securely';
     // Bind credentials before optional provider requests; slow configuration must not
     // leave this form falling back to browser navigation.
+    const bindLoginError = (message) => {
+      error.textContent = message || '';
+      if (message) {
+        error.classList.add('show');
+        email.setAttribute('aria-describedby', 'login-error');
+        password.setAttribute('aria-describedby', 'login-error');
+        email.focus?.({ preventScroll: true });
+      } else {
+        error.classList.remove('show');
+        email.removeAttribute?.('aria-describedby');
+        password.removeAttribute?.('aria-describedby');
+      }
+    };
     form.addEventListener('submit', async event => {
-      event.preventDefault(); error.classList.remove('show'); submit.disabled = true; submit.textContent = 'Signing in…';
+      event.preventDefault(); bindLoginError(''); submit.disabled = true; submit.textContent = 'Signing in…';
       try {
         await api('/api/auth/login',{method:'POST',body:JSON.stringify({email:email.value,password:password.value,code:document.getElementById('login-code')?.value||''})});
         location.href = 'platform.html';
       } catch (problem) {
-        error.textContent = problem.message; error.classList.add('show'); submit.disabled = false; submit.textContent = submitLabel;
+        bindLoginError(problem.message); submit.disabled = false; submit.textContent = submitLabel;
       }
     });
     const redemption=new URLSearchParams((location.hash||'').slice(1));
@@ -216,7 +229,7 @@
       document.title = context.title;
     }
     const oauthError = oauthErrors[search.get('oauth_error')];
-    if (oauthError) { error.textContent = oauthError; error.classList.add('show'); }
+    if (oauthError) bindLoginError(oauthError);
     const social = document.getElementById('social-signin');
     const divider = document.getElementById('signin-divider');
     if (requestedRole === 'staff' || requestedRole === 'admin') {

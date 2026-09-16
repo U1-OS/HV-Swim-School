@@ -8,25 +8,28 @@
 }
 
 :root {
-  --ink: #06142d;
-  --navy: #071d42;
+  /* Brand tokens — BRAND_GUIDE.md. One source of truth; later stylesheets must not redeclare these. */
+  --ink: #061a3b;
+  --navy: #061a3b;
   --navy-2: #0a2858;
-  --blue: #0066ff;
+  --blue: #008ccb;
+  --ocean: #008ccb;
   --cyan: #19c8f4;
   --cyan-soft: #dff8ff;
-  --gold: #ffc107;
+  --gold: #ffc928;
   --orange: #ff8a18;
   --white: #ffffff;
-  --paper: #f5f8fc;
-  --muted: #60708a;
-  --line: #dce6f1;
+  --paper: #f5fafc;
+  --muted: #4c657b;
+  --line: #d9e6ed;
   --green: #22a06b;
   --red: #d94c56;
-  --shadow: 0 24px 70px rgba(3, 21, 51, .12);
-  --shadow-sm: 0 12px 34px rgba(3, 21, 51, .08);
-  --radius: 26px;
+  --shadow: 0 20px 60px #061a3b0c;
+  --shadow-sm: 0 8px 25px #1538420b;
+  --radius: 24px;
   --radius-sm: 16px;
-  --container: min(1180px, calc(100% - 40px));
+  --container: min(1280px, calc(100% - 80px));
+  --aqua-soft: #e6f6fa;
 }
 
 * { box-sizing: border-box; }
@@ -74,7 +77,7 @@ p { margin: 0; }
 .gold { color: var(--gold); }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 .skip-link { position:fixed; z-index:999; left:16px; top:12px; padding:10px 14px; border-radius:10px; color:#061a3b; background:var(--gold); font-size:.75rem; font-weight:900; transform:translateY(-160%); transition:transform .18s ease; }
-.skip-link:focus { transform:none; }
+.skip-link:focus-visible { transform:none; }
 :focus-visible { outline:3px solid #24cef4; outline-offset:3px; }
 
 /* Navigation */
@@ -147,7 +150,7 @@ p { margin: 0; }
 
 /* Hero */
 .hero { position: relative; min-height: 760px; color: white; display: grid; align-items: center; overflow: hidden; background: #03132e; }
-.hero::before { content:""; position:absolute; inset:0; background: linear-gradient(90deg, rgba(3,14,36,.98) 2%, rgba(3,18,44,.86) 37%, rgba(3,20,46,.24) 65%, rgba(3,18,42,.22)), url("hero-swimmer.jpg") center/cover no-repeat; transform: scale(1.02); animation: heroDrift 15s ease-in-out infinite alternate; }
+.hero::before { content:""; position:absolute; inset:0; background: linear-gradient(90deg, rgba(3,14,36,.98) 2%, rgba(3,18,44,.86) 37%, rgba(3,20,46,.24) 65%, rgba(3,18,42,.22)), image-set(url("hero-swimmer.webp") type("image/webp"), url("hero-swimmer.jpg") type("image/jpeg")) center/cover no-repeat; transform: scale(1.02); animation: heroDrift 15s ease-in-out infinite alternate; }
 .hero::after { content:""; position:absolute; inset:auto 0 0; height:180px; background:linear-gradient(180deg, transparent, rgba(1,11,27,.9)); }
 .hero-glow { position:absolute; left:-14vw; top:-25vw; width:60vw; height:60vw; border-radius:50%; background:radial-gradient(circle, rgba(0,157,255,.18), transparent 63%); }
 .hero-caustics { position:absolute; z-index:1; inset:-20%; opacity:.16; mix-blend-mode:screen; pointer-events:none; background:repeating-radial-gradient(ellipse at 72% 32%,transparent 0 28px,rgba(116,226,255,.4) 30px 31px,transparent 33px 68px); transform:rotate(-8deg); animation:causticFloat 13s ease-in-out infinite alternate; }
@@ -236,7 +239,7 @@ p { margin: 0; }
 .loading-card span:nth-child(2){width:72%;height:28px;margin-top:42px}.loading-card span:nth-child(3){width:48%;margin-top:auto}
 .about-layout { display:grid; grid-template-columns:1fr 1.1fr; gap:70px; align-items:center; }
 .photo-panel { position:relative; min-height:520px; border-radius:34px; background:linear-gradient(150deg,#082a59,#004e93); overflow:hidden; box-shadow:var(--shadow); }
-.photo-panel::before { content:""; position:absolute; inset:0; background:url("hero-swimmer.jpg") 66% center/auto 100% no-repeat; opacity:.9; }
+.photo-panel::before { content:""; position:absolute; inset:0; background:image-set(url("hero-swimmer.webp") type("image/webp"), url("hero-swimmer.jpg") type("image/jpeg")) 66% center/auto 100% no-repeat; opacity:.9; }
 .photo-panel::after { content:""; position:absolute; inset:0; background:linear-gradient(0deg,rgba(3,15,35,.7),transparent 65%); }
 .photo-caption { position:absolute; z-index:2; left:25px; right:25px; bottom:25px; padding:18px 20px; border:1px solid rgba(255,255,255,.17); border-radius:18px; color:white; background:rgba(4,21,45,.62); backdrop-filter:blur(14px); }
 .photo-caption strong { display:block; }
@@ -395,7 +398,7 @@ p { margin: 0; }
 .shop-launch-bar span:nth-of-type(2) { color:#4f4522; }
 .shop-launch-bar a { margin-left:auto; font-weight:900; }
 .shop-hero { position:relative; min-height:690px; display:grid; align-items:center; color:white; overflow:hidden; background:#051630; }
-.shop-hero-image { position:absolute; inset:0; background:linear-gradient(90deg,rgba(3,16,38,.99) 0%,rgba(3,21,47,.9) 38%,rgba(3,21,47,.16) 76%),url("merch-uniform-studio-v3.jpg") 69% center/cover no-repeat; transform:scale(1.02); animation:heroDrift 15s ease-in-out infinite alternate; }
+.shop-hero-image { position:absolute; inset:0; background:linear-gradient(90deg,rgba(3,16,38,.99) 0%,rgba(3,21,47,.9) 38%,rgba(3,21,47,.16) 76%),image-set(url("merch-uniform-studio-v3.webp") type("image/webp"), url("merch-uniform-studio-v3.jpg") type("image/jpeg")) 69% center/cover no-repeat; transform:scale(1.02); animation:heroDrift 15s ease-in-out infinite alternate; }
 .shop-hero::after { content:""; position:absolute; inset:auto 0 0; height:170px; background:linear-gradient(transparent,#051630); }
 .shop-hero-content { position:relative; z-index:2; padding:100px 0 130px; }
 .shop-hero-layout { display:grid; grid-template-columns:minmax(0,1.2fr) minmax(290px,.55fr); gap:75px; align-items:center; }
@@ -465,8 +468,8 @@ p { margin: 0; }
 .shop-card:hover { transform:translateY(-7px); box-shadow:0 30px 70px rgba(3,28,59,.14); }
 .shop-product-visual { position:relative; width:100%; aspect-ratio:1.22; padding:0; overflow:hidden; border:0; background:#06234b; }
 .shop-product-visual img { width:100%; height:100%; object-fit:cover; }
-.shop-product-crop { position:absolute; inset:0; background-image:linear-gradient(145deg,rgba(2,20,47,.08),rgba(4,42,78,.06)),url("merch-collection-v2.jpg"); background-repeat:no-repeat; background-size:235%; transition:transform .4s cubic-bezier(.2,.8,.2,1); }
-.shop-product-crop.uniform-studio-crop { background-image:linear-gradient(145deg,rgba(2,20,47,.02),rgba(4,42,78,.03)),url("merch-uniform-studio-v3.jpg"); background-size:210%; }
+.shop-product-crop { position:absolute; inset:0; background-image:linear-gradient(145deg,rgba(2,20,47,.08),rgba(4,42,78,.06)),image-set(url("merch-collection-v2.webp") type("image/webp"), url("merch-collection-v2.jpg") type("image/jpeg")); background-repeat:no-repeat; background-size:235%; transition:transform .4s cubic-bezier(.2,.8,.2,1); }
+.shop-product-crop.uniform-studio-crop { background-image:linear-gradient(145deg,rgba(2,20,47,.02),rgba(4,42,78,.03)),image-set(url("merch-uniform-studio-v3.webp") type("image/webp"), url("merch-uniform-studio-v3.jpg") type("image/jpeg")); background-size:210%; }
 .shop-card:hover .shop-product-crop { transform:scale(1.045); }
 .shop-quick-view { position:absolute; right:14px; bottom:14px; min-height:30px; padding:6px 10px; border-radius:9px; color:#0a3650; background:rgba(255,255,255,.92); font-size:.58rem; font-weight:900; opacity:0; transform:translateY(7px); transition:.22s; }
 .shop-card:hover .shop-quick-view,.shop-product-visual:focus-visible .shop-quick-view { opacity:1; transform:none; }
@@ -621,7 +624,7 @@ p { margin: 0; }
 
 /* Programs and pricing */
 .programs-hero { position:relative; min-height:720px; display:grid; align-items:center; overflow:hidden; color:white; background:radial-gradient(circle at 77% 30%,#0a6592 0,transparent 23%),linear-gradient(118deg,#031229 0%,#062857 52%,#064978 100%); }
-.programs-hero::before { content:""; position:absolute; inset:0; opacity:.18; background:url("hero-swimmer.jpg") 88% center/auto 108% no-repeat; filter:saturate(.7) contrast(1.1); }
+.programs-hero::before { content:""; position:absolute; inset:0; opacity:.18; background:image-set(url("hero-swimmer.webp") type("image/webp"), url("hero-swimmer.jpg") type("image/jpeg")) 88% center/auto 108% no-repeat; filter:saturate(.7) contrast(1.1); }
 .programs-hero::after { content:""; position:absolute; inset:0; background:linear-gradient(90deg,rgba(2,14,34,.55),transparent 72%); }
 .programs-hero-water { position:absolute; z-index:1; inset:-20%; opacity:.18; background:repeating-radial-gradient(ellipse at 75% 42%,transparent 0 29px,rgba(133,235,255,.42) 31px 32px,transparent 34px 70px); transform:rotate(-7deg); animation:causticFloat 14s ease-in-out infinite alternate; }
 .programs-hero-grid { position:relative; z-index:3; display:grid; grid-template-columns:minmax(0,1.25fr) minmax(300px,.55fr); gap:80px; align-items:center; padding:100px 0 130px; }
@@ -697,7 +700,7 @@ p { margin: 0; }
 
 /* Guided enrolment concierge */
 .enrolment-hero { position:relative; min-height:680px; display:grid; align-items:center; overflow:hidden; color:white; background:radial-gradient(circle at 79% 32%,#096594 0,transparent 27%),linear-gradient(120deg,#031329,#062957 57%,#064875); }
-.enrolment-hero::before { content:""; position:absolute; inset:0; opacity:.16; background:url("hero-swimmer.jpg") 86% center/auto 112% no-repeat; filter:saturate(.7); }
+.enrolment-hero::before { content:""; position:absolute; inset:0; opacity:.16; background:image-set(url("hero-swimmer.webp") type("image/webp"), url("hero-swimmer.jpg") type("image/jpeg")) 86% center/auto 112% no-repeat; filter:saturate(.7); }
 .enrolment-hero::after { content:""; position:absolute; inset:0; background:linear-gradient(90deg,rgba(2,14,34,.62),transparent 75%); }
 .enrolment-hero-water { position:absolute; z-index:1; inset:-20%; opacity:.16; background:repeating-radial-gradient(ellipse at 74% 45%,transparent 0 30px,rgba(131,234,255,.4) 32px 33px,transparent 35px 72px); transform:rotate(-7deg); animation:causticFloat 14s ease-in-out infinite alternate; }
 .enrolment-hero-grid { position:relative; z-index:3; display:grid; grid-template-columns:minmax(0,1.15fr) minmax(300px,.55fr); gap:75px; align-items:center; padding:90px 0 125px; }
@@ -807,7 +810,19 @@ p { margin: 0; }
 .consent-check input { margin-top:3px; accent-color:#0878a8; }
 .wizard-error { min-height:24px; margin-top:13px; color:#a23b47; font-size:.65rem; font-weight:750; }
 /* "Please fill in X" has to actually point at something, so mark the field it means. */
-.field-invalid, input.field-invalid, select.field-invalid, textarea.field-invalid { border-color:#c0414f !important; box-shadow:0 0 0 3px rgba(192,65,79,.14); }
+.field-invalid,
+input.field-invalid,
+select.field-invalid,
+textarea.field-invalid,
+.input.field-invalid:focus,
+select.field-invalid:focus,
+textarea.field-invalid:focus,
+body:not([data-platform-page]) .input.field-invalid:focus,
+body:not([data-platform-page]) select.field-invalid:focus,
+body:not([data-platform-page]) textarea.field-invalid:focus {
+  border-color: #c0414f;
+  box-shadow: 0 0 0 3px rgba(192, 65, 79, .14);
+}
 fieldset.field-invalid { border-radius:13px; outline:2px solid #c0414f; outline-offset:4px; }
 .wizard-actions { display:flex; justify-content:space-between; gap:12px; margin-top:10px; padding-top:20px; border-top:1px solid var(--line); }
 .wizard-actions .btn:last-child { margin-left:auto; }
@@ -828,7 +843,7 @@ fieldset.field-invalid { border-radius:13px; outline:2px solid #c0414f; outline-
 
 /* About and teaching approach */
 .about-hero { position:relative; min-height:720px; display:grid; grid-template-columns:minmax(0,1fr); align-items:center; overflow:hidden; color:white; background:#03142e; }
-.about-hero-image { position:absolute; inset:0; background:linear-gradient(90deg,rgba(2,14,34,.98) 0%,rgba(3,24,50,.82) 43%,rgba(3,25,51,.2) 75%),url("hero-swimmer.jpg") 68% center/cover no-repeat; animation:heroDrift 16s ease-in-out infinite alternate; }
+.about-hero-image { position:absolute; inset:0; background:linear-gradient(90deg,rgba(2,14,34,.98) 0%,rgba(3,24,50,.82) 43%,rgba(3,25,51,.2) 75%),image-set(url("hero-swimmer.webp") type("image/webp"), url("hero-swimmer.jpg") type("image/jpeg")) 68% center/cover no-repeat; animation:heroDrift 16s ease-in-out infinite alternate; }
 .about-hero::after { content:""; position:absolute; inset:auto 0 0; height:190px; background:linear-gradient(transparent,rgba(2,14,34,.88)); }
 .about-hero-content { position:relative; z-index:2; padding:100px 0 135px; }
 .about-hero-content > div { max-width:760px; }
@@ -844,7 +859,7 @@ fieldset.field-invalid { border-radius:13px; outline:2px solid #c0414f; outline-
 .about-principles p { margin-top:7px; color:var(--muted); font-size:.64rem; }
 .about-story-grid { display:grid; grid-template-columns:.9fr 1.1fr; gap:75px; align-items:center; }
 .about-portrait { position:relative; min-height:570px; overflow:hidden; border-radius:32px; background:linear-gradient(145deg,#073661,#0081ac); box-shadow:var(--shadow); }
-.about-portrait::before { content:""; position:absolute; inset:0; opacity:.93; background:url("hero-swimmer.jpg") 62% center/auto 108% no-repeat; }
+.about-portrait::before { content:""; position:absolute; inset:0; opacity:.93; background:image-set(url("hero-swimmer.webp") type("image/webp"), url("hero-swimmer.jpg") type("image/jpeg")) 62% center/auto 108% no-repeat; }
 .about-portrait::after { content:""; position:absolute; inset:0; background:linear-gradient(0deg,rgba(2,16,36,.82),transparent 58%); }
 .about-portrait-caption { position:absolute; z-index:2; left:24px; right:24px; bottom:24px; padding:17px; border:1px solid rgba(255,255,255,.17); border-radius:16px; color:white; background:rgba(3,20,43,.65); backdrop-filter:blur(14px); }
 .about-portrait-caption span,.about-portrait-caption strong { display:block; }
@@ -1295,28 +1310,14 @@ textarea { min-height:82px; padding-top:11px; resize:vertical; }
    screens or their interaction states.
    -------------------------------------------------------------------------- */
 body:not([data-platform-page]) {
-  --ink:#071a33;
-  --navy:#061a38;
-  --navy-2:#0a2b55;
-  --blue:#0868e8;
-  --cyan:#35c8e8;
-  --cyan-soft:#e4f8fc;
-  --gold:#ffc94d;
-  --paper:#f4f7fa;
-  --muted:#5d7185;
-  --line:#dbe5ed;
-  --shadow:0 24px 65px rgba(5,30,61,.1);
-  --shadow-sm:0 10px 34px rgba(5,30,61,.075);
-  --radius:24px;
-  --radius-sm:15px;
-  color:var(--ink);
+  color: var(--ink);
   background:
-    radial-gradient(circle at 96% 8%,rgba(53,200,232,.055),transparent 24rem),
+    radial-gradient(circle at 96% 8%, rgba(25, 200, 244, .055), transparent 24rem),
     var(--paper);
-  font-family:"Manrope",ui-sans-serif,"Segoe UI",system-ui,sans-serif;
-  font-size:16px;
-  line-height:1.65;
-  text-rendering:optimizeLegibility;
+  font-family: "Manrope", ui-sans-serif, "Segoe UI", system-ui, sans-serif;
+  font-size: 16px;
+  line-height: 1.65;
+  text-rendering: optimizeLegibility;
 }
 body:not([data-platform-page]) ::selection { color:#031a38; background:#9ceaf8; }
 body:not([data-platform-page]) h1,
@@ -1433,7 +1434,7 @@ body[data-page="home"] .hero::before {
   background:
     linear-gradient(90deg,rgba(3,15,35,.98) 0%,rgba(3,21,48,.84) 42%,rgba(3,23,48,.14) 72%),
     linear-gradient(0deg,rgba(2,15,35,.56),transparent 52%),
-    url("hero-swimmer.jpg") 58% center/cover no-repeat;
+    image-set(url("hero-swimmer.webp") type("image/webp"), url("hero-swimmer.jpg") type("image/jpeg")) 58% center/cover no-repeat;
   animation-duration:24s;
 }
 body[data-page="home"] .hero::after { height:210px; background:linear-gradient(180deg,transparent,rgba(2,14,33,.78)); }
@@ -1736,7 +1737,7 @@ body:not([data-platform-page]) .reveal { transform:translateY(18px); transition-
   body:not([data-platform-page]) .about-hero-image {
     background:
       linear-gradient(90deg,rgba(2,14,34,.98) 0%,rgba(3,24,50,.9) 56%,rgba(3,25,51,.34) 100%),
-      url("hero-swimmer.jpg") 74% center/cover no-repeat;
+      image-set(url("hero-swimmer.webp") type("image/webp"), url("hero-swimmer.jpg") type("image/jpeg")) 74% center/cover no-repeat;
   }
   body:not([data-platform-page]) .programs-hero-copy > p,
   body:not([data-platform-page]) .enrolment-hero-grid > div > p,
@@ -1819,7 +1820,6 @@ body:not([data-platform-page]) .program-card:nth-child(4)::before { background:r
 .facebook-section-compact .facebook-feed-card { min-height:330px; }
 .country-acknowledgement { padding-block:52px; }
 .footer-business-identity { padding:18px 0 0; border-top:1px solid rgba(255,255,255,.1); color:#9fb5c8; font-size:.58rem; line-height:1.5; }
-[hidden] { display:none !important; }
 @media(max-width:700px) {
   body:not([data-platform-page]) .location-detail .location-visual { min-width:0; min-height:320px; display:block; padding:22px; }
   body:not([data-platform-page]) .location-detail .condition-fallback { position:absolute; top:104px; left:22px; right:22px; width:auto; max-width:none; }
@@ -1835,10 +1835,10 @@ body:not([data-platform-page]) .program-card:nth-child(4)::before { background:r
 }
 
 @media print {
-  body:not([data-platform-page]) .reveal { opacity:1!important; transform:none!important; animation:none!important; }
+  body:not([data-platform-page]) .reveal { opacity:1; transform:none; animation:none; }
   body:not([data-platform-page]) .site-header { position:static; }
   body:not([data-platform-page]) .mobile-book-bar,
-  body:not([data-platform-page]) .shop-mobile-bar { display:none!important; }
+  body:not([data-platform-page]) .shop-mobile-bar { display:none; }
 }
 
 /* V5.4 — truthful live states, distinct campaign imagery and a stronger trust-led footer. */
@@ -1860,24 +1860,24 @@ body:not([data-platform-page]) .programs-hero::before {
   opacity:1;
   background:
     linear-gradient(90deg,rgba(2,13,31,.98) 0%,rgba(3,23,48,.91) 43%,rgba(3,25,51,.36) 72%,rgba(3,25,51,.12) 100%),
-    url("hero-programs-v4.jpg") 72% center/cover no-repeat;
+    image-set(url("hero-programs-v4.webp") type("image/webp"), url("hero-programs-v4.jpg") type("image/jpeg")) 72% center/cover no-repeat;
   filter:saturate(.9) contrast(1.03);
 }
 body:not([data-platform-page]) .enrolment-hero::before {
   opacity:1;
   background:
     linear-gradient(90deg,rgba(2,13,31,.98) 0%,rgba(3,23,48,.91) 43%,rgba(3,25,51,.35) 72%,rgba(3,25,51,.1) 100%),
-    url("hero-enquire-v4.jpg") 72% center/cover no-repeat;
+    image-set(url("hero-enquire-v4.webp") type("image/webp"), url("hero-enquire-v4.jpg") type("image/jpeg")) 72% center/cover no-repeat;
   filter:saturate(.9) contrast(1.03);
 }
 body:not([data-platform-page]) .about-hero-image {
   background:
     linear-gradient(90deg,rgba(2,14,34,.98) 0%,rgba(3,24,50,.9) 45%,rgba(3,25,51,.28) 75%,rgba(3,25,51,.08) 100%),
-    url("hero-about-v4-female.jpg") 72% center/cover no-repeat;
+    image-set(url("hero-about-v4-female.webp") type("image/webp"), url("hero-about-v4-female.jpg") type("image/jpeg")) 72% center/cover no-repeat;
 }
 body:not([data-platform-page]) .about-portrait::before {
   opacity:.95;
-  background:url("hero-about-v4-female.jpg") 70% center/cover no-repeat;
+  background:image-set(url("hero-about-v4-female.webp") type("image/webp"), url("hero-about-v4-female.jpg") type("image/jpeg")) 70% center/cover no-repeat;
 }
 
 @media (max-width:700px) {
@@ -2148,14 +2148,6 @@ body:not([data-platform-page]) .country-copy a:hover { color:white; }
 }
 
 /* V5.10 premium public UI: a restrained editorial layer shared by every public page. */
-:root {
-  --paper:#f2f6f9;
-  --line:#d8e4ec;
-  --shadow:0 26px 72px rgba(3,24,52,.13);
-  --shadow-sm:0 13px 38px rgba(3,24,52,.085);
-  --radius:28px;
-  --container:min(1220px,calc(100% - 48px));
-}
 body:not([data-platform-page]) {
   background:radial-gradient(circle at 9% 19%,rgba(25,200,244,.055),transparent 25rem),linear-gradient(180deg,#f6f9fb 0,#f2f6f9 38%,#f5f8fa 100%);
 }
@@ -2192,7 +2184,7 @@ body:not([data-platform-page]) .btn-primary { background:linear-gradient(135deg,
 body:not([data-platform-page]) .btn-primary:hover { transform:translateY(-3px); box-shadow:0 18px 40px rgba(255,183,7,.34),0 1px 0 rgba(255,255,255,.55) inset; }
 
 body[data-page="home"] .hero { min-height:730px; background:#02122d; }
-body[data-page="home"] .hero::before { background:linear-gradient(90deg,rgba(2,13,34,.99) 0%,rgba(3,19,45,.9) 35%,rgba(3,20,46,.35) 63%,rgba(3,18,42,.16)),url("hero-swimmer.jpg") 58% center/cover no-repeat; filter:saturate(1.05) contrast(1.02); }
+body[data-page="home"] .hero::before { background:linear-gradient(90deg,rgba(2,13,34,.99) 0%,rgba(3,19,45,.9) 35%,rgba(3,20,46,.35) 63%,rgba(3,18,42,.16)),image-set(url("hero-swimmer.webp") type("image/webp"), url("hero-swimmer.jpg") type("image/jpeg")) 58% center/cover no-repeat; filter:saturate(1.05) contrast(1.02); }
 body[data-page="home"] .hero::after { height:240px; background:linear-gradient(180deg,transparent,rgba(1,10,27,.94)); }
 body[data-page="home"] .hero-content { padding:92px 0 142px; }
 body[data-page="home"] .hero-copy { max-width:760px; }
@@ -2332,7 +2324,7 @@ body:not([data-platform-page]) .site-footer { border-top:1px solid rgba(118,208,
   transform: translateX(100%);
 }
 .btn:active {
-  transform: scale(0.97) !important;
+  transform: scale(0.97);
 }
 
 /* Interactive Term Fee & Absence Credit Calculator */
@@ -2596,7 +2588,7 @@ body:not([data-platform-page]) .site-footer { border-top:1px solid rgba(118,208,
   body:not([data-platform-page]) .section { padding:72px 0; }
   body:not([data-platform-page]) .section-head { margin-bottom:31px; }
   body[data-page="home"] .hero { min-height:710px; }
-  body[data-page="home"] .hero::before { background:linear-gradient(90deg,rgba(2,13,34,.96),rgba(3,19,45,.79)),url("hero-swimmer.jpg") 65% center/cover no-repeat; }
+  body[data-page="home"] .hero::before { background:linear-gradient(90deg,rgba(2,13,34,.96),rgba(3,19,45,.79)),image-set(url("hero-swimmer.webp") type("image/webp"), url("hero-swimmer.jpg") type("image/jpeg")) 65% center/cover no-repeat; }
   body[data-page="home"] .hero-content { padding:74px 0 135px; }
   body[data-page="home"] .hero h1 { font-size:clamp(3rem,14vw,4.65rem); }
   body[data-page="home"] .hero .intro { font-size:.97rem; line-height:1.65; }
