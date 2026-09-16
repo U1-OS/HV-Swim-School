@@ -240,6 +240,9 @@
 .run-main p,.waitlist-person p,.waitlist-person a { color:#496479; }
 .platform-head p,.panel-head p,.api-row span { font-size:.7rem; }
 .readiness-top span:first-child,.readiness-reading span,.readiness-flags span,.run-time span,.run-main span,.run-main p,.run-capacity span,.schedule-card p,.schedule-card small,.waitlist-person span,.waitlist-person p,.waitlist-person a,.waitlist-class span { font-size:.62rem; }
+.admin-step-up { margin:14px 0 0; padding:14px 16px; border:1px solid #d8e3ec; border-radius:13px; background:#f7fafc; }
+.admin-step-up legend { margin-bottom:6px; color:#154c69; font-size:.72rem; font-weight:850; }
+.admin-step-up .micro { margin:0 0 10px; color:#516779; line-height:1.55; }
 .security-guidance { padding:14px 16px; display:grid; gap:4px; border:1px solid #b9dce8; border-radius:13px; color:#154c69; background:#edf9fc; }
 .security-guidance strong { font-size:.72rem; }
 .security-guidance span { color:#41677a; font-size:.66rem; line-height:1.55; }

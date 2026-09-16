@@ -650,6 +650,15 @@ def migrate_legacy_bookings_table(db: sqlite3.Connection) -> None:
         raise RuntimeError("Booking history migration failed its foreign-key check")
 
 
+def purge_expired_enquiries(db: sqlite3.Connection) -> int:
+    """Delete public enquiries past the six-month retention window. Returns rows removed."""
+    from .security import ENQUIRY_RETENTION_DAYS
+
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=ENQUIRY_RETENTION_DAYS)).isoformat()
+    cursor = db.execute("DELETE FROM enquiries WHERE created_at<=?", (cutoff,))
+    return cursor.rowcount
+
+
 def initialise_database() -> None:
     ensure_private_directory(DB_PATH.parent)
     with db_session() as db:
@@ -664,10 +673,11 @@ def initialise_database() -> None:
         # grow or retain these rows indefinitely.
         login_cutoff = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
         db.execute("DELETE FROM login_attempts WHERE created_at<=?", (login_cutoff,))
-        # Public lesson enquiries are kept for six months under the confirmed business
-        # policy. Enrolled-family and ticket records have separate operational purposes.
-        enquiry_cutoff = (datetime.now(timezone.utc) - timedelta(days=183)).isoformat()
-        db.execute("DELETE FROM enquiries WHERE created_at<=?", (enquiry_cutoff,))
+        purge_expired_enquiries(db)
+        session_columns = {row[1] for row in db.execute("PRAGMA table_info(sessions)")}
+        if "last_seen_at" not in session_columns:
+            db.execute("ALTER TABLE sessions ADD COLUMN last_seen_at TEXT")
+            db.execute("UPDATE sessions SET last_seen_at=created_at WHERE last_seen_at IS NULL")
         # Database-level guards against double booking. Application code already checks,
         # but two requests arriving together can both pass that check before either writes.
         # Created defensively: an older database containing duplicates must not stop startup.

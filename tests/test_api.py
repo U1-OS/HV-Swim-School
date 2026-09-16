@@ -1199,6 +1199,7 @@ def test_management_can_provision_a_family_and_swimmer_with_a_forced_password_ch
             "first_name": "Morgan",
             "last_name": "Lee",
             "phone": "0400 111 222",
+            "password": ADMIN[1],
         },
         headers={"X-CSRF-Token": admin_csrf},
     )
@@ -1278,7 +1279,7 @@ def test_management_can_suspend_and_securely_reissue_access(client):
     temporary_password = "ReissuedAccess!2026"
     reissued = client.post(
         f"/api/admin/accounts/{family['id']}/temporary-password",
-        json={"temporary_password": temporary_password},
+        json={"temporary_password": temporary_password, "password": ADMIN[1]},
         headers=headers,
     )
     assert reissued.status_code == 200, reissued.text
@@ -2691,3 +2692,144 @@ def test_enquiry_search_pagination_covers_older_records(client):
     assert client.get("/api/admin/enquiries", params={"q": "Pagination QA", "offset": 99999}).json()["offset"] == 25
     for params in ({"offset": -1}, {"limit": 101}, {"view": "invalid"}):
         assert client.get("/api/admin/enquiries", params=params).status_code == 422
+
+
+def test_sensitive_admin_actions_require_password_proof(client):
+    client.cookies.clear()
+    admin_csrf = sign_in(client, ADMIN)
+    headers = {"X-CSRF-Token": admin_csrf}
+    blocked = client.post(
+        "/api/admin/accounts",
+        json={
+            "email": "blocked-family@example.com",
+            "temporary_password": "BlockedFamily!26",
+            "role": "customer",
+            "first_name": "Blocked",
+            "last_name": "Family",
+            "password": "wrong-password",
+        },
+        headers=headers,
+    )
+    assert blocked.status_code == 403
+
+
+def test_enquiry_sensitive_fields_are_encrypted_at_rest(client):
+    from backend.database import db_session
+    from backend.security import SENSITIVE_VALUE_PREFIX
+
+    with db_session() as db:
+        db.execute("DELETE FROM audit_log WHERE action='create_enquiry'")
+    client.cookies.clear()
+    created = client.post(
+        "/api/public/enquiries",
+        json={
+            "enquiry_type": "lesson",
+            "name": "Privacy Parent",
+            "email": "privacy-parent@example.com",
+            "phone": "0400 000 111",
+            "swimmer_name": "River",
+            "swimmer_age": "6",
+            "program_interest": "Learn to swim",
+            "experience": "Nervous in deep water",
+            "support_needs": "Needs quiet lane and extra patience",
+        },
+    )
+    assert created.status_code == 200, created.text
+    enquiry_id = created.json()["id"]
+    with db_session() as db:
+        row = db.execute(
+            "SELECT experience,support_needs FROM enquiries WHERE id=?", (enquiry_id,)
+        ).fetchone()
+        assert row["experience"].startswith(SENSITIVE_VALUE_PREFIX)
+        assert row["support_needs"].startswith(SENSITIVE_VALUE_PREFIX)
+    admin_csrf = sign_in(client, ADMIN)
+    listed = client.get("/api/admin/enquiries", params={"q": "privacy-parent@example.com"}).json()
+    match = next(item for item in listed["enquiries"] if item["id"] == enquiry_id)
+    assert match["experience"] == "Nervous in deep water"
+    assert match["support_needs"] == "Needs quiet lane and extra patience"
+
+
+def test_purge_expired_enquiries_removes_old_rows(client):
+    from backend.database import db_session, purge_expired_enquiries
+
+    with db_session() as db:
+        stale_id = db.execute(
+            "INSERT INTO enquiries(name,email,status,created_at) VALUES(?,?,?,?)",
+            ("Stale", "stale@example.com", "closed", "2019-06-01T00:00:00+00:00"),
+        ).lastrowid
+        fresh_id = db.execute(
+            "INSERT INTO enquiries(name,email,status,created_at) VALUES(?,?,?,?)",
+            ("Fresh", "fresh@example.com", "new", datetime.now(timezone.utc).isoformat()),
+        ).lastrowid
+        removed = purge_expired_enquiries(db)
+        assert removed >= 1
+        assert not db.execute("SELECT 1 FROM enquiries WHERE id=?", (stale_id,)).fetchone()
+        assert db.execute("SELECT 1 FROM enquiries WHERE id=?", (fresh_id,)).fetchone()
+
+
+def test_privileged_sessions_expire_after_idle_timeout(client):
+    from backend.database import db_session
+    from backend.security import SESSION_IDLE_HOURS_PRIVILEGED, token_digest
+
+    client.cookies.clear()
+    sign_in(client, ADMIN)
+    assert client.get("/api/auth/me").status_code == 200
+    session_cookie = client.cookies.get("hv_session")
+    assert session_cookie
+    stale = (datetime.now(timezone.utc) - timedelta(hours=SESSION_IDLE_HOURS_PRIVILEGED + 1)).isoformat()
+    with db_session() as db:
+        db.execute(
+            "UPDATE sessions SET last_seen_at=? WHERE id=?",
+            (stale, token_digest(session_cookie)),
+        )
+    assert client.get("/api/auth/me").status_code == 401
+
+
+def test_management_can_erase_family_personal_data(client):
+    from backend.database import db_session
+
+    client.cookies.clear()
+    admin_csrf = sign_in(client, ADMIN)
+    headers = {"X-CSRF-Token": admin_csrf}
+    account = client.post(
+        "/api/admin/accounts",
+        json={
+            "email": "erase-me@example.com",
+            "temporary_password": "EraseMeFamily!26",
+            "role": "customer",
+            "first_name": "Erase",
+            "last_name": "Me",
+            "password": ADMIN[1],
+        },
+        headers=headers,
+    )
+    assert account.status_code == 200, account.text
+    customer_id = account.json()["id"]
+    swimmer = client.post(
+        "/api/admin/swimmers",
+        json={
+            "customer_id": customer_id,
+            "first_name": "Child",
+            "last_name": "Erase",
+            "emergency_contact": "Erase Me · 0400 000 222",
+        },
+        headers=headers,
+    )
+    assert swimmer.status_code == 200, swimmer.text
+    erased = client.post(
+        f"/api/admin/customers/{customer_id}/erase",
+        json={"password": ADMIN[1]},
+        headers=headers,
+    )
+    assert erased.status_code == 200, erased.text
+    assert erased.json()["swimmers_anonymised"] == 1
+    with db_session() as db:
+        user = db.execute("SELECT email,first_name,active FROM users WHERE id=?", (customer_id,)).fetchone()
+        assert user["email"].startswith("erased-")
+        assert user["first_name"] == "Removed"
+        assert user["active"] == 0
+        swimmer_row = db.execute(
+            "SELECT first_name,active FROM swimmers WHERE customer_id=?", (customer_id,)
+        ).fetchone()
+        assert swimmer_row["first_name"] == "Removed"
+        assert swimmer_row["active"] == 0
