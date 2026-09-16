@@ -1,9 +1,30 @@
 <!doctype html>
-<html lang="en-AU"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#061a3b">
-  <meta name="robots" content="noindex,nofollow"><meta name="description" content="HV Swim Bendigo offline connection guidance."><title>HV Swim · Offline</title><link rel="preload" href="assets/fonts/manrope-latin-variable.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="assets/styles.css?v=5.13.0-ui23">  <link rel="stylesheet" href="assets/experience.css?v=5.13.0-ui23">
-  <link rel="stylesheet" href="assets/dark-public.css?v=5.13.0-ui23">
-  <script defer src="assets/experience.js?v=5.13.0-ui23"></script>
+<html lang="en-AU">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#061a3b">
+  <meta name="robots" content="noindex,nofollow">
+  <meta name="description" content="HV Swim Bendigo offline connection guidance.">
+  <title>HV Swim · Offline</title>
+  <link rel="icon" href="assets/app-icon-v3-64.png">
+  <link rel="preload" href="assets/fonts/manrope-latin-variable.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="assets/styles.css?v=5.13.0-ui24">
+  <link rel="stylesheet" href="assets/experience.css?v=5.13.0-ui24">
+  <link rel="stylesheet" href="assets/public.css?v=5.13.0-ui24">
+  <script defer src="assets/experience.js?v=5.13.0-ui24"></script>
 </head>
-<body style="background:#061a3b">
-  <a class="skip-link" href="#main-content">Skip to main content</a><main id="main-content" style="min-height:100svh;display:grid;place-items:center;padding:max(24px,env(safe-area-inset-top)) 24px max(24px,env(safe-area-inset-bottom));color:white;background:radial-gradient(circle at 80% 10%,rgba(25,200,244,.2),transparent 30%),#061a3b"><div style="max-width:560px;text-align:center"><picture><source type="image/webp" srcset="assets/hv-swim-logo-v3.webp"><img src="assets/hv-swim-logo-v3.png" decoding="async" width="400" height="265" alt="HV Swim Bendigo" style="width:190px;margin:0 auto 30px;"></picture><div class="eyebrow">Offline mode</div><h1 style="font-size:3.3rem">You're still on deck.</h1><p style="margin:20px 0 14px;color:#bdd0e3">Previously cached public information may still be available. Secure sign-in, bookings, pool updates and management changes need an internet connection.</p><p style="margin:0 0 28px;color:#7795ae;font-size:.72rem">Nothing is silently queued or submitted while offline.</p><a class="btn btn-primary" href="index.html">Check connection</a></div></main></body></html>
+<body data-page="offline">
+  <a class="skip-link" href="#main-content">Skip to main content</a>
+  <main id="main-content" class="offline-shell">
+    <div class="offline-card">
+      <picture><source type="image/webp" srcset="assets/hv-swim-logo-v3.webp"><img src="assets/hv-swim-logo-v3.png" decoding="async" width="400" height="265" alt="HV Swim Bendigo"></picture>
+      <div class="eyebrow">Offline mode</div>
+      <h1>You're still on deck.</h1>
+      <p class="lead">Previously cached public information may still be available. Secure sign-in, bookings, pool updates and management changes need an internet connection.</p>
+      <p class="micro">Nothing is silently queued or submitted while offline.</p>
+      <a class="btn btn-primary" href="index.html">Check connection</a>
+    </div>
+  </main>
+</body>
+</html>

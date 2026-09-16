@@ -159,14 +159,9 @@
   window.addEventListener('blur', clearDepth);
   const publicRoot = document.body;
   const isPublic = publicRoot && !publicRoot.matches('[data-platform-page],.platform-page');
-  if (isPublic && typeof document.createElement === 'function') {
-    publicRoot.dataset.theme = 'night-water';
-    if (!publicRoot.querySelector('.site-aurora')) {
-      const aurora = document.createElement('div');
-      aurora.className = 'site-aurora';
-      aurora.setAttribute('aria-hidden', 'true');
-      publicRoot.prepend(aurora);
-    }
+  if (isPublic) {
+    publicRoot.dataset.theme = 'studio';
+    publicRoot.querySelector('.site-aurora')?.remove();
   }
 
   if (document.querySelector('.site-header') && document.body && typeof document.createElement === 'function') {
