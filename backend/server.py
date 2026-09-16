@@ -7,6 +7,7 @@ import csv
 import hashlib
 import hmac
 import io
+import ipaddress
 import json
 import logging
 import sqlite3
@@ -27,6 +28,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
 
 from .config import DATA_DIR, ROOT, settings
+from .filesystem import ensure_private_directory, harden_private_file
 from . import identity, payroll_adapter, workforce
 from .database import audit, db_session, initialise_database, rows
 from .integrations import (
@@ -58,7 +60,21 @@ from .oauth import (
     provider_ready as oauth_provider_ready,
     verify_identity_token as oauth_verify_identity_token,
 )
-from .security import business_date_from_timestamp, business_today, decrypt_sensitive, encrypt_sensitive, expires_iso, new_token, now_iso, password_hash, password_needs_rehash, password_verify, public_user, token_digest
+from .security import (
+    MFA_ENROLMENT_PATHS,
+    business_date_from_timestamp,
+    business_today,
+    decrypt_sensitive,
+    encrypt_sensitive,
+    expires_iso,
+    new_token,
+    now_iso,
+    password_hash,
+    password_needs_rehash,
+    password_verify,
+    public_user,
+    token_digest,
+)
 
 SESSION_COOKIE = "hv_session"
 MELBOURNE_TZ = ZoneInfo("Australia/Melbourne")
@@ -193,6 +209,12 @@ def validate_production_config(candidate=settings) -> None:
     apple_redirect = candidate.apple_redirect_uri or f"{candidate.public_url}/api/auth/oauth/apple/callback"
     if all(apple_fields) and not apple_redirect.startswith("https://"):
         raise RuntimeError("APPLE_REDIRECT_URI must use HTTPS in production")
+    if not candidate.trusted_proxies:
+        raise RuntimeError(
+            "HV_TRUSTED_PROXIES must list every reverse-proxy address that terminates HTTPS "
+            "in front of the API (comma-separated). The API uses this to read the client IP "
+            "from X-Forwarded-For without trusting arbitrary clients."
+        )
 
 
 def migrate_integration_token_encryption() -> int:
@@ -1020,10 +1042,25 @@ def issue_session(
     return {"user": public_user(user), "csrf_token": csrf}
 
 
+def _normalised_ip(value: str) -> str | None:
+    candidate = value.strip()
+    if not candidate:
+        return None
+    try:
+        return str(ipaddress.ip_address(candidate))
+    except ValueError:
+        return None
+
+
 def client_ip(request: Request) -> str:
-    # Uvicorn should be configured with explicit trusted proxy IPs in production.
-    # Never trust a client-supplied X-Forwarded-For header directly.
-    return request.client.host if request.client else "unknown"
+    peer = request.client.host if request.client else ""
+    if peer and peer in settings.trusted_proxies:
+        forwarded = request.headers.get("x-forwarded-for", "")
+        if forwarded:
+            client = _normalised_ip(forwarded.split(",")[0])
+            if client:
+                return client
+    return peer or "unknown"
 
 
 def session_user(request: Request) -> dict[str, Any]:
@@ -1040,6 +1077,12 @@ def session_user(request: Request) -> dict[str, Any]:
             raise HTTPException(status_code=401, detail="Session expired")
         if row["must_change_password"] and request.url.path not in {"/api/auth/me", "/api/auth/logout", "/api/auth/change-password"}:
             raise HTTPException(status_code=403, detail="Change your temporary password before using the workspace")
+        if row["role"] == "admin" and settings.production and not row["mfa_enabled"]:
+            if request.url.path not in MFA_ENROLMENT_PATHS:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Set up authenticator protection before using the management workspace",
+                )
         return dict(row)
 
 
@@ -3744,11 +3787,12 @@ def create_qualification_document(
         raise HTTPException(status_code=403, detail="Staff can upload only their own certificate documents")
     document, extension, digest = validate_qualification_document(payload.document_base64, payload.document_media_type)
     filename = f"{new_token(24)}{extension}"
-    QUALIFICATION_DOCUMENT_DIR.mkdir(parents=True, exist_ok=True)
+    ensure_private_directory(QUALIFICATION_DOCUMENT_DIR)
     final_path = QUALIFICATION_DOCUMENT_DIR / filename
     temporary_path = QUALIFICATION_DOCUMENT_DIR / f".{filename}.tmp"
     temporary_path.write_bytes(document)
     temporary_path.replace(final_path)
+    harden_private_file(final_path)
     try:
         with db_session() as db:
             staff = db.execute(
@@ -4192,11 +4236,13 @@ def update_admin_association_badge(
     dimensions: tuple[int, int] | None = None
     if payload.artwork_png_base64 is not None:
         artwork, width, height, artwork_sha256 = validate_association_png(payload.artwork_png_base64)
-        ASSOCIATION_BADGE_DIR.mkdir(parents=True, exist_ok=True)
+        ensure_private_directory(ASSOCIATION_BADGE_DIR)
         artwork_filename = f"{credential_key}-{artwork_sha256[:16]}.png"
+        final_artwork_path = ASSOCIATION_BADGE_DIR / artwork_filename
         temporary_path = ASSOCIATION_BADGE_DIR / f".{artwork_filename}.{new_token(6)}.tmp"
         temporary_path.write_bytes(artwork)
-        temporary_path.replace(ASSOCIATION_BADGE_DIR / artwork_filename)
+        temporary_path.replace(final_artwork_path)
+        harden_private_file(final_artwork_path)
         dimensions = (width, height)
 
     with db_session() as db:

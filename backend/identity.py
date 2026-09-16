@@ -23,6 +23,7 @@ from .database import audit, db_session, rows
 from .security import (
     decrypt_sensitive,
     encrypt_sensitive,
+    management_account_requires_mfa,
     new_token,
     now_iso,
     password_hash,
@@ -688,6 +689,11 @@ def register(app, session_user, csrf_guard):
             fresh = db.execute(
                 "SELECT * FROM users WHERE id=?", (user["id"],)
             ).fetchone()
+            if management_account_requires_mfa(fresh["role"]):
+                raise HTTPException(
+                    403,
+                    "Management accounts must keep authenticator protection enabled",
+                )
             if not password_verify(
                 payload.password, fresh["password_hash"]
             ) or not verify_mfa(db, fresh, payload.code):

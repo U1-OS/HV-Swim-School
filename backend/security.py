@@ -112,6 +112,23 @@ def decrypt_sensitive(value: str | None) -> str | None:
         raise RuntimeError("Sensitive customer data could not be decrypted") from exc
 
 
+def management_account_requires_mfa(role: str) -> bool:
+    from .config import settings
+
+    return role == "admin" and settings.production
+
+
+MFA_ENROLMENT_PATHS = frozenset(
+    {
+        "/api/auth/me",
+        "/api/auth/logout",
+        "/api/auth/change-password",
+        "/api/account/mfa/setup",
+        "/api/account/mfa/confirm",
+    }
+)
+
+
 def public_user(row: Any) -> dict[str, Any]:
     payload = {
         "id": row["id"],
