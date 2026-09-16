@@ -2535,9 +2535,19 @@ def test_lesson_register_enforces_assignment_parent_and_photo_rules(client):
     assert swimmer["reported_absence"] is False
     assert swimmer["photo_consent"] is True
 
+    from backend.server import business_today
+
+    # next_occurrence is the next lesson *datetime* in Melbourne and can fall on
+    # business_today when the class has not started yet; POST rejects only dates
+    # strictly after business_today(), so use a calendar-future class day instead.
+    today = business_today()
+    days_ahead = (booking["weekday"] - today.weekday()) % 7 or 7
+    future_occurrence = (today + timedelta(days=days_ahead)).isoformat()
+    assert date.fromisoformat(future_occurrence) > today
+
     future = client.post(
         "/api/staff/lesson-register",
-        json={"booking_id": booking["booking_id"], "occurrence_date": booking["next_occurrence"], "attendance_status": "excused", "parent_onsite_confirmed": None, "private_note": ""},
+        json={"booking_id": booking["booking_id"], "occurrence_date": future_occurrence, "attendance_status": "excused", "parent_onsite_confirmed": None, "private_note": ""},
         headers={"X-CSRF-Token": csrf},
     )
     assert future.status_code == 422
