@@ -2737,6 +2737,7 @@ def test_enquiry_sensitive_fields_are_encrypted_at_rest(client):
             "program_interest": "Learn to swim",
             "experience": "Nervous in deep water",
             "support_needs": "Needs quiet lane and extra patience",
+            "acknowledgement": True,
         },
     )
     assert created.status_code == 200, created.text
