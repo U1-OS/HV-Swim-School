@@ -6,7 +6,7 @@ uvicorn[standard]>=0.30
 httpx>=0.28
 
 # Pure-Python RS256 verification works on both Intel Macs and production Linux.
-rsa>=4.9
+rsa>=4.9.1
 
 PyNaCl>=1.5
 email-validator>=2.2
