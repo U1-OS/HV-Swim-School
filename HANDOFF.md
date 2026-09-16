@@ -2,8 +2,8 @@
 
 Andrew swaps between Claude and Codex. Read this first and rewrite it last.
 
-**Wheel:** Codex
-**Last updated:** 2026-09-13 by Codex — pagination, local email drafts and launch preparation verified
+**Wheel:** Cursor Cloud Agent
+**Last updated:** 2026-09-16 — PR #4 merged (session idle limits, enquiry encryption/retention, admin step-up on create-account and temporary-password; portal UI wired in `assets/platform.js`)
 
 The working directory was missing on arrival. Restored the exact private GitHub main
 commit `676094ff874af6c2bd6fb5ff98fef979367773bc` into the empty local Developer path.
