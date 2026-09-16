@@ -8,7 +8,7 @@
 }
 
 .auth-page { min-height:100vh; display:grid; grid-template-columns:1.05fr .95fr; background:#061a3b; }
-.auth-visual { position:relative; min-height:100vh; padding:50px clamp(30px,6vw,90px); display:flex; flex-direction:column; justify-content:space-between; color:white; overflow:hidden; background:linear-gradient(90deg,rgba(3,18,43,.96),rgba(5,32,67,.58)),url("hero-swimmer.jpg") 68% center/cover; }
+.auth-visual { position:relative; min-height:100vh; padding:50px clamp(30px,6vw,90px); display:flex; flex-direction:column; justify-content:space-between; color:white; overflow:hidden; background:linear-gradient(90deg,rgba(3,18,43,.96),rgba(5,32,67,.58)),image-set(url("hero-swimmer.webp") type("image/webp"), url("hero-swimmer.jpg") type("image/jpeg")) 68% center/cover; }
 .auth-visual::after { content:""; position:absolute; inset:auto -10% -24% 10%; height:55%; border-radius:50%; border:90px solid rgba(23,199,241,.08); }
 .auth-visual > * { position:relative; z-index:1; }
 .auth-copy { max-width:650px; }
@@ -97,7 +97,7 @@
 .workflow-steps div { min-height:105px; padding:14px; border:1px solid var(--line); border-radius:13px; background:#f8fbfd; }
 .workflow-steps span { width:26px; height:26px; display:grid; place-items:center; border-radius:8px; color:#075e91; background:#dff6fc; font-size:.61rem; font-weight:900; }
 .workflow-steps strong { display:block; margin-top:14px; font-size:.67rem; line-height:1.4; }
-.site-preview { position:relative; min-height:390px; padding:34px 28px; display:flex; flex-direction:column; justify-content:center; overflow:hidden; border-radius:17px; color:white; background:linear-gradient(135deg,rgba(2,17,42,.94),rgba(4,51,93,.82)),url("hero-swimmer.jpg") 65% center/cover; }
+.site-preview { position:relative; min-height:390px; padding:34px 28px; display:flex; flex-direction:column; justify-content:center; overflow:hidden; border-radius:17px; color:white; background:linear-gradient(135deg,rgba(2,17,42,.94),rgba(4,51,93,.82)),image-set(url("hero-swimmer.webp") type("image/webp"), url("hero-swimmer.jpg") type("image/jpeg")) 65% center/cover; }
 .site-preview::after { content:""; position:absolute; width:220px; height:220px; right:-80px; bottom:-110px; border:42px solid rgba(40,207,244,.1); border-radius:50%; }
 .site-preview > * { position:relative; z-index:1; }
 .site-preview > span { color:#77daf4; font-size:.58rem; font-weight:900; letter-spacing:.16em; text-transform:uppercase; }
@@ -240,6 +240,9 @@
 .run-main p,.waitlist-person p,.waitlist-person a { color:#496479; }
 .platform-head p,.panel-head p,.api-row span { font-size:.7rem; }
 .readiness-top span:first-child,.readiness-reading span,.readiness-flags span,.run-time span,.run-main span,.run-main p,.run-capacity span,.schedule-card p,.schedule-card small,.waitlist-person span,.waitlist-person p,.waitlist-person a,.waitlist-class span { font-size:.62rem; }
+.admin-step-up { margin:14px 0 0; padding:14px 16px; border:1px solid #d8e3ec; border-radius:13px; background:#f7fafc; }
+.admin-step-up legend { margin-bottom:6px; color:#154c69; font-size:.72rem; font-weight:850; }
+.admin-step-up .micro { margin:0 0 10px; color:#516779; line-height:1.55; }
 .security-guidance { padding:14px 16px; display:grid; gap:4px; border:1px solid #b9dce8; border-radius:13px; color:#154c69; background:#edf9fc; }
 .security-guidance strong { font-size:.72rem; }
 .security-guidance span { color:#41677a; font-size:.66rem; line-height:1.55; }
@@ -400,7 +403,7 @@
   padding:clamp(34px,5vw,70px) clamp(30px,6vw,92px);
   background:
     linear-gradient(102deg,rgba(2,16,38,.98) 3%,rgba(5,34,68,.82) 48%,rgba(4,45,74,.38)),
-    url("hero-swimmer.jpg") 68% center/cover;
+    image-set(url("hero-swimmer.webp") type("image/webp"), url("hero-swimmer.jpg") type("image/jpeg")) 68% center/cover;
 }
 .auth-visual::before {
   content:"";

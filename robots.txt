@@ -18,4 +18,5 @@ Disallow: /offline.html
 
 # Sitemap: the production domain is not set yet. Once it is, run
 #   node scripts/build-sitemap.mjs https://your-domain.com.au
-# which writes sitemap.xml and adds the Sitemap line below.
+# which writes sitemap.xml, adds the Sitemap line below, and rewrites
+# relative canonical / og:url / share-image values to absolute URLs.

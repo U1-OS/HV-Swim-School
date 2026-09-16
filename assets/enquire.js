@@ -72,10 +72,18 @@
     const legend=group&&group.querySelector('legend');
     return legend?legend.textContent.trim().replace(/\s+/g,' '):'';
   }
+  function describeWizardError(input,invalid){
+    const extra='wizard-error';
+    const described=(input.getAttribute('aria-describedby')||'').split(/\s+/).filter(Boolean).filter(id=>id!==extra);
+    if(invalid) input.setAttribute('aria-describedby',[...described,extra].join(' '));
+    else if(described.length) input.setAttribute('aria-describedby',described.join(' '));
+    else input.removeAttribute('aria-describedby');
+  }
   function markInvalid(input,invalid){
     const target=input.type==='radio'?(input.closest('fieldset')||input):input;
     target.classList.toggle('field-invalid',invalid);
     input.setAttribute('aria-invalid',invalid?'true':'false');
+    describeWizardError(input,invalid);
     if(invalid&&!input.dataset.revalidateBound){
       input.dataset.revalidateBound='1';
       const clear=()=>{ if(input.checkValidity()){markInvalid(input,false);elements.error.textContent='';} };

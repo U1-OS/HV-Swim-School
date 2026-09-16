@@ -17,6 +17,10 @@ from .config import settings
 # transparently after the next successful sign-in by password_needs_rehash().
 PBKDF2_ITERATIONS = 600_000
 SESSION_DAYS = 14
+SESSION_IDLE_HOURS_PRIVILEGED = 8
+SESSION_IDLE_DAYS_CUSTOMER = 30
+MAX_CONCURRENT_SESSIONS = 10
+ENQUIRY_RETENTION_DAYS = 183
 MELBOURNE_TZ = ZoneInfo("Australia/Melbourne")
 SENSITIVE_VALUE_PREFIX = "enc:v1:"
 

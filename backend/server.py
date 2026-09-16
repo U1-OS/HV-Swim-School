@@ -11,6 +11,7 @@ import ipaddress
 import json
 import logging
 import sqlite3
+import contextlib
 from contextlib import asynccontextmanager
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
@@ -31,7 +32,7 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
 from .config import DATA_DIR, ROOT, settings
 from .filesystem import ensure_private_directory, harden_private_file
 from . import identity, payroll_adapter, workforce, lesson_calendar, mail_queue, launch_readiness
-from .database import audit, db_session, initialise_database, rows
+from .database import audit, db_session, initialise_database, purge_expired_enquiries, rows
 from .integrations import (
     current_bendigo_weather,
     decrypt_json,
@@ -75,12 +76,18 @@ from .security import (
     password_verify,
     public_user,
     token_digest,
+    ENQUIRY_RETENTION_DAYS,
+    MAX_CONCURRENT_SESSIONS,
+    SESSION_IDLE_DAYS_CUSTOMER,
+    SESSION_IDLE_HOURS_PRIVILEGED,
 )
 
 SESSION_COOKIE = "hv_session"
 MELBOURNE_TZ = ZoneInfo("Australia/Melbourne")
 SWIMMER_SENSITIVE_FIELDS = ("emergency_contact", "medical_notes", "allergies", "medications", "support_notes")
+ENQUIRY_SENSITIVE_FIELDS = ("support_needs", "experience")
 INCIDENT_SENSITIVE_FIELDS = ("what_happened", "injury_observed", "first_aid_applied", "further_action", "witnesses", "first_aider", "supporting_notes")
+ENQUIRY_RETENTION_INTERVAL_SECONDS = 24 * 60 * 60
 LOGGER = logging.getLogger("hv_swim.backend")
 DEFAULT_API_BODY_LIMIT = 2_000_000
 QUALIFICATION_API_BODY_LIMIT = 7_100_000
@@ -268,6 +275,27 @@ def migrate_integration_token_encryption() -> int:
     return migrated
 
 
+async def _scheduled_enquiry_retention() -> None:
+    await asyncio.sleep(ENQUIRY_RETENTION_INTERVAL_SECONDS)
+    while True:
+        try:
+            with db_session() as db:
+                deleted = purge_expired_enquiries(db)
+                if deleted:
+                    audit(
+                        db,
+                        None,
+                        "purge_enquiries",
+                        "enquiry",
+                        "retention",
+                        {"deleted": deleted, "retention_days": ENQUIRY_RETENTION_DAYS},
+                        None,
+                    )
+        except Exception:
+            LOGGER.exception("Scheduled enquiry retention failed")
+        await asyncio.sleep(ENQUIRY_RETENTION_INTERVAL_SECONDS)
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     validate_production_config()
@@ -276,7 +304,13 @@ async def lifespan(_: FastAPI):
     workforce.migrate()
     payroll_adapter.migrate()
     migrate_integration_token_encryption()
-    yield
+    retention_task = asyncio.create_task(_scheduled_enquiry_retention())
+    try:
+        yield
+    finally:
+        retention_task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await retention_task
 
 
 app = FastAPI(
@@ -757,6 +791,8 @@ class AdminUserInput(BaseModel):
     first_name: str = Field(min_length=1, max_length=80)
     last_name: str = Field(default="", max_length=80)
     phone: str = Field(default="", max_length=40)
+    password: str = Field(min_length=1, max_length=200)
+    mfa_code: str | None = Field(default=None, min_length=6, max_length=6)
 
 
 class AdminSwimmerInput(BaseModel):
@@ -787,6 +823,14 @@ class AccountStatusInput(BaseModel):
 
 class AdminPasswordResetInput(BaseModel):
     temporary_password: str = Field(min_length=12, max_length=200)
+    password: str = Field(min_length=1, max_length=200)
+    mfa_code: str | None = Field(default=None, min_length=6, max_length=6)
+
+
+class FamilyErasureInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    password: str = Field(min_length=1, max_length=200)
+    mfa_code: str | None = Field(default=None, min_length=6, max_length=6)
 
 
 class XeroStaffMappingInput(BaseModel):
@@ -1039,6 +1083,36 @@ def login_throttle_reason(db: sqlite3.Connection, email: str, ip: str) -> str | 
     return None
 
 
+def session_idle_cutoff(role: str) -> str:
+    now = datetime.now(timezone.utc)
+    if role in ("admin", "staff"):
+        return (now - timedelta(hours=SESSION_IDLE_HOURS_PRIVILEGED)).isoformat()
+    return (now - timedelta(days=SESSION_IDLE_DAYS_CUSTOMER)).isoformat()
+
+
+def admin_step_up_proof(db: sqlite3.Connection, user: dict[str, Any], password: str, mfa_code: str | None) -> None:
+    identity.proof_attempt(user["id"])
+    if not password_verify(password, user["password_hash"]):
+        raise HTTPException(status_code=403, detail="Confirm your current password")
+    if user.get("mfa_enabled"):
+        if not mfa_code:
+            raise HTTPException(status_code=403, detail="Authenticator code required")
+        if not identity.verify_mfa(db, user, mfa_code):
+            raise HTTPException(status_code=403, detail="Authenticator code is incorrect")
+
+
+def prune_concurrent_sessions(db: sqlite3.Connection, user_id: int) -> None:
+    excess = db.execute("SELECT COUNT(*) FROM sessions WHERE user_id=?", (user_id,)).fetchone()[0] - MAX_CONCURRENT_SESSIONS
+    if excess <= 0:
+        return
+    oldest = db.execute(
+        "SELECT id FROM sessions WHERE user_id=? ORDER BY COALESCE(last_seen_at, created_at) ASC LIMIT ?",
+        (user_id, excess),
+    ).fetchall()
+    for row in oldest:
+        db.execute("DELETE FROM sessions WHERE id=?", (row["id"],))
+
+
 def issue_session(
     db: sqlite3.Connection,
     user: sqlite3.Row,
@@ -1050,11 +1124,13 @@ def issue_session(
 ) -> dict[str, Any]:
     session_id, csrf = new_token(32), new_token(24)
     stored_session_id = token_digest(session_id)
-    db.execute("DELETE FROM sessions WHERE expires_at<=?", (now_iso(),))
+    seen_at = now_iso()
+    db.execute("DELETE FROM sessions WHERE expires_at<=?", (seen_at,))
     db.execute(
-        "INSERT INTO sessions(id,user_id,csrf_token,created_at,expires_at) VALUES(?,?,?,?,?)",
-        (stored_session_id, user["id"], csrf, now_iso(), expires_iso()),
+        "INSERT INTO sessions(id,user_id,csrf_token,created_at,expires_at,last_seen_at) VALUES(?,?,?,?,?,?)",
+        (stored_session_id, user["id"], csrf, seen_at, expires_iso(), seen_at),
     )
+    prune_concurrent_sessions(db, user["id"])
     audit(db, user["id"], action, "session", stored_session_id[-12:], audit_detail, ip_address)
     db.execute("UPDATE users SET last_login_at=? WHERE id=?", (now_iso(), user["id"]))
     response.set_cookie(
@@ -1096,12 +1172,18 @@ def session_user(request: Request) -> dict[str, Any]:
         raise HTTPException(status_code=401, detail="Sign in required")
     with db_session() as db:
         row = db.execute(
-            """SELECT s.id session_id,s.csrf_token,s.expires_at,u.* FROM sessions s
+            """SELECT s.id session_id,s.csrf_token,s.expires_at,s.last_seen_at,s.created_at session_created_at,u.*
+               FROM sessions s
                JOIN users u ON u.id=s.user_id WHERE s.id=? AND s.expires_at>? AND u.active=1""",
             (token_digest(session_id), now_iso()),
         ).fetchone()
         if not row:
             raise HTTPException(status_code=401, detail="Session expired")
+        last_seen = row["last_seen_at"] or row["session_created_at"]
+        if last_seen < session_idle_cutoff(row["role"]):
+            db.execute("DELETE FROM sessions WHERE id=?", (token_digest(session_id),))
+            raise HTTPException(status_code=401, detail="Session expired")
+        db.execute("UPDATE sessions SET last_seen_at=? WHERE id=?", (now_iso(), token_digest(session_id)))
         if row["must_change_password"] and request.url.path not in {"/api/auth/me", "/api/auth/logout", "/api/auth/change-password"}:
             raise HTTPException(status_code=403, detail="Change your temporary password before using the workspace")
         if row["role"] == "admin" and settings.production and not row["mfa_enabled"]:
@@ -1529,6 +1611,13 @@ def reveal_swimmer_record(record: dict[str, Any]) -> dict[str, Any]:
     for field in SWIMMER_SENSITIVE_FIELDS:
         if field in record:
             record[field] = decrypt_sensitive(record.get(field))
+    return record
+
+
+def reveal_enquiry_record(record: dict[str, Any]) -> dict[str, Any]:
+    for field in ENQUIRY_SENSITIVE_FIELDS:
+        if field in record:
+            record[field] = decrypt_sensitive(record.get(field)) or ""
     return record
 
 
@@ -4179,7 +4268,14 @@ def resolve_admin_alert(
 @app.get("/api/admin/exports/enquiries.csv")
 def export_enquiries(request: Request, user: dict[str, Any] = Depends(require_roles("admin"))) -> Response:
     with db_session() as db:
-        records = rows(db.execute("SELECT created_at,enquiry_type,name,email,phone,swimmer_name,swimmer_age,program_interest,preferred_class,preferred_days,contact_method,status,experience FROM enquiries ORDER BY created_at DESC"))
+        records = [
+            reveal_enquiry_record(item)
+            for item in rows(
+                db.execute(
+                    "SELECT created_at,enquiry_type,name,email,phone,swimmer_name,swimmer_age,program_interest,preferred_class,preferred_days,contact_method,status,experience,support_needs FROM enquiries ORDER BY created_at DESC"
+                )
+            )
+        ]
         audit(db, user["id"], "export_enquiries", "export", "hv-swim-enquiries.csv", {"record_count": len(records)}, client_ip(request))
     return csv_download(
         "hv-swim-enquiries.csv",
@@ -4398,7 +4494,8 @@ def admin_enquiries(
                    e.created_at DESC,e.id DESC LIMIT ? OFFSET ?"""
         counts = {status: 0 for status in ("new", "contacted", "trial_booked", "closed")}
         counts.update({row["status"]: row["n"] for row in db.execute("SELECT status,COUNT(*) n FROM enquiries GROUP BY status")})
-        return {"enquiries": rows(db.execute(query, [*params, limit, offset])), "owners": rows(db.execute(
+        enquiries = [reveal_enquiry_record(item) for item in rows(db.execute(query, [*params, limit, offset]))]
+        return {"enquiries": enquiries, "owners": rows(db.execute(
             "SELECT id,first_name,last_name FROM users WHERE active=1 AND role='admin' ORDER BY first_name,last_name"
         )), "limit": limit, "offset": offset, "total": total, "counts": counts,
             "has_more": offset + limit < total}
@@ -4515,6 +4612,7 @@ def create_admin_account(payload: AdminUserInput, request: Request, user: dict[s
     if settings.production and email.endswith("@hvswim.demo"):
         raise HTTPException(status_code=400, detail="Demo-domain accounts cannot be created in production")
     with db_session() as db:
+        admin_step_up_proof(db, user, payload.password, payload.mfa_code)
         try:
             cursor = db.execute(
                 """INSERT INTO users(email,password_hash,role,first_name,last_name,phone,must_change_password,created_at)
@@ -4533,7 +4631,7 @@ def create_admin_account(payload: AdminUserInput, request: Request, user: dict[s
                 )
         except sqlite3.IntegrityError:
             raise HTTPException(status_code=409, detail="An account with this email already exists")
-        audit(db, user["id"], "create_account", "user", cursor.lastrowid, {"email": email, "role": payload.role}, client_ip(request))
+        audit(db, user["id"], "create_account", "user", cursor.lastrowid, {"role": payload.role}, client_ip(request))
         return {"id": cursor.lastrowid, "created": True, "email": email, "role": payload.role}
 
 
@@ -4575,6 +4673,7 @@ def issue_temporary_password(account_id: int, payload: AdminPasswordResetInput, 
     if account_id == user["id"]:
         raise HTTPException(status_code=400, detail="Use Change password for the account you are currently using")
     with db_session() as db:
+        admin_step_up_proof(db, user, payload.password, payload.mfa_code)
         account = db.execute("SELECT id,role,active FROM users WHERE id=?", (account_id,)).fetchone()
         if not account:
             raise HTTPException(status_code=404, detail="Account not found")
@@ -4588,6 +4687,77 @@ def issue_temporary_password(account_id: int, payload: AdminPasswordResetInput, 
         db.execute("UPDATE account_tokens SET used_at=? WHERE user_id=? AND used_at IS NULL", (now_iso(), account_id))
         audit(db, user["id"], "issue_temporary_password", "user", account_id, {"role": account["role"]}, client_ip(request))
         return {"saved": True, "id": account_id, "must_change_password": True}
+
+
+@app.post("/api/admin/customers/{customer_id}/erase")
+def erase_family_personal_data(
+    customer_id: int,
+    payload: FamilyErasureInput,
+    request: Request,
+    user: dict[str, Any] = Depends(require_roles("admin")),
+    x_csrf_token: str | None = Header(default=None),
+) -> dict[str, Any]:
+    csrf_guard(request, user, x_csrf_token)
+    with db_session() as db:
+        admin_step_up_proof(db, user, payload.password, payload.mfa_code)
+        customer = db.execute(
+            "SELECT id,email,role,customer_number FROM users WHERE id=? AND role='customer'",
+            (customer_id,),
+        ).fetchone()
+        if not customer:
+            raise HTTPException(status_code=404, detail="Family account not found")
+        outstanding = db.execute(
+            """SELECT COUNT(*) FROM billing_invoices
+               WHERE customer_id=? AND status NOT IN ('draft','paid','voided')""",
+            (customer_id,),
+        ).fetchone()[0]
+        if outstanding:
+            raise HTTPException(
+                status_code=409,
+                detail="Resolve outstanding invoices before erasing this family's personal records",
+            )
+        anonymised_email = f"erased-{customer_id}@anonymized.hvswim.invalid"
+        db.execute(
+            """UPDATE users SET email=?,first_name='Removed',last_name='Family',phone=NULL,active=0,
+                      xero_contact_id=NULL,shopify_customer_gid=NULL,must_change_password=0
+               WHERE id=?""",
+            (anonymised_email, customer_id),
+        )
+        swimmers = db.execute("SELECT id FROM swimmers WHERE customer_id=?", (customer_id,)).fetchall()
+        for swimmer in swimmers:
+            db.execute(
+                """UPDATE swimmers SET first_name='Removed',last_name='Swimmer',date_of_birth=NULL,active=0,
+                          emergency_contact=?,medical_notes=?,allergies=?,medications=?,support_notes=?,photo_consent=0
+                   WHERE id=?""",
+                (
+                    encrypt_sensitive(""),
+                    encrypt_sensitive(""),
+                    encrypt_sensitive(""),
+                    encrypt_sensitive(""),
+                    encrypt_sensitive(""),
+                    swimmer["id"],
+                ),
+            )
+        db.execute("DELETE FROM sessions WHERE user_id=?", (customer_id,))
+        db.execute(
+            "UPDATE account_tokens SET used_at=? WHERE user_id=? AND used_at IS NULL",
+            (now_iso(), customer_id),
+        )
+        audit(
+            db,
+            user["id"],
+            "erase_family_data",
+            "user",
+            customer_id,
+            {"customer_number": customer["customer_number"], "swimmers_anonymised": len(swimmers)},
+            client_ip(request),
+        )
+        return {
+            "erased": True,
+            "customer_id": customer_id,
+            "customer_number": customer["customer_number"],
+            "swimmers_anonymised": len(swimmers),
+        }
 
 
 @app.post("/api/admin/swimmers")
@@ -5836,7 +6006,22 @@ def create_enquiry(payload: EnquiryInput, request: Request) -> dict[str, Any]:
         cursor = db.execute(
             """INSERT INTO enquiries(enquiry_type,name,email,phone,swimmer_name,swimmer_age,program_interest,preferred_class,preferred_days,contact_method,experience,support_needs,status,created_at)
                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-            (payload.enquiry_type, payload.name, payload.email, payload.phone, payload.swimmer_name, payload.swimmer_age, payload.program_interest, payload.preferred_class, payload.preferred_days, payload.contact_method, payload.experience, payload.support_needs, "new", now_iso()),
+            (
+                payload.enquiry_type,
+                payload.name,
+                payload.email,
+                payload.phone,
+                payload.swimmer_name,
+                payload.swimmer_age,
+                payload.program_interest,
+                payload.preferred_class,
+                payload.preferred_days,
+                payload.contact_method,
+                encrypt_sensitive(payload.experience.strip()),
+                encrypt_sensitive(payload.support_needs.strip()),
+                "new",
+                now_iso(),
+            ),
         )
         reference = f"HV-{'MERCH' if payload.enquiry_type == 'merchandise' else 'ENQ'}-{cursor.lastrowid:04d}"
         db.execute('UPDATE enquiries SET collection_notice_version=?,acknowledged_at=? WHERE id=?',('2026-09-13',now_iso(),cursor.lastrowid))
@@ -5853,7 +6038,15 @@ def create_enquiry(payload: EnquiryInput, request: Request) -> dict[str, Any]:
             title = f"New enrolment enquiry · {reference}"
             message = f"{payload.name} submitted an enquiry for {swimmer}: {program}."
         db.execute("INSERT INTO notifications(audience_role,title,message,kind,delivery_channels,created_at) VALUES(?,?,?,?,?,?)", ("admin", title, message, "enquiry", '["in_app"]', now_iso()))
-        audit(db, None, "create_enquiry", "enquiry", cursor.lastrowid, {"reference": reference, "enquiry_type": payload.enquiry_type}, ip)
+        audit(
+            db,
+            None,
+            "create_enquiry",
+            "enquiry",
+            cursor.lastrowid,
+            {"reference": reference, "enquiry_type": payload.enquiry_type, "program": payload.program_interest},
+            ip,
+        )
         return {"id": cursor.lastrowid, "reference": reference, "received": True, "message": "Thanks — the HV Swim team can now follow up with you."}
 
 

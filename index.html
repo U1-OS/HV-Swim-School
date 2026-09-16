@@ -8,6 +8,7 @@
   <meta property="og:title" content="HV Swim Bendigo | Confidence starts in the water">
   <meta property="og:description" content="Personal, inclusive swimming lessons from four months to adults in Bendigo.">
   <meta property="og:type" content="website">
+  <meta property="og:url" content="index.html">
   <meta property="og:site_name" content="HV Swim Bendigo">
   <meta property="og:locale" content="en_AU">
   <meta property="og:image" content="assets/og-share-v3.jpg">
@@ -17,10 +18,13 @@
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="HV Swim Bendigo | Confidence starts in the water">
   <meta name="twitter:description" content="Personal, inclusive swimming lessons from four months to adults in Bendigo.">
-  <meta name="twitter:image" content="assets/og-share-v3.jpg">  <title>HV Swim Bendigo | Confidence starts in the water</title>
+  <meta name="twitter:image" content="assets/og-share-v3.jpg">  <link rel="canonical" href="index.html">
+  <title>HV Swim Bendigo | Confidence starts in the water</title>
   <link rel="icon" href="assets/app-icon-v3-64.png">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="assets/app-icon-v3-180.png">
+  <link rel="preload" as="image" href="assets/hero-programs-v4.webp" type="image/webp" fetchpriority="high">
+  <link rel="preload" href="assets/fonts/manrope-latin-variable.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="assets/styles.css?v=5.13.0-ui22">
   <link rel="stylesheet" href="assets/support.css?v=5.13.0-ui22">
   <script defer src="assets/app.js?v=5.13.0-ui22"></script>
@@ -28,12 +32,13 @@
   <script defer src="assets/public-api.js?v=5.13.0-ui22"></script>
   <script type="application/ld+json">{
   "@context": "https://schema.org",
-  "@type": "SportsActivityLocation",
+  "@type": ["SportsActivityLocation", "LocalBusiness"],
   "name": "HV Swim Bendigo",
   "legalName": "HVS BENDIGO PTY LTD",
-  "taxID": "ABN 46 687 937 962",
+  "taxID": "46687937962",
+  "identifier": {"@type": "PropertyValue", "name": "ABN", "value": "46 687 937 962"},
   "description": "Confidence-first swimming lessons for infants, children, teens and adults in Bendigo.",
-  "telephone": "+61 413 462 112",
+  "telephone": "+61413462112",
   "email": "bendigo@hvswimschool.com",
   "address": {
     "@type": "PostalAddress",
@@ -43,13 +48,8 @@
     "postalCode": "3556",
     "addressCountry": "AU"
   },
-  "areaServed": {
-    "@type": "City",
-    "name": "Bendigo"
-  },
-  "sameAs": [
-    "https://www.facebook.com/hvswimschoolbendigo"
-  ]
+  "areaServed": {"@type": "City", "name": "Bendigo"},
+  "sameAs": ["https://www.facebook.com/hvswimschoolbendigo"]
 }</script>
   <link rel="stylesheet" href="assets/experience.css?v=5.13.0-ui22">
   <script defer src="assets/experience.js?v=5.13.0-ui22"></script>
@@ -60,7 +60,7 @@
   <header class="site-header">
     <div class="container nav-wrap">
       <a class="brand" href="index.html" aria-label="HV Swim Bendigo home">
-        <img src="assets/hv-swim-logo-v3.png" width="400" height="265" alt="HV Swim Bendigo">
+        <picture><source type="image/webp" srcset="assets/hv-swim-logo-v3.webp"><img src="assets/hv-swim-logo-v3.png" decoding="async" width="400" height="265" alt="HV Swim Bendigo"></picture>
         <span class="brand-copy"><strong>HV Swim Bendigo</strong><span>Confidence for life</span></span>
       </a>
       <nav class="nav-links" id="main-nav" aria-label="Main navigation">
@@ -98,10 +98,10 @@
             <span>All ages &amp; abilities</span>
             <span>Standard lessons $22.50</span>
           </div>
-          <a class="hero-photo-note" href="about.html"><img src="assets/hero-swimmer.jpg" width="80" height="80" alt="" decoding="async"><span><strong>Little steps. Big confidence.</strong><small>Get to know our approach <span aria-hidden="true">↗</span></small></span></a>
+          <a class="hero-photo-note" href="about.html"><picture><source type="image/webp" srcset="assets/hero-swimmer.webp"><img src="assets/hero-swimmer.jpg" width="80" height="80" alt="" decoding="async"></picture><span><strong>Little steps. Big confidence.</strong><small>Get to know our approach <span aria-hidden="true">↗</span></small></span></a>
         </div>
         <figure class="sunlit-portrait">
-          <img src="assets/hero-programs-v4.jpg" alt="Illustrative swimming campaign: an instructor supporting young swimmers in the water" width="1536" height="1024" fetchpriority="high" decoding="async">
+          <picture><source type="image/webp" srcset="assets/hero-programs-v4.webp"><img src="assets/hero-programs-v4.jpg" alt="Illustrative swimming campaign: an instructor supporting young swimmers in the water" width="1536" height="1024" fetchpriority="high" decoding="async"></picture>
           <figcaption><span class="sunlit-caption-label">A little courage. A world of possibility.</span><strong>Small steps.<br>Wonderful progress.</strong><span>Confidence · Water safety · Belonging</span></figcaption>
           <span class="sunlit-photo-credit">Illustrative campaign image</span>
         </figure>
@@ -118,7 +118,7 @@
       </aside>
     </section>
 
-    <div class="container feature-strip reveal">
+    <div class="container feature-strip reveal" role="region" aria-label="Program benefits">
       <div class="card">
         <div class="feature-item"><span class="icon-box" aria-hidden="true">≈</span><div><strong>Water-safety first</strong><span>Skills that support confidence for life</span></div></div>
         <div class="feature-item"><span class="icon-box" aria-hidden="true">1:1</span><div><strong>Personal teaching</strong><span>Small groups and private tuition</span></div></div>
@@ -185,7 +185,7 @@
               <div class="pool-float float-gold"><span></span></div><div class="pool-float float-coral"><span></span></div><div class="pool-float float-aqua"><span></span></div>
               <div class="pool-board board-one"></div><div class="pool-board board-two"></div>
               <div class="pool-ladder"></div>
-              <div class="pool-sign"><img src="assets/hv-swim-mark-v3.png" width="65" height="65" alt=""><span>Every splash<br>is a start.</span></div>
+              <div class="pool-sign"><picture><source type="image/webp" srcset="assets/hv-swim-mark-v3.webp"><img src="assets/hv-swim-mark-v3.png" decoding="async" width="65" height="65" alt="" aria-hidden="true"></picture><span>Every splash<br>is a start.</span></div>
             </div></div>
             <span class="scene-spark spark-one" aria-hidden="true">✦</span><span class="scene-spark spark-two" aria-hidden="true">✦</span>
             <span class="scene-drag-hint" id="pool-controls-help">Drag to explore · arrow keys to rotate</span>
@@ -230,7 +230,7 @@
         <div class="merch-copy reveal"><div class="eyebrow">The premium HV Swim collection</div><h2>From first splash to home time.</h2><p class="lead space-top-18">Thoughtful essentials for your family's pool routine: comfortable swimwear, embroidered towels and a favourite bottle for the way home.</p><div class="merch-tags"><span>Kids swimwear</span><span>Hooded towels</span><span>Warm drinkware</span><span>Pool gear</span></div><div class="merch-actions"><a class="btn btn-primary" href="shop.html#kit-builder">Explore the collection <span aria-hidden="true">→</span></a><span class="status changed">Coming soon</span></div><p class="micro merch-note">Our collection is in development. Products and ordering will become available after sample approval.</p></div>
         <div class="merch-campaign-stack reveal">
           <figure class="merch-campaign merch-campaign-primary">
-            <img src="assets/merch-kids-premium-v55.jpg" width="1536" height="1024" alt="Premium HV Swim Bendigo children's swimwear, hooded towel, bag, cap, goggles and lesson gear concept" loading="lazy" decoding="async">
+            <picture><source type="image/webp" srcset="assets/merch-kids-premium-v55.webp"><img src="assets/merch-kids-premium-v55.jpg" width="1536" height="1024" alt="Premium HV Swim Bendigo children's swimwear, hooded towel, bag, cap, goggles and lesson gear concept" loading="lazy" decoding="async"></picture>
             <figcaption><span><strong>Children’s lesson-day collection</strong><small>Premium supplier-sample concept</small></span><span class="campaign-arrow" aria-hidden="true">↗</span></figcaption>
           </figure>
         </div>
@@ -363,12 +363,12 @@
 
   <footer class="site-footer">
     <div class="container footer-main">
-      <div class="footer-brand"><img src="assets/hv-swim-logo-v3.png" width="400" height="265" alt="HV Swim Bendigo"><p>Personal swimming lessons focused on confidence, water safety and progress for every age and ability.</p></div>
+      <div class="footer-brand"><picture><source type="image/webp" srcset="assets/hv-swim-logo-v3.webp"><img src="assets/hv-swim-logo-v3.png" loading="lazy" decoding="async" width="400" height="265" alt="HV Swim Bendigo"></picture><p>Personal swimming lessons focused on confidence, water safety and progress for every age and ability.</p></div>
       <div class="footer-col"><strong>Explore</strong><a href="programs.html">Programs &amp; pricing</a><a href="#availability">Availability</a><a href="locations.html">Locations</a><a href="about.html">Our story</a><a href="shop.html">Merch shop</a></div>
       <div class="footer-col"><strong>Platform</strong><a href="login.html?role=customer">Family account</a><a href="login.html?role=staff">Staff account</a><a href="login.html?role=admin">Website admin</a></div>
       <div class="footer-col"><strong>Contact</strong><a href="tel:+61413462112">0413 462 112</a><a href="mailto:bendigo@hvswimschool.com">bendigo@hvswimschool.com</a><a href="https://www.facebook.com/hvswimschoolbendigo" target="_blank" rel="noopener">Facebook</a></div>
     </div>
-    <div class="container footer-bottom"><span>© <span data-year></span> HV Swim Bendigo.</span><nav class="footer-legal" aria-label="Legal"><a href="privacy.html">Privacy</a><a href="cookies.html">Cookies</a><a href="security.html">Security</a><a href="accessibility.html">Accessibility</a><a href="terms.html">Terms &amp; cancellations</a><a href="photo-consent.html">Photo consent</a></nav><span>Safety • Confidence • Belonging</span></div>
+    <div class="container footer-bottom"><span>© <span data-year></span> HV Swim Bendigo.</span><nav class="footer-legal" aria-label="Legal"><a href="privacy.html">Privacy</a><a href="terms.html">Terms &amp; cancellations</a><a href="photo-consent.html">Photo consent</a></nav><span>Safety • Confidence • Belonging</span></div>
   </footer>
   <nav class="mobile-book-bar" aria-label="Quick actions"><a href="locations.html">Pool conditions</a><a class="btn btn-primary" href="enquire.html" data-primary-cta data-analytics-cta="mobile_find_lesson"><span data-primary-cta-label>Find the right lesson</span></a></nav>
   <div class="toast" role="status" aria-live="polite"></div>

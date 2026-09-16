@@ -2,20 +2,26 @@
 
 Andrew swaps between Claude and Codex. Read this first and rewrite it last.
 
-**Wheel:** Cursor (cloud port)
-**Last updated:** 2026-09-16 — port commits 838fdd3 and 8cc560b onto cursor/port-codex-security-ops-e9b5
+**Wheel:** Cursor Cloud Agent
+**Last updated:** 2026-09-16 — PR #4 merged on main; PR #17 public-site upgrade (a11y, SEO, CSS tokens, WebP, PWA) rebased onto main
 
-## Current work — operations and security port onto main
+## Current work — public-site upgrade
 
-Andrew approved landing work from `codex/sunlit-rebuild` (`838fdd3`) and
-`codex/fresh-brand-rebuild` (`8cc560b`) that never reached main. Overlapping
-login-throttle, trusted-proxy client IP and admin MFA items stay on draft PR #1
-(`cursor/harden-backend-high-severity-findings-d8f8`) and are not duplicated here.
-Main enquiry pagination and email-draft behaviour are preserved.
+Branch `cursor/public-site-upgrade-6638` rebased onto latest `main` (`8931b9d`). In-place public HTML/CSS/JS upgrade; **backend/ was not touched**. A former instructor stays off the site.
 
-Read `OPERATIONS_SECURITY_UPGRADE.md` and `SECURITY_REVIEW_2026-09-13.md`.
+- PWA: sign-in and role shells are network-only; runtime cache buckets are generation 24.
+- Accessibility: enquiry errors `aria-describedby`, login recovery `for`/`id`, skip-links `:focus-visible`, table `scope`, decorative marks hidden from AT.
+- SEO: relative canonical + `og:url` on public pages (absolute URLs still come from `build-sitemap.mjs` once a domain exists). Portal shells have `noindex,nofollow`. JSON-LD is `SportsActivityLocation` + `LocalBusiness` aligned with `BUSINESS_DETAILS.md` (entity, ABN digits in `taxID`, Wood Street, email).
+- CSS: one `:root` token set from `BRAND_GUIDE.md` (`#061A3B`, `#008CCB`, `#19C8F4`, `#FFC928`). Public `!important` override fights removed; reduced-motion and `[hidden]` keep `!important` on purpose.
+- Images: photo WebP + JPEG/PNG fallback; logos are lossless WebP. Asset query is `5.13.0-ui22`.
+- Static server: `python3 -m http.server 3000 --bind 0.0.0.0` (tmux `hv-swim-static-3000`). Chrome on `DISPLAY=:1` stays on the homepage.
+
+### Next up
+
+Andrew review of the draft PR. When a production domain is bought, run `node scripts/build-sitemap.mjs https://<domain>` so canonicals, `og:image` and `robots.txt` Sitemap become absolute. Do not restore removed staff names. Do not enable live integrations without approval.
 
 ## Previous work — UI21 launch preparation
+
 
 Andrew selected all five next steps and confirmed no domain or hosting account yet.
 Repository visibility is now PUBLIC by Andrew's action. Continue pushing verified source;
