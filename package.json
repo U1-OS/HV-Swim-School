@@ -15,7 +15,7 @@
     "mobile:open:android": "npx cap open android"
   },
   "dependencies": {
-    "@capacitor/android": "^8.0.0",
+    "@capacitor/android": "^8.5.2",
     "@capacitor/app": "^8.0.0",
     "@capacitor/core": "^8.0.0",
     "@capacitor/geolocation": "^8.0.0",
