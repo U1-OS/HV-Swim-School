@@ -25,12 +25,26 @@ const allCss = styles.map((f) => read(join('assets', f))).join('\n');
 
 // 1. Every local href/src in every page resolves to a real file.
 for (const page of pages) {
-  for (const [, raw] of read(page).matchAll(/(?:href|src)="([^"]*)"/g)) {
+  for (const [, raw] of read(page).matchAll(/(?:href|src|srcset)="([^"]*)"/g)) {
     if (!raw || raw.startsWith('#')) continue;
     if (/^[a-z][a-z0-9+.-]*:/i.test(raw) || raw.startsWith('//')) continue;   // tel:, mailto:, https:, //cdn
     const clean = raw.replace(/^\.?\//, '').split(/[?#]/)[0];
     if (!clean) continue;
     if (!existsSync(join(root, clean))) fail('broken link', `${page} -> ${raw}`);
+  }
+}
+
+// Local CSS url() / image-set() files must exist or backgrounds silently vanish.
+for (const style of styles) {
+  const source = read(join('assets', style));
+  for (const [, raw] of source.matchAll(/url\(["']?([^"')]+)["']?\)/g)) {
+    if (!raw || raw.startsWith('data:') || /^[a-z][a-z0-9+.-]*:/i.test(raw) || raw.startsWith('//')) continue;
+    const clean = raw.replace(/^\.?\//, '').split(/[?#]/)[0];
+    if (!clean) continue;
+    const fromAssets = join(root, 'assets', clean);
+    if (!existsSync(fromAssets) && !existsSync(join(root, clean))) {
+      fail('broken css url', `assets/${style} -> ${raw}`);
+    }
   }
 }
 
