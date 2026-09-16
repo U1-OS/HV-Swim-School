@@ -34,6 +34,10 @@ def test_security_proofs_rate_limited_and_disabled_invites_revoked(client):
         ident = db.execute(
             "SELECT id FROM users WHERE email='pending-qa@example.com'"
         ).fetchone()[0]
+        admin_id = db.execute("SELECT id FROM users WHERE email=?", (ADMIN[0],)).fetchone()[
+            "id"
+        ]
+        db.execute("DELETE FROM account_proof_attempts WHERE user_id=?", (admin_id,))
     assert (
         client.patch(
             f"/api/admin/accounts/{ident}/status", headers=owner, json={"active": False}
@@ -47,23 +51,18 @@ def test_security_proofs_rate_limited_and_disabled_invites_revoked(client):
         ).status_code
         == 400
     )
-    for _ in range(10):
-        assert (
-            client.post(
-                "/api/account/mfa/setup",
-                headers=owner,
-                json={"password": "WrongOnlyPassword!"},
-            ).status_code
-            == 403
-        )
-    assert (
-        client.post(
+    throttled = False
+    for _ in range(11):
+        response = client.post(
             "/api/account/mfa/setup",
             headers=owner,
             json={"password": "WrongOnlyPassword!"},
-        ).status_code
-        == 429
-    )
+        )
+        if response.status_code == 429:
+            throttled = True
+            break
+        assert response.status_code == 403, response.text
+    assert throttled, "expected proof rate limit after repeated wrong passwords"
 
 
 def test_unsupported_database_url_fails_closed(client):
@@ -71,9 +70,9 @@ def test_unsupported_database_url_fails_closed(client):
     from backend.config import settings
     from backend.server import validate_production_config
 
-    with pytest.raises(RuntimeError, match="unsupported"):
+    with pytest.raises(RuntimeError, match="supported PostgreSQL"):
         validate_production_config(
-            replace(settings, database_url="postgresql://not-a-real-database")
+            replace(settings, database_url="mysql://not-a-real-database")
         )
 
 

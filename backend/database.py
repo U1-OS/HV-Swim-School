@@ -567,10 +567,14 @@ CREATE INDEX IF NOT EXISTS idx_audit_action_ip ON audit_log(action, ip_address, 
 CREATE INDEX IF NOT EXISTS idx_login_attempts_lookup ON login_attempts(email, ip_address, created_at);
 CREATE INDEX IF NOT EXISTS idx_login_attempts_ip ON login_attempts(ip_address, created_at);
 CREATE INDEX IF NOT EXISTS idx_login_attempts_created_at ON login_attempts(created_at);
+CREATE INDEX IF NOT EXISTS idx_login_attempts_ip ON login_attempts(ip_address, success, created_at);
 """
 
 
 def connect() -> sqlite3.Connection:
+    if settings.database_url:
+        from .postgres_storage import Connection
+        return Connection(settings.database_url)
     ensure_private_directory(DB_PATH.parent)
     connection = sqlite3.connect(DB_PATH, timeout=15, check_same_thread=False)
     harden_database_files(DB_PATH)
@@ -650,6 +654,19 @@ def migrate_legacy_bookings_table(db: sqlite3.Connection) -> None:
         raise RuntimeError("Booking history migration failed its foreign-key check")
 
 
+def reject_preview_database(db) -> None:
+    """Fail before migrations if a production process points at synthetic preview data."""
+    if not settings.production:
+        return
+    if list(db.execute("PRAGMA table_info(users)")) and db.execute("SELECT 1 FROM users WHERE LOWER(email) LIKE '%@hvswim.demo' LIMIT 1").fetchone():
+        raise RuntimeError("Production cannot use a preview database; select a clean production database")
+    term_columns = {row[1] for row in db.execute("PRAGMA table_info(school_terms)")}
+    if "source" in term_columns and db.execute("SELECT 1 FROM school_terms WHERE source='preview' LIMIT 1").fetchone():
+        raise RuntimeError("Production cannot use preview term records")
+    if list(db.execute("PRAGMA table_info(audit_log)")) and db.execute("SELECT 1 FROM audit_log WHERE action='seed_database' LIMIT 1").fetchone():
+        raise RuntimeError("Production cannot use a seeded preview database")
+
+
 def purge_expired_enquiries(db: sqlite3.Connection) -> int:
     """Delete public enquiries past the six-month retention window. Returns rows removed."""
     from .security import ENQUIRY_RETENTION_DAYS
@@ -662,18 +679,30 @@ def purge_expired_enquiries(db: sqlite3.Connection) -> int:
 def initialise_database() -> None:
     ensure_private_directory(DB_PATH.parent)
     with db_session() as db:
+        reject_preview_database(db)
+        if settings.database_url:
+            from .postgres_storage import install_helpers
+            install_helpers(db)
         # WAL allows readers to continue while a short management write is committed.
         # The explicit busy timeout above turns brief write contention into a bounded wait
         # instead of an immediate operational error.
         db.execute("PRAGMA journal_mode=WAL")
         db.executescript(SCHEMA)
-        migrate_legacy_bookings_table(db)
+        from .lesson_calendar import SCHEMA as CALENDAR_SCHEMA
+        db.executescript(CALENDAR_SCHEMA)
+        from .mail_queue import SCHEMA as MAIL_SCHEMA
+        db.executescript(MAIL_SCHEMA)
+        from .launch_readiness import SCHEMA as LAUNCH_SCHEMA
+        db.executescript(LAUNCH_SCHEMA)
+        if not settings.database_url: migrate_legacy_bookings_table(db)
         # Rate-limit records carry email and IP data. Enforce the documented retention at
         # startup as well as during sign-in so a site receiving only failed traffic cannot
         # grow or retain these rows indefinitely.
         login_cutoff = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
         db.execute("DELETE FROM login_attempts WHERE created_at<=?", (login_cutoff,))
         purge_expired_enquiries(db)
+        enquiry_cutoff = (datetime.now(timezone.utc) - timedelta(days=183)).isoformat()
+        db.execute("DELETE FROM mail_outbox WHERE created_at<=? AND status NOT IN ('processing','uncertain')", (enquiry_cutoff,))
         session_columns = {row[1] for row in db.execute("PRAGMA table_info(sessions)")}
         if "last_seen_at" not in session_columns:
             db.execute("ALTER TABLE sessions ADD COLUMN last_seen_at TEXT")
@@ -705,6 +734,8 @@ def initialise_database() -> None:
             "next_action": "TEXT NOT NULL DEFAULT 'review'",
             "follow_up_on": "TEXT",
             "revision": "INTEGER NOT NULL DEFAULT 0",
+            "collection_notice_version": "TEXT",
+            "acknowledged_at": "TEXT",
 
         }.items():
             if column not in enquiry_columns:
@@ -830,7 +861,7 @@ def initialise_database() -> None:
                 db.execute(
                     """UPDATE swimmers SET emergency_contact=?,medical_notes=?,allergies=?,medications=?,support_notes=?
                        WHERE id=?""",
-                    (*(encrypt_sensitive(value) for value in values), swimmer["id"]),
+                    (*(value if value and value.startswith(SENSITIVE_VALUE_PREFIX) else encrypt_sensitive(value) for value in values), swimmer["id"]),
                 )
         attendance_columns = {row[1] for row in db.execute("PRAGMA table_info(lesson_attendance)")}
         if "term_id" not in attendance_columns:

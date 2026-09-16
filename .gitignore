@@ -19,3 +19,23 @@ _to_delete/
 
 # Local compose secrets — copy from .env.production.example; never commit.
 deploy/.env
+
+# Isolated synthetic local preview; never commit runtime records or keys.
+data/local-preview/
+*.hvbackup
+data/recovery/
+data/email-capture/
+
+# Private qualification uploads and all nested database variants.
+data/staff-qualification-documents/
+data/**/*.db*
+
+# Secret variants, private keys, dumps and staff medical records.
+.env.*
+!.env.example
+*.pem
+*.p8
+*.key
+*.dump
+*.sql
+data/staff-documents/

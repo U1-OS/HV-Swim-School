@@ -217,6 +217,7 @@
     elements.experience.value=composeExperience().slice(0,500);
     elements.preferredDays.value=[...form.querySelectorAll('[name="preferred_day"]:checked')].map(input=>input.value).join(', ');
     const payload=Object.fromEntries(new FormData(form).entries());
+    payload.acknowledgement=!!form.querySelector('[name="acknowledgement"]')?.checked;
     delete payload.confidence;delete payload.class_choice;delete payload.preferred_day;
     elements.submit.disabled=true;elements.submit.textContent='Sending securely…';elements.error.textContent='';
     try{

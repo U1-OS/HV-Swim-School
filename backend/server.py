@@ -20,6 +20,7 @@ from urllib.parse import parse_qs, quote, urlparse
 from zoneinfo import ZoneInfo
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, Response, status
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -30,7 +31,7 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
 
 from .config import DATA_DIR, ROOT, settings
 from .filesystem import ensure_private_directory, harden_private_file
-from . import identity, payroll_adapter, workforce
+from . import identity, payroll_adapter, workforce, lesson_calendar, mail_queue, launch_readiness
 from .database import audit, db_session, initialise_database, purge_expired_enquiries, rows
 from .integrations import (
     current_bendigo_weather,
@@ -162,9 +163,31 @@ def fulfilment_mode_for_route(route: str) -> str:
     return SUPPLIER_ROUTE_DETAILS.get(route, SUPPLIER_ROUTE_DETAILS["manual_review"])["automation"]
 
 
+def validate_https_url(value: str, name: str, *, origin_only: bool = False) -> None:
+    try:
+        parsed = urlparse(value)
+        invalid = (
+            parsed.scheme != "https" or not parsed.hostname or parsed.username is not None
+            or parsed.password is not None or parsed.fragment or parsed.port == 0
+            or any(character.isspace() or character in "\\" for character in value)
+            or (origin_only and (parsed.path not in ("", "/") or parsed.query))
+        )
+    except ValueError:
+        invalid = True
+    if invalid:
+        raise RuntimeError(f"{name} must be a valid HTTPS {'origin' if origin_only else 'URL'} without credentials")
+
+
 def validate_production_config(candidate=settings) -> None:
+    if candidate.app_env.lower() not in {"development", "test", "staging", "production"}:
+        raise RuntimeError("HV_APP_ENV is not a recognised environment")
     if candidate.database_url:
-        raise RuntimeError("DATABASE_URL / HV_DATABASE_URL is unsupported by this SQLite build. Configure HV_DATA_DIR on a protected persistent disk; PostgreSQL requires a separately tested storage migration.")
+        parsed=urlparse(candidate.database_url)
+        if parsed.scheme not in ('postgres','postgresql'):
+            raise RuntimeError('DATABASE_URL must be a supported PostgreSQL URL')
+        local=parsed.hostname in ('localhost','127.0.0.1','::1') or not parsed.hostname
+        if candidate.production and (local or parse_qs(parsed.query).get('sslmode')!=['verify-full']):
+            raise RuntimeError('Production PostgreSQL requires a remote host and sslmode=verify-full')
     if not candidate.production:
         return
     insecure_secrets = {
@@ -173,13 +196,15 @@ def validate_production_config(candidate=settings) -> None:
     }
     if candidate.session_secret in insecure_secrets or len(candidate.session_secret) < 32:
         raise RuntimeError("HV_SESSION_SECRET must be a unique random value of at least 32 characters")
-    if len(candidate.data_encryption_key) < 32 or candidate.data_encryption_key == candidate.session_secret:
+    insecure_secrets.add("replace-with-a-separate-random-data-encryption-key")
+    if candidate.data_encryption_key in insecure_secrets or len(candidate.data_encryption_key) < 32 or candidate.data_encryption_key == candidate.session_secret:
         raise RuntimeError("HV_DATA_ENCRYPTION_KEY must be a separate random value of at least 32 characters")
-    if not candidate.public_url.startswith("https://"):
-        raise RuntimeError("HV_PUBLIC_URL must use HTTPS in production")
+    validate_https_url(candidate.public_url, "HV_PUBLIC_URL", origin_only=True)
+    if not candidate.database_url:
+        raise RuntimeError("HV_DATABASE_URL must select managed PostgreSQL in production")
     xero_configured = bool(candidate.xero_client_id and candidate.xero_client_secret and candidate.xero_redirect_uri)
-    if xero_configured and not candidate.xero_redirect_uri.startswith("https://"):
-        raise RuntimeError("XERO_REDIRECT_URI must use HTTPS in production")
+    if xero_configured:
+        validate_https_url(candidate.xero_redirect_uri, "XERO_REDIRECT_URI")
     if candidate.xero_sync_enabled and not xero_configured:
         raise RuntimeError("XERO_SYNC_ENABLED requires the complete Xero OAuth configuration")
     if candidate.xero_sync_enabled and (
@@ -202,20 +227,20 @@ def validate_production_config(candidate=settings) -> None:
         or not urlparse(f"https://{shopify_domain}").hostname
     ):
         raise RuntimeError("SHOPIFY_STORE_DOMAIN must be a hostname without a scheme or path")
-    if candidate.pool_sensor_url and not candidate.pool_sensor_url.startswith("https://"):
-        raise RuntimeError("POOL_SENSOR_URL must use HTTPS in production")
+    if candidate.pool_sensor_url:
+        validate_https_url(candidate.pool_sensor_url, "POOL_SENSOR_URL")
     google_fields = (candidate.google_client_id, candidate.google_client_secret)
     if any(google_fields) and not all(google_fields):
         raise RuntimeError("GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET must be configured together")
     google_redirect = candidate.google_redirect_uri or f"{candidate.public_url}/api/auth/oauth/google/callback"
-    if all(google_fields) and not google_redirect.startswith("https://"):
-        raise RuntimeError("GOOGLE_REDIRECT_URI must use HTTPS in production")
+    if all(google_fields):
+        validate_https_url(google_redirect, "GOOGLE_REDIRECT_URI")
     apple_fields = (candidate.apple_client_id, candidate.apple_client_secret)
     if any(apple_fields) and not all(apple_fields):
         raise RuntimeError("APPLE_CLIENT_ID and APPLE_CLIENT_SECRET must be configured together")
     apple_redirect = candidate.apple_redirect_uri or f"{candidate.public_url}/api/auth/oauth/apple/callback"
-    if all(apple_fields) and not apple_redirect.startswith("https://"):
-        raise RuntimeError("APPLE_REDIRECT_URI must use HTTPS in production")
+    if all(apple_fields):
+        validate_https_url(apple_redirect, "APPLE_REDIRECT_URI")
     if not candidate.trusted_proxies:
         raise RuntimeError(
             "HV_TRUSTED_PROXIES must list every reverse-proxy address that terminates HTTPS "
@@ -357,15 +382,15 @@ async def security_headers(request: Request, call_next):
             response = JSONResponse(status_code=400, content={"detail": "Invalid Content-Length header"})
             response.headers["X-Request-ID"] = request_id
             return response
-    elif request_path.startswith("/api/"):
-        # Do not let HTTP/1.1 chunked requests bypass the Content-Length gate.
-        # Starlette replays this cached body to the route handler after the check.
-        if len(await request.body()) > body_limit:
-            response = JSONResponse(status_code=413, content={"detail": "Request body is too large"})
-            response.headers["X-Content-Type-Options"] = "nosniff"
-            response.headers["Cache-Control"] = "no-store"
-            response.headers["X-Request-ID"] = request_id
-            return response
+    if request_path.startswith('/api/'):
+        # Bound memory while receiving, including chunked bodies and dishonest lengths.
+        received=0;chunks=[]
+        async for chunk in request.stream():
+            received+=len(chunk)
+            if received>body_limit:
+                return JSONResponse(status_code=413,content={'detail':'Request body is too large'},headers={'Cache-Control':'no-store','X-Request-ID':request_id,'X-Content-Type-Options':'nosniff'})
+            chunks.append(chunk)
+        request._body=b''.join(chunks)  # Starlette's cached request replays to the route.
     content_type = request.headers.get("content-type", "").lower()
     if request_path.startswith("/api/") and request_path != "/api/auth/oauth/apple/callback" and content_type.startswith(
         ("application/x-www-form-urlencoded", "multipart/form-data")
@@ -377,10 +402,10 @@ async def security_headers(request: Request, call_next):
         return response
     try:
         response = await call_next(request)
-    except Exception:
+    except Exception as problem:
         if not settings.production:
             raise
-        LOGGER.exception("Unhandled request failure", extra={"request_id": request_id, "path": request_path})
+        LOGGER.error("Unhandled request failure", extra={"request_id": request_id, "path": request_path, "error_type": type(problem).__name__})
         response = JSONResponse(
             status_code=500,
             content={"detail": "The request could not be completed", "request_id": request_id},
@@ -914,6 +939,7 @@ class ReminderPreferencesInput(BaseModel):
 
 class EnquiryInput(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
+    acknowledgement: bool = False
 
     enquiry_type: Literal["lesson", "merchandise", "general", "existing_customer", "lesson_question", "private_lesson", "billing", "feedback", "other"] = "lesson"
     name: str = Field(min_length=2, max_length=100)
@@ -932,6 +958,7 @@ class EnquiryInput(BaseModel):
 
     @model_validator(mode="after")
     def validate_reply_details(self):
+        if not self.website and not self.acknowledgement:raise ValueError('Please acknowledge the enquiry collection notice')
         if self.contact_method in {"phone", "sms"} and not 8 <= sum(character.isdecimal() for character in self.phone) <= 15:
             raise ValueError("Enter a complete phone number for your selected reply method")
         return self
@@ -1258,7 +1285,7 @@ def materialise_due_lesson_reminders(db: sqlite3.Connection, user_id: int) -> in
     window_end = local_now + timedelta(hours=preferences["hours_before"])
     created = 0
     bookings = db.execute(
-        """SELECT b.id booking_id,s.first_name swimmer_first,c.title,c.weekday,c.start_time,l.name location_name
+        """SELECT b.id booking_id,c.id class_id,s.first_name swimmer_first,c.title,c.weekday,c.start_time,l.name location_name
            FROM bookings b JOIN swimmers s ON s.id=b.swimmer_id JOIN classes c ON c.id=b.class_id
            JOIN locations l ON l.id=c.location_id
            WHERE s.customer_id=? AND b.status='confirmed' AND c.active=1""",
@@ -1267,16 +1294,11 @@ def materialise_due_lesson_reminders(db: sqlite3.Connection, user_id: int) -> in
     term_start = date.fromisoformat(term["start_date"])
     term_end = date.fromisoformat(term["end_date"])
     for booking in bookings:
-        occurrence = next_class_occurrence(booking["weekday"], max(local_now.date(), term_start), term_end)
-        if not occurrence:
-            continue
-        lesson_time = datetime.strptime(booking["start_time"], "%H:%M").time()
-        lesson_at = datetime.combine(occurrence, lesson_time, tzinfo=MELBOURNE_TZ)
-        if lesson_at <= local_now:
-            occurrence += timedelta(days=7)
-            lesson_at += timedelta(days=7)
-        if occurrence > term_end or lesson_at > window_end:
-            continue
+        effective=lesson_calendar.next_occurrence(db,booking['class_id'],local_now)
+        if not effective: continue
+        occurrence=date.fromisoformat(effective['occurrence_date'])
+        lesson_at=datetime.combine(occurrence,datetime.strptime(effective['start_time'],'%H:%M').time(),tzinfo=MELBOURNE_TZ)
+        if lesson_at>window_end: continue
         existing = db.execute(
             "SELECT 1 FROM lesson_reminder_dispatches WHERE booking_id=? AND occurrence_date=? AND user_id=?",
             (booking["booking_id"], occurrence.isoformat(), user_id),
@@ -1289,7 +1311,7 @@ def materialise_due_lesson_reminders(db: sqlite3.Connection, user_id: int) -> in
             (
                 user_id,
                 f"Lesson reminder · {booking['swimmer_first']}",
-                f"{booking['title']} is at {booking['start_time']} on {occurrence.strftime('%A')} at {booking['location_name']}.",
+                f"{booking['title']} is at {effective['start_time']} on {occurrence.strftime('%A %d %B')} at {booking['location_name']}.",
                 "lesson_reminder",
                 json.dumps(preferences["channels"]),
                 now_iso(),
@@ -1319,7 +1341,15 @@ def create_xero_lesson_charge(
     first = next_class_occurrence(swim_class["weekday"], date.fromisoformat(term["start_date"]), date.fromisoformat(term["end_date"]))
     if not first:
         raise HTTPException(status_code=409, detail="This class has no lesson dates in the active term")
-    lesson_count = ((date.fromisoformat(term["end_date"]) - first).days // 7) + 1
+    lesson_count=0
+    day=first
+    while day<=date.fromisoformat(term['end_date']):
+        exception=db.execute('SELECT * FROM lesson_exceptions WHERE class_id=? AND original_date=?',(swim_class['id'],day.isoformat())).fetchone()
+        if exception and exception['action']=='move':
+            included=any(c['original_date']==day.isoformat() for c in lesson_calendar.on_date(db,exception['target_date'],class_id=swim_class['id']))
+        else:included=any(c['original_date']==day.isoformat() for c in lesson_calendar.on_date(db,day,class_id=swim_class['id']))
+        lesson_count+=int(included);day+=timedelta(days=7)
+    if not lesson_count:raise HTTPException(409,'This class has no effective lesson dates in the active term')
     # Guarantee the permanent identifiers inside the enrolment transaction. New family
     # and swimmer records receive them earlier, while this closes the gap for migrated or
     # legacy records before an invoice reference is created.
@@ -1481,12 +1511,11 @@ async def refresh_and_store_xero_token(token: dict[str, Any]) -> dict[str, Any]:
 
 
 def validate_class_occurrence(db: sqlite3.Connection, class_row: sqlite3.Row, occurrence: date) -> sqlite3.Row:
-    term = term_for_date(db, occurrence)
-    if not term:
-        raise HTTPException(status_code=409, detail="This date is not inside a published school term")
-    if occurrence.weekday() != class_row["weekday"]:
-        raise HTTPException(status_code=422, detail="The selected date does not match this class day")
-    return term
+    class_id = class_row['class_id'] if 'class_id' in class_row.keys() else class_row['id']
+    match = next((item for item in lesson_calendar.on_date(db,occurrence) if item['id']==class_id),None)
+    if not match:
+        raise HTTPException(status_code=422, detail="No lesson is scheduled for this class on the selected date")
+    return term_for_date(db,date.fromisoformat(match['original_date']))
 
 
 def certificate_reference(db: sqlite3.Connection) -> str:
@@ -2096,7 +2125,7 @@ def csv_download(filename: str, headings: list[str], records: list[list[Any]]) -
         safe = []
         for value in record:
             text = "" if value is None else str(value)
-            safe.append("'" + text if text.startswith(("=", "+", "-", "@", "\t", "\r")) else text)
+            safe.append(workforce.safe_cell(text))
         writer.writerow(safe)
     return Response(output.getvalue(), media_type="text/csv; charset=utf-8", headers={"Content-Disposition": f'attachment; filename="{filename}"'})
 
@@ -2144,6 +2173,7 @@ def admin_system_health(user: dict[str, Any] = Depends(require_roles("admin"))) 
             "foreign_key_violations": len(foreign_key_violations),
             "billing_total_mismatches": int(billing_mismatches),
             "journal_mode": journal_mode,
+            "check_scope": "Index and constraint validity; use provider integrity tooling for physical storage" if settings.database_url else "SQLite quick_check and foreign_key_check",
         },
         "security": {
             "integration_token_encryption": "current" if legacy_token_count == 0 else "migration_required",
@@ -2218,6 +2248,10 @@ def public_association_badge_artwork(credential_key: str) -> FileResponse:
         return FileResponse(artwork_path, media_type="image/png")
 
 
+def oauth_browser_cookie(provider):
+    return ('__Host-' if settings.production else '')+'hv-oauth-'+provider
+
+
 def oauth_error_redirect(code: str) -> RedirectResponse:
     return RedirectResponse(url=f"/login.html?oauth_error={quote(code, safe='')}", status_code=303)
 
@@ -2238,6 +2272,9 @@ async def complete_oauth_login(
     if provider not in {"google", "apple"} or not state or not code:
         return oauth_error_redirect("invalid_response")
     state_digest = hashlib.sha256(state.encode("utf-8")).hexdigest()
+    browser_verifier=request.cookies.get(oauth_browser_cookie(provider),'')
+    if not browser_verifier or not hmac.compare_digest(browser_verifier,state_digest):
+        return oauth_error_redirect('browser_mismatch')
     with db_session() as db:
         db.execute("DELETE FROM oauth_login_attempts WHERE expires_at<=?", (now_iso(),))
         attempt = db.execute(
@@ -2275,7 +2312,9 @@ async def complete_oauth_login(
     last_name = safe_oauth_name(claims.get("family_name") or profile_name.get("lastName"), "")
     signed_in_at = now_iso()
     response = RedirectResponse(url="/platform.html?account=connected", status_code=303)
+    response.delete_cookie(oauth_browser_cookie(provider),path="/",secure=settings.production)
     with db_session() as db:
+        db.execute("BEGIN IMMEDIATE")
         identity = db.execute(
             "SELECT * FROM oauth_identities WHERE provider=? AND subject=?",
             (provider, subject),
@@ -2285,12 +2324,17 @@ async def complete_oauth_login(
             user = db.execute("SELECT * FROM users WHERE id=? AND active=1", (identity["user_id"],)).fetchone()
             if not user:
                 return oauth_error_redirect("account_unavailable")
+            if user["role"]!="customer":return oauth_error_redirect("team_account_requires_approval")
+            if user["mfa_enabled"]:return oauth_error_redirect("use_password_and_mfa")
         else:
             user = db.execute("SELECT * FROM users WHERE email=?", (email,)).fetchone()
+            if user and user["mfa_enabled"]:return oauth_error_redirect("use_password_and_mfa")
             if user and not user["active"]:
                 return oauth_error_redirect("account_unavailable")
             if user and user["role"] != "customer":
                 return oauth_error_redirect("team_account_requires_approval")
+            if user:
+                return oauth_error_redirect("account_link_required")
             if not user:
                 cursor = db.execute(
                     """INSERT INTO users(
@@ -2384,7 +2428,11 @@ def start_oauth(provider: str, request: Request) -> RedirectResponse:
         )
     except OAuthProviderError:
         raise HTTPException(status_code=503, detail="Account provider is not ready")
-    return RedirectResponse(url=destination, status_code=302)
+    response=RedirectResponse(url=destination,status_code=302)
+    response.set_cookie(oauth_browser_cookie(provider),hashlib.sha256(state.encode()).hexdigest(),
+                        max_age=OAUTH_ATTEMPT_MINUTES*60,httponly=True,secure=settings.production,
+                        samesite='none' if provider=='apple' and settings.production else 'lax',path='/')
+    return response
 
 
 @app.get("/api/auth/oauth/google/callback")
@@ -2527,11 +2575,7 @@ def public_locations() -> dict[str, Any]:
                 item["reading_stale"] = datetime.now(timezone.utc) - created > timedelta(hours=24)
             else:
                 item["reading_stale"] = True
-            item["today_classes"] = rows(db.execute(
-                """SELECT code,title,start_time,duration_minutes FROM classes
-                   WHERE active=1 AND location_id=? AND weekday=? ORDER BY start_time""",
-                (location["id"], today_weekday),
-            )) if term["in_session"] and "closed" not in location["public_status"].lower() else []
+            item['today_classes']=[{k:occ[k] for k in ('code','title','start_time','duration_minutes','rescheduled','calendar_note')} for occ in lesson_calendar.on_date(db,business_today()) if occ['location_id']==location['id']] if 'closed' not in location['public_status'].lower() else []
             output.append(item)
         return {"locations": output, "term_calendar": term}
 
@@ -3172,6 +3216,9 @@ def customer_bookings(user: dict[str, Any] = Depends(require_roles("customer", "
                     JOIN locations l ON l.id=c.location_id LEFT JOIN users u ON u.id=c.instructor_id
                     WHERE {where} ORDER BY c.weekday,c.start_time"""
         bookings = rows(db.execute(query, params))
+        for booking in bookings:
+            booking['next_lesson'] = lesson_calendar.next_occurrence(db,booking['class_id']) if booking['status']=='confirmed' else None
+        bookings.sort(key=lambda item: ((item.get('next_lesson') or {}).get('occurrence_date','9999'),(item.get('next_lesson') or {}).get('start_time',''),item['id']))
         waitlist_query = f"""SELECT w.id,w.position,w.status,w.created_at,s.id swimmer_id,s.swimmer_number,s.first_name swimmer_first,s.last_name swimmer_last,
                               c.id class_id,c.title,c.level,c.weekday,c.start_time,c.duration_minutes,l.name location_name
                               FROM waitlist w JOIN swimmers s ON s.id=w.swimmer_id JOIN classes c ON c.id=w.class_id
@@ -3263,8 +3310,9 @@ def customer_absences(user: dict[str, Any] = Depends(require_roles("customer")))
         if term:
             term_end = date.fromisoformat(term["end_date"])
             for booking in bookings:
-                occurrence = next_class_occurrence(booking["weekday"], today, term_end)
-                booking["next_occurrence"] = occurrence.isoformat() if occurrence else None
+                occurrence = lesson_calendar.next_occurrence(db,booking['class_id'])
+                booking['next_occurrence'] = occurrence['occurrence_date'] if occurrence else None
+                booking['scheduled_dates'] = [item['occurrence_date'] for item in lesson_calendar.dates_for_class(db,booking['class_id'],today)]
         else:
             for booking in bookings:
                 booking["next_occurrence"] = None
@@ -3322,6 +3370,11 @@ def report_customer_absence(payload: AbsenceReportInput, request: Request, user:
         ).fetchone()
         if not booking or booking["customer_id"] != user["id"] or booking["status"] != "confirmed":
             raise HTTPException(status_code=404, detail="Confirmed lesson booking not found")
+        effective=next((c for c in lesson_calendar.on_date(db,payload.occurrence_date,class_id=booking['class_id'])),None)
+        if effective:
+            starts=datetime.fromisoformat(f"{payload.occurrence_date}T{effective['start_time']}").replace(tzinfo=MELBOURNE_TZ)
+            if starts<=datetime.now(MELBOURNE_TZ):raise HTTPException(409,'This lesson has already started; contact management about an absence')
+        if db.execute("SELECT 1 FROM lesson_attendance WHERE booking_id=? AND occurrence_date=? AND attendance_status IN ('present','late')",(payload.booking_id,payload.occurrence_date.isoformat())).fetchone():raise HTTPException(409,'Attendance is already recorded; contact management to reconcile it')
         term = validate_class_occurrence(db, booking, payload.occurrence_date)
         if term["status"] != "active":
             raise HTTPException(status_code=409, detail="Absences can only be reported within the active school term")
@@ -3431,24 +3484,11 @@ def staff_roster(user: dict[str, Any] = Depends(require_roles("staff", "admin"))
 def staff_lesson_register(occurrence_date: date | None = None, user: dict[str, Any] = Depends(require_roles("staff", "admin"))) -> dict[str, Any]:
     selected = occurrence_date or business_today()
     with db_session() as db:
-        term = term_for_date(db, selected)
+        classes=lesson_calendar.on_date(db,selected,user['id'] if user['role']=='staff' else None)
+        term=term_for_date(db,selected)
+        if not term and classes: term=term_for_date(db,date.fromisoformat(classes[0]['original_date']))
         if not term:
-            return {
-                "occurrence_date": selected.isoformat(),
-                "term": None,
-                "classes": [],
-                "message": "This date is outside every published school term.",
-            }
-        owner_clause = " AND c.instructor_id=?" if user["role"] == "staff" else ""
-        params: tuple[Any, ...] = (selected.weekday(), user["id"]) if user["role"] == "staff" else (selected.weekday(),)
-        classes = rows(db.execute(
-            f"""SELECT c.id,c.code,c.title,c.level,c.start_time,c.duration_minutes,c.capacity,
-                       l.id location_id,l.name location_name,l.slug location_slug,
-                       u.first_name instructor_first,u.last_name instructor_last
-                FROM classes c JOIN locations l ON l.id=c.location_id LEFT JOIN users u ON u.id=c.instructor_id
-                WHERE c.active=1 AND c.weekday=?{owner_clause} ORDER BY c.start_time,c.id""",
-            params,
-        ))
+            return {'occurrence_date':selected.isoformat(),'term':None,'classes':[], 'message':'No lessons are scheduled on this date.'}
         for class_item in classes:
             register = rows(db.execute(
                 """SELECT b.id booking_id,s.id swimmer_id,s.first_name swimmer_first,s.last_name swimmer_last,
@@ -3749,15 +3789,16 @@ def create_incident_report(
                WHERE id=?""",
             (payload.severity, encrypted["first_aider"], int(payload.emergency_services), encrypted["supporting_notes"], incident_id),
         )
-        db.execute(
-            """INSERT INTO notifications(user_id,title,message,kind,delivery_channels,created_at)
-               VALUES(?,?,?,?,?,?)""",
-            (
-                swimmer["customer_id"], "Incident report recorded",
-                f"A private incident report for {swimmer['first_name']} has been recorded under {reference}. Sign in to review it and contact HV Swim if you have questions.",
-                "incident", '["in_app"]', now_iso(),
-            ),
-        )
+        if payload.incident_type!='safeguarding':
+            db.execute(
+                """INSERT INTO notifications(user_id,title,message,kind,delivery_channels,created_at)
+                   VALUES(?,?,?,?,?,?)""",
+                (
+                    swimmer["customer_id"], "Incident report recorded",
+                    f"A private incident report for {swimmer['first_name']} has been recorded under {reference}. Sign in to review it and contact HV Swim if you have questions.",
+                    "incident", '["in_app"]', now_iso(),
+                ),
+            )
         audit(
             db, user["id"], "create_incident_report", "incident_report", incident_id,
             {
@@ -3770,7 +3811,7 @@ def create_incident_report(
         return {
             "id": incident_id, "reference": reference, "status": "open",
             "swimmer_number": swimmer["swimmer_number"], "family_customer_number": swimmer["customer_number"],
-            "staff_number": user.get("staff_number"), "family_notification": "delivered_in_app",
+            "staff_number": user.get("staff_number"), "family_notification": "withheld_for_safeguarding_review" if payload.incident_type=="safeguarding" else "delivered_in_app",
         }
 
 
@@ -3802,7 +3843,7 @@ def customer_incidents(user: dict[str, Any] = Depends(require_roles("customer"))
     with db_session() as db:
         reports = incident_payloads(db.execute(
             """SELECT ir.id,ir.reference,ir.incident_at,ir.incident_type,ir.what_happened,
-                      ir.injury_observed,ir.first_aid_applied,ir.further_action,ir.witnesses,
+                      ir.injury_observed,ir.first_aid_applied,ir.further_action,
                       ir.parent_notified,ir.status,ir.created_at,ir.severity,ir.first_aider,ir.emergency_services,
                       s.first_name swimmer_first,s.last_name swimmer_last,s.swimmer_number,
                       family.customer_number,reporter.staff_number,
@@ -3811,7 +3852,7 @@ def customer_incidents(user: dict[str, Any] = Depends(require_roles("customer"))
                JOIN users family ON family.id=ir.family_user_id
                JOIN users reporter ON reporter.id=ir.reported_by
                JOIN locations l ON l.id=ir.location_id
-               WHERE ir.family_user_id=? ORDER BY ir.incident_at DESC,ir.id DESC""",
+               WHERE ir.family_user_id=? AND ir.incident_type<>'safeguarding' ORDER BY ir.incident_at DESC,ir.id DESC""",
             (user["id"],),
         ))
         return {"reports": reports}
@@ -4062,7 +4103,7 @@ def admin_dashboard(user: dict[str, Any] = Depends(require_roles("admin"))) -> d
             checklist = db.execute("SELECT created_at,deck_safe,first_aid_ready,equipment_ready,water_checked FROM pool_checklists WHERE location_id=? ORDER BY created_at DESC LIMIT 1", (location["id"],)).fetchone()
             reading_fresh = bool(reading and now - datetime.fromisoformat(reading["created_at"]) <= timedelta(hours=24))
             checklist_fresh = bool(checklist and now - datetime.fromisoformat(checklist["created_at"]) <= timedelta(hours=24))
-            today_classes = db.execute("SELECT COUNT(*) FROM classes WHERE active=1 AND location_id=? AND weekday=?", (location["id"], today_weekday)).fetchone()[0] if term_context["in_session"] else 0
+            today_classes = sum(1 for c in lesson_calendar.on_date(db,business_today()) if c["location_id"]==location["id"])
             locations.append({**dict(location), "latest_reading": dict(reading) if reading else None, "latest_checklist": dict(checklist) if checklist else None, "reading_fresh": reading_fresh, "checklist_fresh": checklist_fresh, "today_classes": today_classes})
         metrics = {
             "active_swimmers": active_swimmers,
@@ -4078,7 +4119,7 @@ def admin_dashboard(user: dict[str, Any] = Depends(require_roles("admin"))) -> d
         }
         return {
             "generated_at": now_iso(),
-            "source": {"name": "HV Swim operational database", "mode": "Local SQLite preview", "freshness": "Live at page load"},
+            "source": {"name": "HV Swim operational database", "mode": "PostgreSQL" if settings.database_url else "SQLite", "freshness": "Live at page load"},
             "metrics": metrics,
             "enquiry_mix": enquiry_mix,
             "classes": class_rows,
@@ -4109,10 +4150,7 @@ def admin_locations(user: dict[str, Any] = Depends(require_roles("admin"))) -> d
                 "SELECT created_at,deck_safe,first_aid_ready,equipment_ready,water_checked FROM pool_checklists WHERE location_id=? ORDER BY created_at DESC LIMIT 1",
                 (location["id"],),
             ).fetchone()
-            today_classes = rows(db.execute(
-                "SELECT code,title,start_time,duration_minutes FROM classes WHERE active=1 AND location_id=? AND weekday=? ORDER BY start_time",
-                (location["id"], today_weekday),
-            )) if term_context["in_session"] else []
+            today_classes = [c for c in lesson_calendar.on_date(db,business_today()) if c['location_id']==location['id']]
             locations.append({
                 **dict(location),
                 "latest_reading": dict(reading) if reading else None,
@@ -4603,6 +4641,9 @@ def update_account_status(account_id: int, payload: AccountStatusInput, request:
     if account_id == user["id"] and not payload.active:
         raise HTTPException(status_code=400, detail="You cannot deactivate the account you are currently using")
     with db_session() as db:
+        db.execute("BEGIN IMMEDIATE")
+        if not db.execute("SELECT 1 FROM users WHERE id=? AND active=1 AND role='admin'", (user["id"],)).fetchone():
+            raise HTTPException(403, "Management access is no longer active")
         account = db.execute("SELECT id,email,role,active FROM users WHERE id=?", (account_id,)).fetchone()
         if not account:
             raise HTTPException(status_code=404, detail="Account not found")
@@ -4788,7 +4829,7 @@ def admin_enrolments(user: dict[str, Any] = Depends(require_roles("admin"))) -> 
             item = dict(row)
             item["available"] = max(0, item["capacity"] - item["enrolled"])
             item["utilisation"] = round(100 * item["enrolled"] / max(1, item["capacity"]), 1)
-            item["is_today"] = term_context["in_session"] and item["weekday"] == business_today().weekday()
+            item["is_today"] = any(c["id"]==item["id"] for c in lesson_calendar.on_date(db,business_today()))
             classes.append(item)
         waitlist_query = """SELECT w.id,w.position,w.status,w.created_at,c.id class_id,c.code,c.title,c.weekday,c.start_time,c.capacity,
                             s.id swimmer_id,s.first_name swimmer_first,s.last_name swimmer_last,u.id customer_id,
@@ -4801,7 +4842,7 @@ def admin_enrolments(user: dict[str, Any] = Depends(require_roles("admin"))) -> 
         waiting = rows(db.execute(waitlist_query))
         return {
             "generated_at": now_iso(),
-            "source": {"name": "HV Swim operational database", "mode": "Local SQLite preview"},
+            "source": {"name": "HV Swim operational database", "mode": "PostgreSQL" if settings.database_url else "SQLite"},
             "summary": {
                 "active_classes": len(classes),
                 "confirmed_places": sum(item["enrolled"] for item in classes),
@@ -5879,9 +5920,9 @@ def update_product(product_id: int, payload: ProductUpdateInput, request: Reques
         db.execute(
             """UPDATE products
                SET price_cents=?,status=?,sample_status=?,cost_cents=?,supplier_route=?,fulfilment_mode=?,personalisation=?,
-                   shopify_gid=CASE WHEN ? IS NULL THEN shopify_gid ELSE NULLIF(?, '') END,
-                   printify_product_id=CASE WHEN ? IS NULL THEN printify_product_id ELSE NULLIF(?, '') END,
-                   supplier_reference=CASE WHEN ? IS NULL THEN supplier_reference ELSE NULLIF(?, '') END
+                   shopify_gid=CASE WHEN CAST(? AS TEXT) IS NULL THEN shopify_gid ELSE NULLIF(?, '') END,
+                   printify_product_id=CASE WHEN CAST(? AS TEXT) IS NULL THEN printify_product_id ELSE NULLIF(?, '') END,
+                   supplier_reference=CASE WHEN CAST(? AS TEXT) IS NULL THEN supplier_reference ELSE NULLIF(?, '') END
                WHERE id=?""",
             (
                 payload.price_cents, payload.status, payload.sample_status, payload.cost_cents,
@@ -5906,10 +5947,28 @@ def update_product(product_id: int, payload: ProductUpdateInput, request: Reques
 @app.post("/api/products/cart")
 async def create_cart(payload: CartInput, request: Request, user: dict[str, Any] = Depends(session_user), x_csrf_token: str | None = Header(default=None)) -> dict[str, Any]:
     csrf_guard(request, user, x_csrf_token)
+    # Recheck the local launch gates on the server. A hidden catalogue card does
+    # not prevent a caller submitting a known/unapproved Shopify variant directly.
+    if not settings.commerce_live_approved or not shopify_ready():
+        raise HTTPException(409, "The shop is not ready to accept orders")
+    with db_session() as db:
+        enabled = public_feature_controls(db)["merch_home"]["effective_enabled"]
+        approved = {str(item["shopify_gid"]): item for item in rows(db.execute("SELECT * FROM products"))
+                    if item["status"] == "available" and not product_launch_blockers(item)
+                    and (item.get("audience") != "staff" or user["role"] == "admin")}
+    if not enabled or not approved:
+        raise HTTPException(409, "The shop is not ready to accept orders")
     try:
+        live = await shopify_products()
+        match = next((product for product in live if str(product.get("id")) in approved
+                      and any(str(edge.get("node", {}).get("id")) == payload.variant_id
+                              and edge.get("node", {}).get("availableForSale") is True
+                              for edge in product.get("variants", {}).get("edges", []))), None)
+        if match is None:
+            raise HTTPException(409, "This option is not approved and available for purchase")
         return {"cart": await shopify_create_cart(payload.variant_id, payload.quantity)}
-    except RuntimeError as exc:
-        raise HTTPException(status_code=409, detail=str(exc))
+    except HTTPException:
+        raise
     except Exception:
         raise HTTPException(status_code=502, detail="Shopify cart could not be created")
 
@@ -5965,6 +6024,8 @@ def create_enquiry(payload: EnquiryInput, request: Request) -> dict[str, Any]:
             ),
         )
         reference = f"HV-{'MERCH' if payload.enquiry_type == 'merchandise' else 'ENQ'}-{cursor.lastrowid:04d}"
+        db.execute('UPDATE enquiries SET collection_notice_version=?,acknowledged_at=? WHERE id=?',('2026-09-13',now_iso(),cursor.lastrowid))
+        if payload.contact_method=='email': mail_queue.enqueue(db,'acknowledgement',reference,str(payload.email),f'enquiry:{cursor.lastrowid}:ack')
         if payload.enquiry_type == "merchandise":
             title = f"New merchandise enquiry · {reference}"
             message = f"{payload.name} asked about the HV Swim collection."
@@ -5996,6 +6057,159 @@ def audit_log(user: dict[str, Any] = Depends(require_roles("admin"))) -> dict[st
         return {"audit": rows(db.execute(query))}
 
 
+
+
+class CalendarClosureInput(BaseModel):
+    start_date: date
+    end_date: date
+    location_id: int | None = Field(default=None,gt=0)
+    reason: str = Field(min_length=5,max_length=180)
+
+
+class CalendarExceptionInput(BaseModel):
+    class_id: int = Field(gt=0)
+    original_date: date
+    action: Literal['cancel','move']
+    target_date: date | None = None
+    target_time: str | None = Field(default=None,pattern=r'^([01]\d|2[0-3]):[0-5]\d$')
+    reason: str = Field(min_length=5,max_length=180)
+
+
+@app.get('/api/admin/calendar')
+def management_calendar(user=Depends(require_roles('admin'))):
+    with db_session() as db:
+        return {'closures':rows(db.execute('SELECT cc.*,l.name location_name FROM calendar_closures cc LEFT JOIN locations l ON l.id=cc.location_id ORDER BY start_date DESC,id DESC')),
+                'exceptions':rows(db.execute('SELECT e.*,c.title FROM lesson_exceptions e JOIN classes c ON c.id=e.class_id ORDER BY original_date DESC,e.id DESC')),
+                'classes':rows(db.execute('SELECT id,title,weekday,start_time FROM classes WHERE active=1 ORDER BY title,id')),
+                'locations':rows(db.execute('SELECT id,name FROM locations ORDER BY id'))}
+
+
+@app.post('/api/admin/calendar/closures')
+def add_calendar_closure(payload:CalendarClosureInput,request:Request,user=Depends(require_roles('admin')),x_csrf_token:str|None=Header(default=None)):
+    csrf_guard(request,user,x_csrf_token)
+    if payload.start_date<business_today() or payload.end_date<payload.start_date or (payload.end_date-payload.start_date).days>365:
+        raise HTTPException(422,'Choose a future closure range of at most one year')
+    with db_session() as db:
+        db.execute('BEGIN IMMEDIATE')
+        if payload.location_id and not db.execute('SELECT id FROM locations WHERE id=?',(payload.location_id,)).fetchone(): raise HTTPException(404,'Location not found')
+        existing=db.execute('SELECT id FROM calendar_closures WHERE start_date<=? AND end_date>=? AND (location_id IS NULL OR CAST(? AS INTEGER) IS NULL OR location_id=?)',(payload.end_date.isoformat(),payload.start_date.isoformat(),payload.location_id,payload.location_id)).fetchone()
+        if existing: raise HTTPException(409,'This closure overlaps an existing closure')
+        for table,column in [('absence_reports','occurrence_date'),('lesson_attendance','occurrence_date')]:
+            if db.execute(f'SELECT 1 FROM {table} r JOIN bookings b ON b.id=r.booking_id JOIN classes c ON c.id=b.class_id WHERE r.{column}>=? AND r.{column}<=? AND (CAST(? AS INTEGER) IS NULL OR c.location_id=?) LIMIT 1',(payload.start_date.isoformat(),payload.end_date.isoformat(),payload.location_id,payload.location_id)).fetchone():
+                raise HTTPException(409,'Attendance or absence records already exist in this range; reconcile them before changing the calendar')
+        ident=db.execute('INSERT INTO calendar_closures(start_date,end_date,location_id,reason,created_by,created_at) VALUES(?,?,?,?,?,?)',(payload.start_date.isoformat(),payload.end_date.isoformat(),payload.location_id,payload.reason.strip(),user['id'],now_iso())).lastrowid
+        audit(db,user['id'],'add_calendar_closure','calendar_closure',ident,payload.model_dump(mode='json'),client_ip(request))
+        return {'id':ident,'saved':True}
+
+
+@app.post('/api/admin/calendar/exceptions')
+def add_calendar_exception(payload:CalendarExceptionInput,request:Request,user=Depends(require_roles('admin')),x_csrf_token:str|None=Header(default=None)):
+    csrf_guard(request,user,x_csrf_token)
+    if payload.original_date<business_today(): raise HTTPException(422,'Past lessons cannot be changed')
+    with db_session() as db:
+        db.execute('BEGIN IMMEDIATE')
+        item=db.execute('SELECT * FROM classes WHERE id=? AND active=1',(payload.class_id,)).fetchone()
+        if not item or payload.original_date.weekday()!=item['weekday'] or not lesson_calendar.term(db,payload.original_date.isoformat()): raise HTTPException(422,'Choose an original recurring lesson inside a published term')
+        if db.execute('SELECT id FROM lesson_exceptions WHERE class_id=? AND original_date=?',(payload.class_id,payload.original_date.isoformat())).fetchone(): raise HTTPException(409,'An exception already exists for this lesson; remove it first')
+        for table in ['absence_reports','lesson_attendance']:
+            if db.execute(f'SELECT 1 FROM {table} r JOIN bookings b ON b.id=r.booking_id WHERE b.class_id=? AND r.occurrence_date=?',(payload.class_id,payload.original_date.isoformat())).fetchone(): raise HTTPException(409,'Attendance or absence records exist; reconcile them before changing this lesson')
+        original_at=datetime.fromisoformat(f"{payload.original_date}T{item['start_time']}").replace(tzinfo=ZoneInfo('Australia/Melbourne'))
+        if original_at<=datetime.now(ZoneInfo('Australia/Melbourne')): raise HTTPException(422,'Past lessons cannot be changed')
+        if payload.action=='move':
+            if not payload.target_date or not payload.target_time or payload.target_date<business_today() or abs((payload.target_date-payload.original_date).days)>90: raise HTTPException(422,'Choose a future replacement date and time within 90 days of the lesson')
+            if datetime.fromisoformat(f'{payload.target_date}T{payload.target_time}').replace(tzinfo=ZoneInfo('Australia/Melbourne'))<=datetime.now(ZoneInfo('Australia/Melbourne')): raise HTTPException(422,'Replacement lesson must be in the future')
+            if lesson_calendar.closed(db,item['location_id'],payload.target_date.isoformat()): raise HTTPException(409,'The venue is closed on the replacement date')
+            start=sum(int(v)*m for v,m in zip(payload.target_time.split(':'),(60,1)))
+            if start+item['duration_minutes']>1440: raise HTTPException(422,'The lesson must finish on the same day')
+            for other in lesson_calendar.on_date(db,payload.target_date):
+                if other['id']==item['id'] and other['original_date']==payload.original_date.isoformat(): continue
+                other_start=sum(int(v)*m for v,m in zip(other['start_time'].split(':'),(60,1)))
+                if other['id']==item['id'] or (other['instructor_id']==item['instructor_id'] and max(start,other_start)<min(start+item['duration_minutes'],other_start+other['duration_minutes'])): raise HTTPException(409,'The replacement conflicts with an existing class or instructor lesson')
+        ident=db.execute('INSERT INTO lesson_exceptions(class_id,original_date,action,target_date,target_time,reason,created_by,created_at) VALUES(?,?,?,?,?,?,?,?)',(payload.class_id,payload.original_date.isoformat(),payload.action,payload.target_date.isoformat() if payload.action=='move' else None,payload.target_time if payload.action=='move' else None,payload.reason.strip(),user['id'],now_iso())).lastrowid
+        audit(db,user['id'],'add_lesson_exception','lesson_exception',ident,payload.model_dump(mode='json'),client_ip(request))
+        return {'id':ident,'saved':True}
+
+
+@app.delete('/api/admin/calendar/{kind}/{record_id}')
+def remove_calendar_change(kind:Literal['closures','exceptions'],record_id:int,request:Request,user=Depends(require_roles('admin')),x_csrf_token:str|None=Header(default=None)):
+    csrf_guard(request,user,x_csrf_token)
+    table='calendar_closures' if kind=='closures' else 'lesson_exceptions'
+    with db_session() as db:
+        db.execute('BEGIN IMMEDIATE')
+        row=db.execute(f'SELECT * FROM {table} WHERE id=?',(record_id,)).fetchone()
+        if not row: raise HTTPException(404,'Calendar record not found')
+        earliest=min(v for v in [dict(row).get('original_date'),dict(row).get('target_date'),dict(row).get('start_date')] if v)
+        if earliest<business_today().isoformat(): raise HTTPException(409,'Past calendar changes are retained for historical records')
+        if kind=='exceptions' and row['target_date']:
+            for records in ['lesson_attendance','absence_reports']:
+                if db.execute(f'SELECT 1 FROM {records} r JOIN bookings b ON b.id=r.booking_id WHERE b.class_id=? AND r.occurrence_date=?',(row['class_id'],row['target_date'])).fetchone(): raise HTTPException(409,'Reconcile replacement lesson records before removing this change')
+        affected=[row['original_date']] if kind=='exceptions' else [(date.fromisoformat(row['start_date'])+timedelta(days=n)).isoformat() for n in range((date.fromisoformat(row['end_date'])-date.fromisoformat(row['start_date'])).days+1)]
+        before={day:{(c['id'],c['original_date'],c['start_time']) for c in lesson_calendar.on_date(db,day)} for day in affected}
+        db.execute(f'DELETE FROM {table} WHERE id=?',(record_id,))
+        for day in affected:
+            occurrences=lesson_calendar.on_date(db,day)
+            for restored in occurrences:
+                if (restored['id'],restored['original_date'],restored['start_time']) in before[day]:continue
+                start=sum(int(v)*m for v,m in zip(restored['start_time'].split(':'),(60,1)))
+                for other in occurrences:
+                    if other is restored:continue
+                    other_start=sum(int(v)*m for v,m in zip(other['start_time'].split(':'),(60,1)))
+                    if restored['instructor_id'] and restored['instructor_id']==other['instructor_id'] and max(start,other_start)<min(start+restored['duration_minutes'],other_start+other['duration_minutes']):
+                        raise HTTPException(409,'Removing this change would create an instructor conflict; move the replacement lesson first')
+
+        audit(db,user['id'],'remove_calendar_change',kind,record_id,dict(row),client_ip(request))
+        return {'saved':True}
+
+
+
+
+
+@app.get('/api/admin/mail')
+def management_mail(user=Depends(require_roles('admin'))):
+    with db_session() as db:
+        mail_queue.recover_claims(db,datetime.now(timezone.utc))
+        items=rows(db.execute('SELECT id,encrypted_payload,status,attempts,last_error,created_at,finished_at FROM mail_outbox ORDER BY id DESC LIMIT 100'))
+        for item in items:
+            payload=json.loads(decrypt_sensitive(item.pop('encrypted_payload')))
+            item.update(reference=payload['reference'],kind=payload['kind'])
+        return {'messages':items,'mode':'held until explicitly queued; capture is the default worker mode','limit':100}
+
+class MailReviewInput(BaseModel):
+    action:Literal['queue','confirm_not_sent','cancel']
+    reason:str=Field(min_length=5,max_length=180)
+
+@app.post('/api/admin/mail/{mail_id}/review')
+def review_mail(mail_id:int,payload:MailReviewInput,request:Request,user=Depends(require_roles('admin')),x_csrf_token:str|None=Header(default=None)):
+    csrf_guard(request,user,x_csrf_token)
+    with db_session() as db:
+        db.execute('BEGIN IMMEDIATE')
+        row=db.execute('SELECT * FROM mail_outbox WHERE id=?',(mail_id,)).fetchone()
+        allowed={'queue':{'held','failed'},'confirm_not_sent':{'uncertain'},'cancel':{'held','queued','retry','failed','uncertain'}}
+        if not row or row['status'] not in allowed[payload.action]:raise HTTPException(409,'This message cannot take that action in its current state')
+        state='cancelled' if payload.action=='cancel' else 'queued'
+        db.execute('UPDATE mail_outbox SET status=?,available_at=?,last_error=NULL WHERE id=?',(state,now_iso(),mail_id))
+        audit(db,user['id'],'review_mail','mail_outbox',mail_id,{'action':payload.action,'reason':payload.reason,'from':row['status'],'to':state},client_ip(request))
+        return {'saved':True}
+
+
+@app.get('/api/admin/launch-readiness')
+def launch_report(user=Depends(require_roles('admin'))):
+    with db_session() as db:return launch_readiness.report(db,settings,business_today().isoformat())
+
+class LaunchEvidenceInput(BaseModel):
+    reference:str=Field(min_length=8,max_length=180)
+    expires_on:date
+
+@app.put('/api/admin/launch-readiness/{key}')
+def save_launch_evidence(key:str,payload:LaunchEvidenceInput,request:Request,user=Depends(require_roles('admin')),x_csrf_token:str|None=Header(default=None)):
+    csrf_guard(request,user,x_csrf_token)
+    if key not in launch_readiness.EVIDENCE:raise HTTPException(404,'Unknown evidence item')
+    if not business_today()<=payload.expires_on<=business_today()+timedelta(days=366):raise HTTPException(422,'Choose a review expiry within the next year')
+    with db_session() as db:
+        db.execute('INSERT INTO launch_evidence(key,reference,reviewed_by,reviewed_at,expires_on) VALUES(?,?,?,?,?) ON CONFLICT(key) DO UPDATE SET reference=excluded.reference,reviewed_by=excluded.reviewed_by,reviewed_at=excluded.reviewed_at,expires_on=excluded.expires_on',(key,payload.reference,user['id'],now_iso(),payload.expires_on.isoformat()))
+        audit(db,user['id'],'record_launch_evidence','launch_evidence',key,{'expires_on':payload.expires_on.isoformat()},client_ip(request))
+        return {'saved':True}
+
 identity.register(app, session_user, csrf_guard)
 workforce.register(app, session_user, csrf_guard)
 
@@ -6004,6 +6218,14 @@ workforce.register(app, session_user, csrf_guard)
 def unknown_api_route(unmatched_path: str) -> None:
     """Keep unmatched API requests JSON even though the static site has an HTML 404."""
     raise HTTPException(status_code=404, detail="Not Found")
+
+
+@app.exception_handler(RequestValidationError)
+async def invalid_request(request: Request, exc: RequestValidationError):
+    # Pydantic includes rejected input by default, which can echo passwords, tokens,
+    # health narratives or an entire malformed body into browser/proxy error capture.
+    errors = [{key: error[key] for key in ("type", "loc", "msg") if key in error} for error in exc.errors()]
+    return JSONResponse({"detail": errors}, status_code=422)
 
 
 @app.exception_handler(StarletteHTTPException)
@@ -6040,6 +6262,9 @@ PUBLIC_ROOT_FILES = frozenset(
         "photo-consent.html",
         "platform.html",
         "privacy.html",
+        "cookies.html",
+        "security.html",
+        "accessibility.html",
         "programs.html",
         "robots.txt",
         "service-worker.js",

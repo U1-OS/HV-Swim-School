@@ -46,6 +46,9 @@ def client(tmp_path_factory):
     importlib.reload(config)
     config.DATA_DIR = db_dir
     config.DB_PATH = db_dir / "test.db"
+    if os.environ.get('HV_TEST_POSTGRES_URL'):
+        from dataclasses import replace
+        config.settings=replace(config.settings,database_url=os.environ['HV_TEST_POSTGRES_URL'])
 
     from backend import database
     importlib.reload(database)
@@ -128,12 +131,12 @@ def test_enquiry_reply_validation_and_categories(client):
     from pydantic import ValidationError
 
     for kind in ("lesson", "existing_customer", "lesson_question", "private_lesson", "billing", "merchandise", "feedback", "other"):
-        parsed = EnquiryInput(name="  Test Parent  ", email="qa@example.com", enquiry_type=kind)
+        parsed = EnquiryInput(acknowledgement=True,name="  Test Parent  ", email="qa@example.com", enquiry_type=kind)
         assert parsed.name == "Test Parent"
     for override in ({"name": "   "}, {"contact_method": "carrier_pigeon"}, {"contact_method": "phone"}, {"contact_method": "sms", "phone": "abcdefgh"}):
         with pytest.raises(ValidationError):
             EnquiryInput(**({"name": "QA Parent", "email": "qa@example.com"} | override))
-    assert EnquiryInput(name="QA Parent", email="qa@example.com", contact_method="phone", phone="+61 413 462 112").phone
+    assert EnquiryInput(acknowledgement=True,name="QA Parent", email="qa@example.com", contact_method="phone", phone="+61 413 462 112").phone
     with pytest.raises(ValidationError):
         IncidentReportInput(swimmer_id=1, location_slug="wood-street", incident_at=datetime.now(timezone.utc), incident_type="injury", what_happened=" " * 12)
 
@@ -212,7 +215,7 @@ def test_protected_system_health_checks_database_without_exposing_paths_or_secre
     assert payload["database"]["integrity"] == "ok"
     assert payload["database"]["foreign_key_violations"] == 0
     assert payload["database"]["billing_total_mismatches"] == 0
-    assert payload["database"]["journal_mode"] == "wal"
+    assert payload["database"]["journal_mode"] == ("postgresql" if os.environ.get("HV_TEST_POSTGRES_URL") else "wal")
     assert payload["security"]["integration_token_encryption"] == "current"
     assert "path" not in response.text.lower()
     assert "token" not in str(payload["integrations"]).lower()
@@ -2134,6 +2137,7 @@ def test_integration_status_never_returns_credentials(client):
 # --- public enquiry form -------------------------------------------------------------
 
 ENQUIRY = {
+    "acknowledgement": True,
     "name": "Sam Rivers",
     "email": "sam@example.com",
     "swimmer_name": "Ivy",
@@ -2157,6 +2161,7 @@ def test_merchandise_interest_is_recorded_as_merchandise_not_a_fake_swimmer(clie
     response = client.post(
         "/api/public/enquiries",
         json={
+            "acknowledgement": True,
             "enquiry_type": "merchandise",
             "name": "Alex Rivers",
             "email": "alex@example.com",
@@ -2732,6 +2737,7 @@ def test_enquiry_sensitive_fields_are_encrypted_at_rest(client):
             "program_interest": "Learn to swim",
             "experience": "Nervous in deep water",
             "support_needs": "Needs quiet lane and extra patience",
+            "acknowledgement": True,
         },
     )
     assert created.status_code == 200, created.text
