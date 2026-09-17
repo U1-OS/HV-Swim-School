@@ -121,9 +121,20 @@
     elements.error.textContent='';return true;
   }
   function showStep(step,scroll=true){
-    currentStep=Math.max(1,Math.min(4,step));
+    const next=Math.max(1,Math.min(4,step));
+    const reduced=document.documentElement.dataset.motion==='off'||window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    form.dataset.stepDir=next<currentStep?'back':'forward';
+    currentStep=next;
     form.dataset.currentStep=String(currentStep);
-    document.querySelectorAll('.wizard-step').forEach(section=>{const active=Number(section.dataset.step)===currentStep;section.hidden=!active;section.classList.toggle('active',active);});
+    document.querySelectorAll('.wizard-step').forEach(section=>{
+      const active=Number(section.dataset.step)===currentStep;
+      section.hidden=!active;
+      section.classList.remove('active');
+      if(active){
+        if(!reduced) void section.offsetWidth;
+        section.classList.add('active');
+      }
+    });
     document.querySelectorAll('[data-progress]').forEach(item=>{const value=Number(item.dataset.progress);item.classList.toggle('active',value===currentStep);item.classList.toggle('complete',value<currentStep);if(value===currentStep)item.setAttribute('aria-current','step');else item.removeAttribute('aria-current');});
     elements.stepLabel.textContent=`Step ${currentStep} of 4`;
     elements.progressBar.style.width=`${currentStep*25}%`;
