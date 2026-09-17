@@ -2,32 +2,32 @@
 
 Andrew swaps between Claude and Codex. Read this first and rewrite it last.
 
-**Wheel:** Cursor Cloud Agent (Animated pass)
-**Last updated:** 2026-09-17 — continuing draft PR #20; Andrew rejected the vibrant pass as “very boring / I said animated”
+**Wheel:** Cursor Cloud Agent (Motion-hard pass)
+**Last updated:** 2026-09-17 — Andrew still called the last pass boring; this pass makes motion unmissable on PR #20
 
-## Current work — animated public pass on PR #20
+## Current work — motion-hard pass on PR #20
 
 Stay on `cursor/studio-motion-946d` ([#20](https://github.com/U1-OS/HV-Swim-School/pull/20)). Do not rebuild, invent data, or merge. **backend/ was not touched.** Night Water stays gone.
 
-Andrew’s last note: first load must *feel* animated — not a 200ms fade. Professional, not toy/crypto. `prefers-reduced-motion` and Pause motion still win. Infinite loops use GPU transforms only (no janky filters) and pause when `data-page-visible=false`.
+This pass is the response to “still very boring / I said animated”:
 
-Motion added in this pass:
+- **Living water:** faster tide/glow/sheen, sweeping caustics, denser ripples, larger orbs, floating HV mark, wave band. Pointer moves the water layer (`--px/--py`). Homepage WebGL mesh is lightened and actually visible (`soft-light`, opacity 0.32).
+- **Cinematic load:** full-bleed curtain wipe (~1.15s), staggered headline clip-path (80px / 1.25–1.35s), photo frame wipe then **ken-burns** that keeps moving. A mid-load still must show the curtain/headline/photo still entering.
+- **Scroll:** 72px + rotateX(8deg) + scale, 140ms stagger. Clip-path photo reveals. Programs anchor bar is sticky.
+- **Interactive:** magnetic gold/outline buttons, stronger 3D card tilt (~10deg), CTA sheen + press scale(0.96). Enquiry steps slide 56px.
+- `prefers-reduced-motion` and Pause motion still win; loops pause when the tab is hidden.
 
-- **Hero water:** moving tide gradient (~8s), glow (~7s), sheen (~6.5s), three expanding ripple rings, floating orbs (~46px travel), gold/cyan spark accents. Inner-page heroes keep a faster sheen.
-- **Headline:** clip-path wipe + 56px rise + scale on first paint (does not wait for IntersectionObserver). Gold underline draws after the line lands.
-- **Photo:** frame wipe + 1.16 scale settle on the campaign portrait; about-hero image uses the same image settle.
-- **Scroll:** `.reveal` is 48px + scale(.97) with 110ms stagger (cap 440ms). Photo panels, about portrait and location visuals use clip-path image reveals, not opacity-only.
-- **Cards/buttons:** hover lift ~4–10px, program-card image zoom 1.08→1.16, CTA `:active` press scale(.97).
-- **Enquiry:** step slides 42px with a slight scale; progress bar still width-animates.
-- **Nav:** compact-on-scroll 92px→64px (logo 118→84) plus gold underline (beats leftover `display:none` on `.active::after`).
-
-- Asset query `5.13.0-ui30`. PWA CORE/RUNTIME/PUBLIC_DATA caches generation 32.
+- Asset query `5.13.0-ui31`. PWA CORE/RUNTIME/PUBLIC_DATA caches generation 33.
 - Static server: `python3 -m http.server 3000 --bind 0.0.0.0` (tmux `hv-swim-static-3000`). Chrome on `DISPLAY=:1` at `http://127.0.0.1:3000/index.html`.
-- After shots: `/cursor/stores/bc-b1f5564c-7e5b-4036-bcec-0b643b33099a/media/animated-pass/`
+- After shots + recording: `/cursor/stores/bc-b1f5564c-7e5b-4036-bcec-0b643b33099a/media/motion-hard/`
 
 ### Next up
 
 Andrew review of draft PR https://github.com/U1-OS/HV-Swim-School/pull/20. Shop remains “in preparation” until samples/Shopify. When a production domain is bought, run `node scripts/build-sitemap.mjs https://<domain>`. Do not restore removed staff names. Do not enable live integrations without approval. Do not resurrect Night Water.
+
+## Previous work — animated public pass on PR #20
+
+Headline wipe + 56px rise, 8s water, 48px scroll. Andrew still rejected it as too subtle.
 
 ## Previous work — vibrant public upgrade on studio motion
 

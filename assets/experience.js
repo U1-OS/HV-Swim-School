@@ -141,7 +141,7 @@
   }
   document.addEventListener('pointermove', event => {
     if (!finePointer.matches || motionOff()) return;
-    const card = event.target.closest('.program-card,.collection-nav-card,.shop-card:not(.loading-card)');
+    const card = event.target.closest('.program-card,.collection-nav-card,.shop-card:not(.loading-card),.choice-card,.location-detail,.photo-panel');
     if (card !== depthTarget) { clearDepth(); depthTarget = card; }
     if (!card) return;
     point = [event.clientX, event.clientY];
@@ -150,8 +150,8 @@
       depthFrame = 0;
       if (!depthTarget || motionOff()) return;
       const rect = depthTarget.getBoundingClientRect();
-      depthTarget.style.setProperty('--depth-x', `${clamp((.5-(point[1]-rect.top)/rect.height)*5,-3,3)}deg`);
-      depthTarget.style.setProperty('--depth-y', `${clamp(((point[0]-rect.left)/rect.width-.5)*5,-3,3)}deg`);
+      depthTarget.style.setProperty('--depth-x', `${clamp((.5-(point[1]-rect.top)/rect.height)*12,-10,10)}deg`);
+      depthTarget.style.setProperty('--depth-y', `${clamp(((point[0]-rect.left)/rect.width-.5)*12,-10,10)}deg`);
       depthTarget.dataset.depthActive = '';
     });
   }, {passive:true});
@@ -179,5 +179,39 @@
     window.addEventListener('scroll', schedule, {passive:true});
     window.addEventListener('resize', schedule, {passive:true});
     update();
+  }
+
+  if (isPublic && !motionOff()) {
+    const live = document.querySelector('.studio-hero, .immersive-hero, .programs-hero, .enrolment-hero, .page-hero, .about-hero, .shop-hero');
+    let waterFrame = 0;
+    const paintPointer = (x, y, target) => {
+      waterFrame = 0;
+      if (!target || motionOff()) return;
+      target.style.setProperty('--px', x.toFixed(3));
+      target.style.setProperty('--py', y.toFixed(3));
+    };
+    if (live && finePointer.matches) {
+      live.addEventListener('pointermove', event => {
+        if (event.pointerType === 'touch' || motionOff()) return;
+        const rect = live.getBoundingClientRect();
+        const x = (event.clientX - rect.left) / rect.width - 0.5;
+        const y = (event.clientY - rect.top) / rect.height - 0.5;
+        if (!waterFrame) waterFrame = requestAnimationFrame(() => paintPointer(x, y, live));
+      }, {passive:true});
+      live.addEventListener('pointerleave', () => paintPointer(0, 0, live), {passive:true});
+    }
+
+    document.querySelectorAll('.btn-primary, .btn-outline').forEach(button => {
+      button.addEventListener('pointermove', event => {
+        if (!finePointer.matches || motionOff() || event.pointerType === 'touch') return;
+        const rect = button.getBoundingClientRect();
+        button.style.setProperty('--mx', `${clamp(event.clientX - rect.left - rect.width / 2, -18, 18)}px`);
+        button.style.setProperty('--my', `${clamp(event.clientY - rect.top - rect.height / 2, -12, 12)}px`);
+      });
+      button.addEventListener('pointerleave', () => {
+        button.style.setProperty('--mx', '0px');
+        button.style.setProperty('--my', '0px');
+      });
+    });
   }
 })();

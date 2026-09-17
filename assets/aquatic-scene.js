@@ -11,15 +11,15 @@
   if(!gl)return;
   const vertex=`attribute vec2 p; uniform float t; uniform float aspect; uniform vec2 pointer; varying vec3 normal; varying vec3 world;
     void main(){float x=p.x,z=p.y;float a=x*.8+z*.5+t*.36,b=z*1.8-x*.2-t*.45;
-    float y=sin(a)*.18+cos(b)*.075;normal=normalize(vec3(-cos(a)*.144-sin(b)*.015,1.,-cos(a)*.09+sin(b)*.135));
+    float y=sin(a)*.26+cos(b)*.11;normal=normalize(vec3(-cos(a)*.144-sin(b)*.015,1.,-cos(a)*.09+sin(b)*.135));
     world=vec3(x,y,z);vec3 v=vec3(x+pointer.x*.12,y*.78-z*.625-1.6,y*.625+z*.78-9.);
     float d=-v.z;gl_Position=vec4(v.x*1.7/aspect,v.y*1.7,(d-1.)*.8,d);}`;
   const fragment=`precision mediump float; varying vec3 normal;varying vec3 world;
     void main(){vec3 light=normalize(vec3(-.7,1.,.4));float diffuse=max(dot(normal,light),0.);
     float spec=pow(max(dot(reflect(-light,normal),normalize(vec3(0.,3.,-5.)-world)),0.),40.);
     float bands=pow(abs(sin(world.x*3.3+world.z*2.2+world.y*18.)),18.);
-    vec3 color=mix(vec3(.012,.10,.23),vec3(.025,.59,.76),diffuse*.6)+vec3(.55,.92,1.)*spec+vec3(.15,.62,.82)*bands*.13;
-    gl_FragColor=vec4(color,.85);}`;
+    vec3 color=mix(vec3(.42,.84,.96),vec3(.08,.52,.78),diffuse*.55)+vec3(.95,.99,1.)*spec*.7+vec3(.35,.82,.95)*bands*.32;
+    gl_FragColor=vec4(color,.42);}`;
   const shaders=[];let program,buffer,frame=0,visible=false,lost=false,last=0,phase=0;
   try{
     for(const [type,source] of [[gl.VERTEX_SHADER,vertex],[gl.FRAGMENT_SHADER,fragment]]){const shader=gl.createShader(type);shaders.push(shader);gl.shaderSource(shader,source);gl.compileShader(shader);if(!gl.getShaderParameter(shader,gl.COMPILE_STATUS))throw new Error('Shader unavailable');}
