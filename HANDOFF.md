@@ -2,27 +2,28 @@
 
 Andrew swaps between Claude and Codex. Read this first and rewrite it last.
 
-**Wheel:** Cursor Cloud Agent (Studio rebuild)
-**Last updated:** 2026-09-17 — draft PR #19; CI flake fix on lesson-register test (Melbourne date)
+**Wheel:** Cursor Cloud Agent (Studio motion)
+**Last updated:** 2026-09-17 — PR #19 merged to main; draft PR #20 studio motion
 
-## Current work — clean studio public rebuild
+## Current work — studio motion on the light public site
 
-Andrew rejected merged PR #18 Night Water (“it looks shit”). Branch `cursor/clean-bold-rebuild-cadf` from latest `origin/main` (`9f4dcc2`). **backend/ was not touched.** A former instructor stays off the site.
+Andrew said “continue” after reviewing the cream / navy / gold studio look. Treated as go-ahead. **backend/ was not touched.** A former instructor stays off the site.
 
-- New `assets/public.css` loaded last on public pages only. Light editorial system: cream paper `#F4EFE4`, HV navy type `#061A3B`, gold CTAs `#FFC928`, cyan as a hairline/link accent. Not a dark overlay on the old layout.
-- Deleted `assets/dark-public.css`. Removed the Night Water aurora injection; `experience.js` now sets `data-theme="studio"` and strips leftover `.site-aurora` nodes.
-- Homepage photograph is a real image with caption below — no navy gradient over the photo. About hero uses the campaign crop beside the copy.
-- Enquiry wizard: gold progress rail, step fade, selected choice cards, `data-current-step` on the form. Continue still validates before advancing.
-- Offline page rebuilt on the same light system. Login/portals do not load `public.css` and stay usable.
-- Asset query `5.13.0-ui24`. PWA CORE/RUNTIME/PUBLIC_DATA caches generation 26; `public.css` is in CORE_SHELL.
-- Copy and business details unchanged (HVS BENDIGO PTY LTD, Wood Street, Laura-led teaching, $22.50). No staff names reintroduced.
-- Static server: `python3 -m http.server 3000 --bind 0.0.0.0` (tmux `hv-swim-static-3000`). Chrome on `DISPLAY=:1` stays on `http://127.0.0.1:3000/index.html`.
-- After shots: `/cursor/stores/bc-b1f5564c-7e5b-4036-bcec-0b643b33099a/media/clean-rebuild/` (desktop + mobile for public pages, enquire step 2, programs/shop mid-scroll, login).
-- CI run 35105771925 failed `test_lesson_register_enforces_assignment_parent_and_photo_rules`: not the CSS branch — `next_occurrence` can equal Melbourne `business_today()` while POST only rejects dates *after* today. Test now posts a weekday strictly in the future; parent/photo assertions unchanged.
+- Merged [#19](https://github.com/U1-OS/HV-Swim-School/pull/19) to `main` at `5c4ff03` (no rebase needed; CI green after the Melbourne lesson-register test fix). No force-push to main.
+- New branch `cursor/studio-motion-946d` → draft [#20](https://github.com/U1-OS/HV-Swim-School/pull/20).
+- Motion stays on the studio paper: scroll reveals with a failsafe, hero copy rise + gold underline draw, header compact on scroll, gold nav underline on hover/focus/active, reading-progress actually tracks, cards/CTAs lift, enquiry forward/back step motion. `prefers-reduced-motion` and Pause motion still win.
+- Home hero accent is navy with a gold underline (overrides leftover cyan text-fill). Copy, prices (`$22.50`) and staff names unchanged.
+- Asset query `5.13.0-ui27`. PWA CORE/RUNTIME/PUBLIC_DATA caches generation 29.
+- Static server still `python3 -m http.server 3000 --bind 0.0.0.0` (tmux `hv-swim-static-3000`). Chrome on `DISPLAY=:1` is on `http://127.0.0.1:3000/index.html`.
+- After shots: `/cursor/stores/bc-b1f5564c-7e5b-4036-bcec-0b643b33099a/media/studio-motion/`
 
 ### Next up
 
-Andrew review of draft PR https://github.com/U1-OS/HV-Swim-School/pull/19. Shop remains “in preparation” until samples/Shopify. When a production domain is bought, run `node scripts/build-sitemap.mjs https://<domain>`. Do not restore removed staff names. Do not enable live integrations without approval.
+Andrew review of draft PR https://github.com/U1-OS/HV-Swim-School/pull/20. Shop remains “in preparation” until samples/Shopify. When a production domain is bought, run `node scripts/build-sitemap.mjs https://<domain>`. Do not restore removed staff names. Do not enable live integrations without approval. Do not resurrect Night Water.
+
+## Previous work — clean studio public rebuild (PR #19)
+
+Merged to main (`5c4ff03`). Light editorial public system in `assets/public.css` (cream `#F4EFE4`, navy `#061A3B`, gold CTAs `#FFC928`). Night Water `dark-public.css` removed. Homepage photo is un-overlaid. Enquiry gold rail + `data-current-step`. Lesson-register test uses a weekday strictly after Melbourne `business_today()`.
 
 ## Previous work — Night Water public rebuild (PR #18)
 
