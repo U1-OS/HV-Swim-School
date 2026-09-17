@@ -12,7 +12,7 @@ Continue `cursor/studio-motion-946d` (draft [#20](https://github.com/U1-OS/HV-Sw
 - Public paper shifts to very light blue (`#eef7fb`) with navy type, ocean/cyan/turquoise accents and gold CTAs only.
 - Home hero keeps existing copy and campaign photo; adds GPU water layers and floating orbs. Compact glass nav, colour-coded program cards using existing photos (`hero-swimmer`, `hero-programs-v4`, `hero-about-v4-female`, `hero-enquire-v4`).
 - Locations, weather and announcement bar still fail closed / API-gated. Enquiry remains an enquiry; sending sets `aria-busy` and `.is-sending`. Flags stay as the Country acknowledgement.
-- Asset query `5.13.0-ui28`. PWA CORE/RUNTIME/PUBLIC_DATA caches generation 30.
+- Asset query `5.13.0-ui29`. PWA CORE/RUNTIME/PUBLIC_DATA caches generation 31.
 - Static server: `python3 -m http.server 3000 --bind 0.0.0.0` (tmux `hv-swim-static-3000`). Chrome on `DISPLAY=:1` at `http://127.0.0.1:3000/index.html`.
 - After shots: `/cursor/stores/bc-b1f5564c-7e5b-4036-bcec-0b643b33099a/media/vibrant-upgrade/`
 

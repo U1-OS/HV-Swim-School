@@ -497,8 +497,12 @@ body:not([data-platform-page])[data-page="home"] .hero h1 span:last-child {
   position: absolute;
   top: 16px;
   right: 16px;
+  left: auto;
+  bottom: auto;
   z-index: 1;
-  display: block;
+  display: inline-flex;
+  width: max-content;
+  height: auto;
   margin: 0;
   padding: 6px 10px;
   color: var(--navy);
@@ -586,7 +590,8 @@ body[data-page="home"] .program-card:nth-child(n) {
   min-height: 420px;
   padding: 22px 22px 24px;
   color: var(--white);
-  background: var(--navy);
+  background-color: var(--navy);
+  background-image: none;
   border: 0;
   border-radius: 22px;
   box-shadow: var(--shadow-sm);
@@ -609,10 +614,10 @@ body[data-page="home"] .program-card:focus-visible {
   content: "";
   position: absolute;
   inset: 0;
-  z-index: -1;
   pointer-events: none;
 }
 .program-card::before {
+  z-index: 0;
   background: var(--navy) center / cover no-repeat;
   transform: scale(1.05);
   transition: transform .7s cubic-bezier(.2,.75,.2,1);
@@ -620,8 +625,10 @@ body[data-page="home"] .program-card:focus-visible {
 .program-card:hover::before,
 .program-card:focus-visible::before { transform: scale(1.12); }
 .program-card::after {
+  z-index: 1;
   background: linear-gradient(180deg, rgba(6, 26, 59, 0.08) 12%, rgba(6, 26, 59, 0.82) 78%);
 }
+.program-card > * { position: relative; z-index: 2; }
 .program-card[data-program="infant"]::before {
   background-image: image-set(url("hero-swimmer.webp") type("image/webp"), url("hero-swimmer.jpg") type("image/jpeg"));
   background-position: 62% center;
@@ -1358,12 +1365,39 @@ body:not([data-platform-page])[data-page="home"] .hero.immersive-hero {
 }
 body:not([data-platform-page])[data-page="home"] .hero::before,
 body:not([data-platform-page])[data-page="home"] .hero::after { display: none; }
-body:not([data-platform-page])[data-page="home"] .program-card {
-  min-height: 420px;
-  padding: 22px 22px 24px;
-  color: var(--white);
-  background: var(--navy);
-  border: 0;
+body:not([data-platform-page])[data-page="home"] .program-card[data-program="infant"]::before,
+body:not([data-platform-page])[data-page="home"] .program-card[data-program="learn"]::before,
+body:not([data-platform-page])[data-page="home"] .program-card[data-program="stroke"]::before,
+body:not([data-platform-page])[data-page="home"] .program-card[data-program="private"]::before {
+  display: block;
+  inset: 0;
+  width: auto;
+  height: auto;
+  border-radius: 0;
+  background-size: cover;
+  background-repeat: no-repeat;
+}
+body:not([data-platform-page])[data-page="home"] .program-card::after {
+  display: block;
+  inset: 0;
+  width: auto;
+  height: auto;
+}
+body:not([data-platform-page])[data-page="home"] .program-card[data-program="infant"]::before {
+  background-image: image-set(url("hero-swimmer.webp") type("image/webp"), url("hero-swimmer.jpg") type("image/jpeg"));
+  background-position: 62% center;
+}
+body:not([data-platform-page])[data-page="home"] .program-card[data-program="learn"]::before {
+  background-image: image-set(url("hero-programs-v4.webp") type("image/webp"), url("hero-programs-v4.jpg") type("image/jpeg"));
+  background-position: 48% center;
+}
+body:not([data-platform-page])[data-page="home"] .program-card[data-program="stroke"]::before {
+  background-image: image-set(url("hero-about-v4-female.webp") type("image/webp"), url("hero-about-v4-female.jpg") type("image/jpeg"));
+  background-position: 58% center;
+}
+body:not([data-platform-page])[data-page="home"] .program-card[data-program="private"]::before {
+  background-image: image-set(url("hero-enquire-v4.webp") type("image/webp"), url("hero-enquire-v4.jpg") type("image/jpeg"));
+  background-position: 50% 30%;
 }
 
 body:not([data-platform-page]) .page-hero,
@@ -1627,3 +1661,16 @@ body:not([data-platform-page]) .about-hero-image { border-radius: 0 0 0 28px; ov
   }
   body:not([data-platform-page]) .hv-support-launcher-copy { display: none; }
 }
+
+body:not([data-platform-page]) .studio-photo-credit,
+body:not([data-platform-page]) .sunlit-photo-credit {
+  left: auto;
+  bottom: auto;
+  width: max-content;
+  height: auto;
+}
+body:not([data-platform-page]) .feature-item .icon-box {
+  color: var(--navy);
+  background: linear-gradient(160deg, var(--gold), #ffe07a);
+}
+body:not([data-platform-page]) .aquatic-canvas { opacity: 0.04; }
