@@ -2,31 +2,32 @@
 
 Andrew swaps between Claude and Codex. Read this first and rewrite it last.
 
-**Wheel:** Cursor Cloud Agent (Studio rebuild)
-**Last updated:** 2026-09-17 — draft PR #19; CI flake fix on lesson-register test (Melbourne date)
+**Wheel:** Codex
+**Last updated:** 2026-09-17 — Andrew stopped Cursor visual work and handed back to Codex
 
-## Current work — clean studio public rebuild
+## Stop — Andrew returned this to Codex
 
-Andrew rejected merged PR #18 Night Water (“it looks shit”). Branch `cursor/clean-bold-rebuild-cadf` from latest `origin/main` (`9f4dcc2`). **backend/ was not touched.** A former instructor stays off the site.
+Andrew said he does not like the public-site work built in this Cursor Project and will continue in Codex. Do not start another visual pass from Cursor. Do not merge PR #20.
 
-- New `assets/public.css` loaded last on public pages only. Light editorial system: cream paper `#F4EFE4`, HV navy type `#061A3B`, gold CTAs `#FFC928`, cyan as a hairline/link accent. Not a dark overlay on the old layout.
-- Deleted `assets/dark-public.css`. Removed the Night Water aurora injection; `experience.js` now sets `data-theme="studio"` and strips leftover `.site-aurora` nodes.
-- Homepage photograph is a real image with caption below — no navy gradient over the photo. About hero uses the campaign crop beside the copy.
-- Enquiry wizard: gold progress rail, step fade, selected choice cards, `data-current-step` on the form. Continue still validates before advancing.
-- Offline page rebuilt on the same light system. Login/portals do not load `public.css` and stay usable.
-- Asset query `5.13.0-ui24`. PWA CORE/RUNTIME/PUBLIC_DATA caches generation 26; `public.css` is in CORE_SHELL.
-- Copy and business details unchanged (HVS BENDIGO PTY LTD, Wood Street, Laura-led teaching, $22.50). No staff names reintroduced.
-- Static server: `python3 -m http.server 3000 --bind 0.0.0.0` (tmux `hv-swim-static-3000`). Chrome on `DISPLAY=:1` stays on `http://127.0.0.1:3000/index.html`.
-- After shots: `/cursor/stores/bc-b1f5564c-7e5b-4036-bcec-0b643b33099a/media/clean-rebuild/` (desktop + mobile for public pages, enquire step 2, programs/shop mid-scroll, login).
-- CI run 35105771925 failed `test_lesson_register_enforces_assignment_parent_and_photo_rules`: not the CSS branch — `next_occurrence` can equal Melbourne `business_today()` while POST only rejects dates *after* today. Test now posts a weekday strictly in the future; parent/photo assertions unchanged.
+Working copy remains `~/Developer/HV-Swim-School`. Remote is public `https://github.com/U1-OS/HV-Swim-School`. Pull `main` before you write anything.
 
-### Next up
+### What is on `main` now
 
-Andrew review of draft PR https://github.com/U1-OS/HV-Swim-School/pull/19. Shop remains “in preparation” until samples/Shopify. When a production domain is bought, run `node scripts/build-sitemap.mjs https://<domain>`. Do not restore removed staff names. Do not enable live integrations without approval.
+- Security / deploy / Postgres-port work from this Project is already merged (PRs #1–#4 and follow-ups). Keep it. Do not revert backend hardening.
+- Public look on `main` is the light studio skin from merged PR #19 (`assets/public.css`, `data-theme="studio"`). Night Water (`assets/dark-public.css`) was merged in PR #18 then rejected (“it looks shit”) and replaced by #19. Do not resurrect the dark skin.
+- Copy, photos, prices, staff names: unchanged on purpose. A former instructor stays off the site.
+
+### What is not merged
+
+- PR #20 (`cursor/studio-motion-946d`, latest `be4c145`) — extra animation on top of the studio skin (curtain, living water, ken-burns, magnetic buttons). Andrew still called it boring, then stopped the visual thread. **Do not merge.** Close or ignore it unless Andrew explicitly wants that branch.
+
+### Next up (Codex)
+
+Andrew owns the public look again. Decide whether to keep PR #19’s studio CSS on `main` or restore an earlier public presentation — he did not ask Cursor to revert. Shop stays “in preparation” until samples/Shopify. No live integrations, domain, or hosting without his approval. Run `node scripts/check-site.mjs` before commits.
 
 ## Previous work — Night Water public rebuild (PR #18)
 
-Merged to main, then rejected on look. Dark overlay (`assets/dark-public.css`, aurora, caches generation 25) is what this studio pass replaces. Do not resurrect that skin.
+Merged to main, then rejected on look. Dark overlay (`assets/dark-public.css`, aurora, caches generation 25) was replaced on main by PR #19. Do not resurrect that skin.
 
 ## Previous work — public-site upgrade (PR #17)
 
