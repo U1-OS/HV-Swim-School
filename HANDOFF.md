@@ -2,27 +2,44 @@
 
 Andrew swaps between Claude and Codex. Read this first and rewrite it last.
 
-**Wheel:** Cursor Cloud Agent (Studio rebuild)
-**Last updated:** 2026-09-17 — draft PR #19; CI flake fix on lesson-register test (Melbourne date)
+**Wheel:** Cursor Cloud Agent (Motion-hard pass)
+**Last updated:** 2026-09-17 — Andrew still called the last pass boring; this pass makes motion unmissable on PR #20
 
-## Current work — clean studio public rebuild
+## Current work — motion-hard pass on PR #20
 
-Andrew rejected merged PR #18 Night Water (“it looks shit”). Branch `cursor/clean-bold-rebuild-cadf` from latest `origin/main` (`9f4dcc2`). **backend/ was not touched.** A former instructor stays off the site.
+Stay on `cursor/studio-motion-946d` ([#20](https://github.com/U1-OS/HV-Swim-School/pull/20)). Do not rebuild, invent data, or merge. **backend/ was not touched.** Night Water stays gone.
 
-- New `assets/public.css` loaded last on public pages only. Light editorial system: cream paper `#F4EFE4`, HV navy type `#061A3B`, gold CTAs `#FFC928`, cyan as a hairline/link accent. Not a dark overlay on the old layout.
-- Deleted `assets/dark-public.css`. Removed the Night Water aurora injection; `experience.js` now sets `data-theme="studio"` and strips leftover `.site-aurora` nodes.
-- Homepage photograph is a real image with caption below — no navy gradient over the photo. About hero uses the campaign crop beside the copy.
-- Enquiry wizard: gold progress rail, step fade, selected choice cards, `data-current-step` on the form. Continue still validates before advancing.
-- Offline page rebuilt on the same light system. Login/portals do not load `public.css` and stay usable.
-- Asset query `5.13.0-ui24`. PWA CORE/RUNTIME/PUBLIC_DATA caches generation 26; `public.css` is in CORE_SHELL.
-- Copy and business details unchanged (HVS BENDIGO PTY LTD, Wood Street, Laura-led teaching, $22.50). No staff names reintroduced.
-- Static server: `python3 -m http.server 3000 --bind 0.0.0.0` (tmux `hv-swim-static-3000`). Chrome on `DISPLAY=:1` stays on `http://127.0.0.1:3000/index.html`.
-- After shots: `/cursor/stores/bc-b1f5564c-7e5b-4036-bcec-0b643b33099a/media/clean-rebuild/` (desktop + mobile for public pages, enquire step 2, programs/shop mid-scroll, login).
-- CI run 35105771925 failed `test_lesson_register_enforces_assignment_parent_and_photo_rules`: not the CSS branch — `next_occurrence` can equal Melbourne `business_today()` while POST only rejects dates *after* today. Test now posts a weekday strictly in the future; parent/photo assertions unchanged.
+This pass is the response to “still very boring / I said animated”:
+
+- **Living water:** faster tide/glow/sheen, sweeping caustics, denser ripples, larger orbs, floating HV mark, wave band. Pointer moves the water layer (`--px/--py`). Homepage WebGL mesh is lightened and actually visible (`soft-light`, opacity 0.32).
+- **Cinematic load:** full-bleed curtain wipe (~1.15s), staggered headline clip-path (80px / 1.25–1.35s), photo frame wipe then **ken-burns** that keeps moving. A mid-load still must show the curtain/headline/photo still entering.
+- **Scroll:** 72px + rotateX(8deg) + scale, 140ms stagger. Clip-path photo reveals. Programs anchor bar is sticky.
+- **Interactive:** magnetic gold/outline buttons, stronger 3D card tilt (~10deg), CTA sheen + press scale(0.96). Enquiry steps slide 56px.
+- `prefers-reduced-motion` and Pause motion still win; loops pause when the tab is hidden.
+
+- Asset query `5.13.0-ui31`. PWA CORE/RUNTIME/PUBLIC_DATA caches generation 33.
+- Static server: `python3 -m http.server 3000 --bind 0.0.0.0` (tmux `hv-swim-static-3000`). Chrome on `DISPLAY=:1` at `http://127.0.0.1:3000/index.html`.
+- After shots + recording: `/cursor/stores/bc-b1f5564c-7e5b-4036-bcec-0b643b33099a/media/motion-hard/`
 
 ### Next up
 
-Andrew review of draft PR https://github.com/U1-OS/HV-Swim-School/pull/19. Shop remains “in preparation” until samples/Shopify. When a production domain is bought, run `node scripts/build-sitemap.mjs https://<domain>`. Do not restore removed staff names. Do not enable live integrations without approval.
+Andrew review of draft PR https://github.com/U1-OS/HV-Swim-School/pull/20. Shop remains “in preparation” until samples/Shopify. When a production domain is bought, run `node scripts/build-sitemap.mjs https://<domain>`. Do not restore removed staff names. Do not enable live integrations without approval. Do not resurrect Night Water.
+
+## Previous work — animated public pass on PR #20
+
+Headline wipe + 56px rise, 8s water, 48px scroll. Andrew still rejected it as too subtle.
+
+## Previous work — vibrant public upgrade on studio motion
+
+Light-blue paper (`#eef7fb`), gold CTAs, campaign photos on program cards. Andrew rejected the motion bar as too quiet.
+
+## Previous work — studio motion on the light public site
+
+Draft PR #20 motion pass on the cream studio system: scroll reveals, hero rise + gold underline, compact header, enquiry step motion. `prefers-reduced-motion` and Pause motion still win.
+
+## Previous work — clean studio public rebuild (PR #19)
+
+Merged to main (`5c4ff03`). Light editorial public system in `assets/public.css` (cream `#F4EFE4`, navy `#061A3B`, gold CTAs `#FFC928`). Night Water `dark-public.css` removed. Homepage photo is un-overlaid. Enquiry gold rail + `data-current-step`. Lesson-register test uses a weekday strictly after Melbourne `business_today()`.
 
 ## Previous work — Night Water public rebuild (PR #18)
 

@@ -121,9 +121,20 @@
     elements.error.textContent='';return true;
   }
   function showStep(step,scroll=true){
-    currentStep=Math.max(1,Math.min(4,step));
+    const next=Math.max(1,Math.min(4,step));
+    const reduced=document.documentElement.dataset.motion==='off'||window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    form.dataset.stepDir=next<currentStep?'back':'forward';
+    currentStep=next;
     form.dataset.currentStep=String(currentStep);
-    document.querySelectorAll('.wizard-step').forEach(section=>{const active=Number(section.dataset.step)===currentStep;section.hidden=!active;section.classList.toggle('active',active);});
+    document.querySelectorAll('.wizard-step').forEach(section=>{
+      const active=Number(section.dataset.step)===currentStep;
+      section.hidden=!active;
+      section.classList.remove('active');
+      if(active){
+        if(!reduced) void section.offsetWidth;
+        section.classList.add('active');
+      }
+    });
     document.querySelectorAll('[data-progress]').forEach(item=>{const value=Number(item.dataset.progress);item.classList.toggle('active',value===currentStep);item.classList.toggle('complete',value<currentStep);if(value===currentStep)item.setAttribute('aria-current','step');else item.removeAttribute('aria-current');});
     elements.stepLabel.textContent=`Step ${currentStep} of 4`;
     elements.progressBar.style.width=`${currentStep*25}%`;
@@ -221,6 +232,7 @@
     payload.acknowledgement=!!form.querySelector('[name="acknowledgement"]')?.checked;
     delete payload.confidence;delete payload.class_choice;delete payload.preferred_day;
     elements.submit.disabled=true;elements.submit.textContent='Sending securely…';elements.error.textContent='';
+    form.setAttribute('aria-busy','true');form.classList.add('is-sending');
     try{
       const result=await request('/api/public/enquiries',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)},12000);
       form.hidden=true;document.querySelector('.enrolment-progress').hidden=true;
@@ -230,7 +242,7 @@
       clearDraft();
       success.scrollIntoView({behavior:scrollBehavior(),block:'center'});
       requestAnimationFrame(()=>success.querySelector('h2')?.focus({preventScroll:true}));
-    }catch(problem){elements.error.textContent=`${problem.message} Please try again or call 0413 462 112.`;elements.submit.disabled=false;elements.submit.innerHTML='Send secure enquiry <span aria-hidden="true">→</span>';}
+    }catch(problem){elements.error.textContent=`${problem.message} Please try again or call 0413 462 112.`;elements.submit.disabled=false;elements.submit.innerHTML='Send secure enquiry <span aria-hidden="true">→</span>';form.removeAttribute('aria-busy');form.classList.remove('is-sending');}
   });
 
   request('/api/classes',{headers:{Accept:'application/json'}}).then(payload=>{classes=payload.classes||[];renderClasses();}).catch(()=>{document.getElementById('wizard-class-grid').innerHTML='<label class="wizard-class-card flexible"><input type="radio" name="class_choice" value="Flexible—team recommendation"><span class="class-choice-check">✓</span><div><span class="class-match-label">Timetable unavailable</span><strong>Keep me flexible</strong><small>The team will check the current classes and recommend a suitable time when they reply.</small></div></label>';});

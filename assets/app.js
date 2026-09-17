@@ -182,8 +182,8 @@
   else mobileNav.addListener(handleNavBreakpoint);
   setMenu(false);
   document.querySelectorAll('[data-year]').forEach(el => el.textContent = String(new Date().getFullYear()));
-  document.querySelectorAll('.grid-2,.grid-3,.grid-4,.journey-grid,.availability-grid').forEach(grid => {
-    [...grid.children].forEach((item,index) => item.style.setProperty('--reveal-delay',`${Math.min(index * 70, 280)}ms`));
+  document.querySelectorAll('.grid-2,.grid-3,.grid-4,.journey-grid,.availability-grid,.start-steps').forEach(grid => {
+    [...grid.children].forEach((item,index) => item.style.setProperty('--reveal-delay',`${Math.min(index * 140, 560)}ms`));
   });
   const header = document.querySelector('.site-header');
   const updateHeader = () => header?.classList.toggle('scrolled', window.scrollY > 24);

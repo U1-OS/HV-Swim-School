@@ -25,11 +25,11 @@
   <link rel="apple-touch-icon" href="assets/app-icon-v3-180.png">
   <link rel="preload" as="image" href="assets/hero-programs-v4.webp" type="image/webp" fetchpriority="high">
   <link rel="preload" href="assets/fonts/manrope-latin-variable.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="assets/styles.css?v=5.13.0-ui24">
-  <link rel="stylesheet" href="assets/support.css?v=5.13.0-ui24">
-  <script defer src="assets/app.js?v=5.13.0-ui24"></script>
-  <script defer src="assets/support.js?v=5.13.0-ui24"></script>
-  <script defer src="assets/public-api.js?v=5.13.0-ui24"></script>
+  <link rel="stylesheet" href="assets/styles.css?v=5.13.0-ui31">
+  <link rel="stylesheet" href="assets/support.css?v=5.13.0-ui31">
+  <script defer src="assets/app.js?v=5.13.0-ui31"></script>
+  <script defer src="assets/support.js?v=5.13.0-ui31"></script>
+  <script defer src="assets/public-api.js?v=5.13.0-ui31"></script>
   <script type="application/ld+json">{
   "@context": "https://schema.org",
   "@type": ["SportsActivityLocation", "LocalBusiness"],
@@ -51,10 +51,10 @@
   "areaServed": {"@type": "City", "name": "Bendigo"},
   "sameAs": ["https://www.facebook.com/hvswimschoolbendigo"]
 }</script>
-  <link rel="stylesheet" href="assets/experience.css?v=5.13.0-ui24">
-  <link rel="stylesheet" href="assets/public.css?v=5.13.0-ui24">
-  <script defer src="assets/experience.js?v=5.13.0-ui24"></script>
-  <script defer src="assets/aquatic-scene.js?v=5.13.0-ui24"></script>
+  <link rel="stylesheet" href="assets/experience.css?v=5.13.0-ui31">
+  <link rel="stylesheet" href="assets/public.css?v=5.13.0-ui31">
+  <script defer src="assets/experience.js?v=5.13.0-ui31"></script>
+  <script defer src="assets/aquatic-scene.js?v=5.13.0-ui31"></script>
 </head>
 <body data-page="home">
   <a class="skip-link" href="#main-content">Skip to main content</a>
@@ -84,6 +84,23 @@
 
   <main id="main-content">
     <section class="hero immersive-hero studio-hero">
+      <div class="hero-curtain" aria-hidden="true"></div>
+      <div class="hero-water" aria-hidden="true">
+        <span class="hero-water-tide"></span>
+        <span class="hero-water-glow"></span>
+        <span class="hero-water-caustic"></span>
+        <span class="hero-water-sheen"></span>
+        <span class="hero-ripple hero-ripple-one"></span>
+        <span class="hero-ripple hero-ripple-two"></span>
+        <span class="hero-ripple hero-ripple-three"></span>
+        <span class="hero-float-orb hero-float-orb-one"></span>
+        <span class="hero-float-orb hero-float-orb-two"></span>
+        <span class="hero-float-orb hero-float-orb-three"></span>
+        <span class="hero-float-spark hero-float-spark-one"></span>
+        <span class="hero-float-spark hero-float-spark-two"></span>
+        <span class="hero-float-mark hero-float-mark-one">HV</span>
+        <span class="hero-wave-band"></span>
+      </div>
       <div class="hero-content immersive-layout studio-hero-grid">
         <div class="hero-copy reveal">
           <div class="eyebrow" data-site-field="hero_eyebrow">Bendigo's confidence-first swim school</div>
@@ -101,7 +118,7 @@
           </div>
           <a class="hero-photo-note" href="about.html"><picture><source type="image/webp" srcset="assets/hero-swimmer.webp"><img src="assets/hero-swimmer.jpg" width="80" height="80" alt="" decoding="async"></picture><span><strong>Little steps. Big confidence.</strong><small>Get to know our approach <span aria-hidden="true">↗</span></small></span></a>
         </div>
-        <figure class="studio-portrait sunlit-portrait">
+        <figure class="studio-portrait sunlit-portrait hero-photo-enter">
           <picture><source type="image/webp" srcset="assets/hero-programs-v4.webp"><img src="assets/hero-programs-v4.jpg" alt="Illustrative swimming campaign: an instructor supporting young swimmers in the water" width="1536" height="1024" fetchpriority="high" decoding="async"></picture>
           <figcaption><span class="studio-caption-label sunlit-caption-label">A little courage. A world of possibility.</span><strong>Small steps.<br>Wonderful progress.</strong><span>Confidence · Water safety · Belonging</span></figcaption>
           <span class="studio-photo-credit sunlit-photo-credit">Illustrative campaign image</span>
@@ -154,21 +171,21 @@
           <a class="btn btn-soft" href="programs.html">Explore programs &amp; pricing</a>
         </div>
         <div class="grid-4">
-          <a class="program-card reveal" href="programs.html#infant"><span class="program-num">01 / INFANT</span><div><h3>Infant aquatics</h3><p>Positive early water experiences with a parent or carer, building familiarity and safe foundations.</p><div class="meta"><span class="tag">From 4 months</span><span class="tag">Carer supported</span></div><span class="program-card-link">Program details &amp; pricing →</span></div></a>
-          <a class="program-card reveal" href="programs.html#learn"><span class="program-num">02 / LEARN</span><div><h3>Learn to swim</h3><p>Progressive lessons that develop confidence, breath control, body position and core swimming skills.</p><div class="meta"><span class="tag">Small groups</span><span class="tag">Skill based</span></div><span class="program-card-link">Program details &amp; pricing →</span></div></a>
-          <a class="program-card reveal" href="programs.html#stroke"><span class="program-num">03 / DEVELOP</span><div><h3>Stroke development</h3><p>Technique, endurance and stronger movement patterns for swimmers ready to go further.</p><div class="meta"><span class="tag">Technique</span><span class="tag">Endurance</span></div><span class="program-card-link">Program details &amp; pricing →</span></div></a>
-          <a class="program-card reveal" href="programs.html#private"><span class="program-num">04 / PRIVATE</span><div><h3>Private lessons</h3><p>One-on-one tuition shaped around a swimmer's goals, learning style and confidence.</p><div class="meta"><span class="tag">1:1 coaching</span><span class="tag">All abilities</span></div><span class="program-card-link">Program details &amp; pricing →</span></div></a>
+          <a class="program-card reveal" data-program="infant" href="programs.html#infant"><span class="program-num">01 / INFANT</span><div><h3>Infant aquatics</h3><p>Positive early water experiences with a parent or carer, building familiarity and safe foundations.</p><div class="meta"><span class="tag">From 4 months</span><span class="tag">Carer supported</span></div><span class="program-card-link">Program details &amp; pricing →</span></div></a>
+          <a class="program-card reveal" data-program="learn" href="programs.html#learn"><span class="program-num">02 / LEARN</span><div><h3>Learn to swim</h3><p>Progressive lessons that develop confidence, breath control, body position and core swimming skills.</p><div class="meta"><span class="tag">Small groups</span><span class="tag">Skill based</span></div><span class="program-card-link">Program details &amp; pricing →</span></div></a>
+          <a class="program-card reveal" data-program="stroke" href="programs.html#stroke"><span class="program-num">03 / DEVELOP</span><div><h3>Stroke development</h3><p>Technique, endurance and stronger movement patterns for swimmers ready to go further.</p><div class="meta"><span class="tag">Technique</span><span class="tag">Endurance</span></div><span class="program-card-link">Program details &amp; pricing →</span></div></a>
+          <a class="program-card reveal" data-program="private" href="programs.html#private"><span class="program-num">04 / PRIVATE</span><div><h3>Private lessons</h3><p>One-on-one tuition shaped around a swimmer's goals, learning style and confidence.</p><div class="meta"><span class="tag">1:1 coaching</span><span class="tag">All abilities</span></div><span class="program-card-link">Program details &amp; pricing →</span></div></a>
         </div>
       </div>
     </section>
 
     <section class="section start-section" aria-labelledby="start-title">
       <div class="container">
-        <div class="section-head"><div><div class="eyebrow">Your next chapter starts here</div><h2 id="start-title">A simple start.<br>A personal welcome.</h2></div><a class="text-link" href="programs.html#first-lesson">Your first lesson guide ↗</a></div>
+        <div class="section-head reveal"><div><div class="eyebrow">Your next chapter starts here</div><h2 id="start-title">A simple start.<br>A personal welcome.</h2></div><a class="text-link" href="programs.html#first-lesson">Your first lesson guide ↗</a></div>
         <div class="start-steps">
-          <article><span>01</span><h3>Tell us about your swimmer</h3><p>Share their experience, confidence and what you hope they’ll achieve.</p></article>
-          <article><span>02</span><h3>Find their starting point</h3><p>Our team helps you choose a suitable program, venue and class.</p></article>
-          <article><span>03</span><h3>Take the next step together</h3><p>We confirm the arrangements and help you prepare for their first lesson.</p></article>
+          <article class="reveal"><span>01</span><h3>Tell us about your swimmer</h3><p>Share their experience, confidence and what you hope they’ll achieve.</p></article>
+          <article class="reveal"><span>02</span><h3>Find their starting point</h3><p>Our team helps you choose a suitable program, venue and class.</p></article>
+          <article class="reveal"><span>03</span><h3>Take the next step together</h3><p>We confirm the arrangements and help you prepare for their first lesson.</p></article>
         </div>
       </div>
     </section>
