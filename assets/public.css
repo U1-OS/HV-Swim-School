@@ -450,7 +450,12 @@ body:not([data-platform-page])[data-page="home"] .hero h1 span:last-child {
 .photo-panel::after { background: linear-gradient(transparent 45%, rgba(6, 26, 59, 0.55)); }
 .photo-caption { color: var(--white); }
 .stat-row { gap: 22px; margin-top: 36px; }
-.stat strong { font-size: 2.2rem; letter-spacing: -0.05em; }
+.stat strong,
+body:not([data-platform-page]) .stat strong {
+  color: var(--navy);
+  font-size: 2.2rem;
+  letter-spacing: -0.05em;
+}
 
 /* Program cards */
 .program-card,
