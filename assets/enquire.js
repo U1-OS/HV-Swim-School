@@ -122,6 +122,7 @@
   }
   function showStep(step,scroll=true){
     currentStep=Math.max(1,Math.min(4,step));
+    form.dataset.currentStep=String(currentStep);
     document.querySelectorAll('.wizard-step').forEach(section=>{const active=Number(section.dataset.step)===currentStep;section.hidden=!active;section.classList.toggle('active',active);});
     document.querySelectorAll('[data-progress]').forEach(item=>{const value=Number(item.dataset.progress);item.classList.toggle('active',value===currentStep);item.classList.toggle('complete',value<currentStep);if(value===currentStep)item.setAttribute('aria-current','step');else item.removeAttribute('aria-current');});
     elements.stepLabel.textContent=`Step ${currentStep} of 4`;
