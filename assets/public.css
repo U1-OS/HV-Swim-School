@@ -242,7 +242,12 @@ h3 { letter-spacing: -0.03em; }
   letter-spacing: -0.07em;
   text-shadow: none;
 }
-.immersive-hero h1 .hero-heading-main { color: var(--navy); }
+.immersive-hero h1 .hero-heading-main,
+body[data-page="home"] .hero h1 .hero-heading-main {
+  color: var(--navy);
+  background: none;
+  -webkit-text-fill-color: currentColor;
+}
 .immersive-hero h1 span,
 .studio-hero h1 span {
   color: var(--navy);
@@ -256,8 +261,24 @@ h3 { letter-spacing: -0.03em; }
   background-position: 0 92%;
 }
 .studio-hero .hero-copy.visible h1 span,
-.immersive-hero .hero-copy.visible h1 span {
+.immersive-hero .hero-copy.visible h1 span,
+body[data-page="home"] .hero-copy.visible h1 span:last-child {
   animation: studio-mark 0.9s cubic-bezier(.2,.75,.2,1) 0.22s forwards;
+}
+body[data-page="home"] .hero h1 span:last-child,
+body:not([data-platform-page])[data-page="home"] .hero h1 span:last-child {
+  position: static;
+  width: auto;
+  max-width: none;
+  color: var(--navy);
+  background: none;
+  background-image: linear-gradient(var(--gold), var(--gold));
+  background-repeat: no-repeat;
+  background-size: 0 0.18em;
+  background-position: 0 92%;
+  -webkit-background-clip: border-box;
+  background-clip: border-box;
+  -webkit-text-fill-color: currentColor;
 }
 .studio-hero .hero-copy.reveal { transform: none; }
 .studio-hero .hero-copy.visible > * {

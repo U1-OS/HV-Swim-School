@@ -1,13 +1,13 @@
-const CORE_CACHE = 'hv-swim-v5130-core-27';
-const RUNTIME_CACHE = 'hv-swim-v5130-runtime-27';
-const PUBLIC_DATA_CACHE = 'hv-swim-v5130-public-data-27';
+const CORE_CACHE = 'hv-swim-v5130-core-28';
+const RUNTIME_CACHE = 'hv-swim-v5130-runtime-28';
+const PUBLIC_DATA_CACHE = 'hv-swim-v5130-public-data-28';
 const PRIVATE_NAV = /\/(?:login|platform|admin|staff|customer|START_HERE)\.html$/i;
 const CORE_SHELL = [
-  './assets/experience.css?v=5.13.0-ui25', './assets/experience.js?v=5.13.0-ui25',
-  './assets/public.css?v=5.13.0-ui25',
+  './assets/experience.css?v=5.13.0-ui26', './assets/experience.js?v=5.13.0-ui26',
+  './assets/public.css?v=5.13.0-ui26',
   './offline.html', './manifest.webmanifest',
-  './assets/styles.css?v=5.13.0-ui25', './assets/app.js?v=5.13.0-ui25',
-  './assets/support.css?v=5.13.0-ui25', './assets/support.js?v=5.13.0-ui25',
+  './assets/styles.css?v=5.13.0-ui26', './assets/app.js?v=5.13.0-ui26',
+  './assets/support.css?v=5.13.0-ui26', './assets/support.js?v=5.13.0-ui26',
   './assets/icons.svg', './assets/hv-swim-logo-v3.png',
   './assets/fonts/manrope-latin-variable.woff2',
   './assets/app-icon-v3-64.png', './assets/app-icon-v3-192.png',
